@@ -360,8 +360,8 @@
       ],
       "albumInteraction": {
         "type": "starlight",
-        "name": "Brilho de estrela",
-        "description": "Ganha um brilho suave, sem piscar rapidamente.",
+        "name": "Constelação viva",
+        "description": "Flutua enquanto estrelas douradas e azuladas brilham ao redor.",
         "periodMs": 4000,
         "activeFraction": 0.47,
         "phaseOffset": 0.0507
