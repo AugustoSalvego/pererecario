@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 2,
+  "atlas": "assets/frogs_atlas.png",
+  "atlasSize": [
+    1619,
+    971
+  ],
+  "tiers": {
+    "common": {
+      "label": "Comum",
+      "weight": 60,
+      "periodMs": 3800,
+      "amplitude": 0.08,
+      "sizeCm": [
+        2,
+        5
+      ]
+    },
+    "uncommon": {
+      "label": "Incomum",
+      "weight": 28,
+      "periodMs": 3200,
+      "amplitude": 0.15,
+      "sizeCm": [
+        2.5,
+        6
+      ]
+    },
+    "rare": {
+      "label": "Rara",
+      "weight": 10,
+      "periodMs": 2800,
+      "amplitude": 0.22,
+      "sizeCm": [
+        3,
+        7
+      ]
+    },
+    "special": {
+      "label": "Especial",
+      "weight": 2,
+      "periodMs": 2800,
+      "amplitude": 0.22,
+      "sizeCm": [
+        3,
+        7
+      ]
+    }
+  },
+  "species": [
+    {
+      "id": "frog_leaf",
+      "name": "Folhinha",
+      "index": 1,
+      "tier": "common",
+      "description": "Pequena exploradora que adora descansar entre as folhas.",
+      "rect": [
+        24,
+        29,
+        266,
+        278
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2,
+        5
+      ],
+      "albumInteraction": {
+        "type": "color_shift",
+        "name": "Troca de verde",
+        "description": "Muda suavemente do verde-folha para um tom mais azulado.",
+        "periodMs": 8200,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.137
+      }
+    },
+    {
+      "id": "frog_pitanga",
+      "name": "Pitanga",
+      "index": 2,
+      "tier": "common",
+      "description": "Suas pintinhas lembram frutinhas maduras.",
+      "rect": [
+        347,
+        52,
+        282,
+        249
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2,
+        5
+      ],
+      "albumInteraction": {
+        "type": "cheeks",
+        "name": "Bochechas cheias",
+        "description": "Enche as bochechas e solta o ar devagar.",
+        "periodMs": 6800,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.274
+      }
+    },
+    {
+      "id": "frog_drop",
+      "name": "Gotinha",
+      "index": 3,
+      "tier": "common",
+      "description": "Uma bolinha azul sempre pronta para um pulinho.",
+      "rect": [
+        678,
+        107,
+        233,
+        194
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2,
+        5
+      ],
+      "albumInteraction": {
+        "type": "double_hop",
+        "name": "Dois pulinhos",
+        "description": "Dá dois pulinhos pequenos, um depois do outro.",
+        "periodMs": 7100,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.41100000000000003
+      }
+    },
+    {
+      "id": "frog_moss",
+      "name": "Musgo",
+      "index": 4,
+      "tier": "common",
+      "description": "Prefere observar o movimento com muita calma.",
+      "rect": [
+        954,
+        109,
+        336,
+        193
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2,
+        5
+      ],
+      "albumInteraction": {
+        "type": "throat",
+        "name": "Coaxar preguiçoso",
+        "description": "Infla a garganta uma vez e volta a descansar.",
+        "periodMs": 9400,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.548
+      }
+    },
+    {
+      "id": "frog_honey",
+      "name": "Mel",
+      "index": 5,
+      "tier": "uncommon",
+      "description": "Seu tom dourado ilumina qualquer coleção.",
+      "rect": [
+        1337,
+        26,
+        261,
+        280
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2.5,
+        6
+      ],
+      "albumInteraction": {
+        "type": "warm_glow",
+        "name": "Banho de sol",
+        "description": "Fica um pouquinho mais dourada por alguns instantes.",
+        "periodMs": 8700,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.685
+      }
+    },
+    {
+      "id": "frog_jabuticaba",
+      "name": "Jabuticaba",
+      "index": 6,
+      "tier": "rare",
+      "description": "Redondinha, discreta e cheia de pequenas pintas.",
+      "rect": [
+        25,
+        394,
+        277,
+        220
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        3,
+        7
+      ],
+      "albumInteraction": {
+        "type": "puff",
+        "name": "Bolinha de jabuticaba",
+        "description": "Estufa o corpo e volta ao formato normal.",
+        "periodMs": 7600,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.8220000000000001
+      }
+    },
+    {
+      "id": "frog_clay",
+      "name": "Barro",
+      "index": 7,
+      "tier": "common",
+      "description": "Tem as cores da terra depois da chuva.",
+      "rect": [
+        344,
+        359,
+        257,
+        255
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2,
+        5
+      ],
+      "albumInteraction": {
+        "type": "crouch_hop",
+        "name": "Salto preparado",
+        "description": "Se abaixa antes de dar um salto curto.",
+        "periodMs": 7900,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.9590000000000001
+      }
+    },
+    {
+      "id": "frog_cloud",
+      "name": "Nuvem",
+      "index": 8,
+      "tier": "uncommon",
+      "description": "Clara e fofinha, com pezinhos cor de céu.",
+      "rect": [
+        650,
+        393,
+        290,
+        211
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2.5,
+        6
+      ],
+      "albumInteraction": {
+        "type": "breath",
+        "name": "Respiração tranquila",
+        "description": "Respira fundo, enchendo e esvaziando o corpo.",
+        "periodMs": 10200,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.09600000000000009
+      }
+    },
+    {
+      "id": "frog_lagoon",
+      "name": "Lagoa",
+      "index": 9,
+      "tier": "uncommon",
+      "description": "Suas manchas lembram reflexos na água.",
+      "rect": [
+        983,
+        383,
+        312,
+        228
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2.5,
+        6
+      ],
+      "albumInteraction": {
+        "type": "look_around",
+        "name": "Curiosa",
+        "description": "Inclina o corpo suavemente para os dois lados.",
+        "periodMs": 8300,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.2330000000000001
+      }
+    },
+    {
+      "id": "frog_guava",
+      "name": "Goiabinha",
+      "index": 10,
+      "tier": "uncommon",
+      "description": "Pequena, rosada e curiosa.",
+      "rect": [
+        1343,
+        410,
+        244,
+        201
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2.5,
+        6
+      ],
+      "albumInteraction": {
+        "type": "shy",
+        "name": "Tímida",
+        "description": "Se encolhe um pouco e depois se solta.",
+        "periodMs": 7300,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.3700000000000001
+      }
+    },
+    {
+      "id": "frog_star",
+      "name": "Estrelinha",
+      "index": 11,
+      "tier": "special",
+      "description": "Carrega um pedacinho do céu em suas pintas.",
+      "rect": [
+        15,
+        722,
+        258,
+        207
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        3,
+        7
+      ],
+      "albumInteraction": {
+        "type": "starlight",
+        "name": "Brilho de estrela",
+        "description": "Ganha um brilho suave, sem piscar rapidamente.",
+        "periodMs": 11200,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.5070000000000001
+      }
+    },
+    {
+      "id": "frog_sprout",
+      "name": "Broto",
+      "index": 12,
+      "tier": "common",
+      "description": "Estica o pescoço para descobrir novos caminhos.",
+      "rect": [
+        307,
+        660,
+        267,
+        271
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2,
+        5
+      ],
+      "albumInteraction": {
+        "type": "stretch",
+        "name": "Espreguiçada",
+        "description": "Se estica, como quem acabou de acordar.",
+        "periodMs": 8900,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.6440000000000001
+      }
+    },
+    {
+      "id": "frog_ember",
+      "name": "Brasa",
+      "index": 13,
+      "tier": "rare",
+      "description": "Tem cores quentes e um salto cheio de energia.",
+      "rect": [
+        621,
+        720,
+        324,
+        212
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        3,
+        7
+      ],
+      "albumInteraction": {
+        "type": "double_croak",
+        "name": "Coaxar animado",
+        "description": "Infla a garganta duas vezes seguidas.",
+        "periodMs": 8100,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.7810000000000001
+      }
+    },
+    {
+      "id": "frog_lavender",
+      "name": "Lavanda",
+      "index": 14,
+      "tier": "rare",
+      "description": "Delicada, de pernas compridas e tons suaves.",
+      "rect": [
+        989,
+        674,
+        280,
+        256
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        3,
+        7
+      ],
+      "albumInteraction": {
+        "type": "sway",
+        "name": "Balanço delicado",
+        "description": "Balança o corpo devagar, com os pés no lugar.",
+        "periodMs": 9700,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.9180000000000001
+      }
+    },
+    {
+      "id": "frog_jade",
+      "name": "Jade",
+      "index": 15,
+      "tier": "uncommon",
+      "description": "Uma joia verde com pintinhas turquesa.",
+      "rect": [
+        1313,
+        706,
+        291,
+        218
+      ],
+      "anchor": [
+        0.5,
+        1.0
+      ],
+      "sizeCm": [
+        2.5,
+        6
+      ],
+      "albumInteraction": {
+        "type": "jade_shift",
+        "name": "Reflexo de lagoa",
+        "description": "Alterna suavemente entre verde e turquesa.",
+        "periodMs": 10600,
+        "activeFraction": 0.28,
+        "phaseOffset": 0.05500000000000016
+      }
+    }
+  ],
+  "rules": {
+    "captureRadiusMeters": 35,
+    "maxLocationAccuracyMeters": 40,
+    "newSpeciesAfterDuplicateCount": 4,
+    "rareOrSpecialAfterCount": 9,
+    "specialAfterCount": 19,
+    "unlimitedPhotoRetries": true,
+    "escapeEnabled": false,
+    "captureAssistAfterMisses": 2,
+    "notes": "Balance inicial para teste. Garantias propostas, não implementadas na prévia. Prioridade: especial, descoberta nova, rara. Garantias adiadas permanecem pendentes."
+  }
+}

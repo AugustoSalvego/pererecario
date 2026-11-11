@@ -1,0 +1,21 @@
+name: pererecario
+description: Offline-first frog collection game (visual prototype).
+publish_to: none
+version: 0.2.0+2
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/frogs_atlas.png
+    - assets/species.json
