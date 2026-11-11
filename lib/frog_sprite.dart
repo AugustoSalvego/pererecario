@@ -141,7 +141,10 @@ class _FrogPainter extends CustomPainter {
           break;
         case 'breath': sx += pulse * .035; sy += pulse * .05; break;
         case 'warm_glow': hue = -pulse * 9; light += pulse * .08; break;
-        case 'starlight': light += pulse * .17; break;
+        case 'starlight':
+          light += pulse * .42;
+          lift = -pulse * height * .035;
+          break;
         case 'look_around': rotation = active ? math.sin(u * math.pi * 2) * .075 * pulse : 0; break;
         case 'shy': sy -= pulse * .09; sx -= pulse * .025; break;
         case 'stretch': sy += pulse * .10; sx -= pulse * .04; break;
@@ -160,9 +163,54 @@ class _FrogPainter extends CustomPainter {
     canvas.translate(size.width / 2 + dx, base + dy + lift);
     canvas.rotate(rotation);
     canvas.scale(sx, sy);
+    // Special album magic: an instant soft aura with independent star twinkles.
+    // Keep effects separate from the sprite to preserve the pixel-art outlines.
+    final special = moving && motion == FrogMotion.idle && sprite.trait == 'starlight';
+    final glow = .52 + pulse * .48;
+    if (special) {
+      final center = Offset(0, -height * .52);
+      final radius = math.max(width, height) * .78;
+      canvas.drawCircle(center, radius, Paint()
+        ..shader = ui.Gradient.radial(center, radius, [
+          Color.fromRGBO(255, 245, 174, .30 + glow * .30),
+          Color.fromRGBO(168, 217, 255, .13 + glow * .20),
+          const Color(0x00a8d9ff),
+        ], [0.0, .48, 1.0]));
+    }
     // Draw one intact atlas sprite. Stretching 2px rows distorted cheek/throat pixels.
     canvas.drawImageRect(sprite.atlas, sprite.source,
       Rect.fromLTWH(-width / 2, -height, width, height), paint);
+    if (special) {
+      final spots = <Offset>[
+        Offset(-width * .54, -height * .83),
+        Offset(width * .57, -height * .79),
+        Offset(-width * .61, -height * .40),
+        Offset(width * .62, -height * .32),
+        Offset(-width * .13, -height * 1.10),
+        Offset(width * .27, -height * 1.04),
+      ];
+      for (var i = 0; i < spots.length; i++) {
+        final shimmer = .56 + .44 * math.sin(angle + i * 1.7);
+        final r = math.max(2.2, math.min(width, height) * (.018 + .014 * shimmer))
+          * (i % 3 == 0 ? 1.25 : 1.0);
+        final o = spots[i];
+        final p = Path()
+          ..moveTo(o.dx, o.dy - r * 1.75)
+          ..lineTo(o.dx + r * .25, o.dy - r * .25)
+          ..lineTo(o.dx + r * 1.5, o.dy)
+          ..lineTo(o.dx + r * .25, o.dy + r * .25)
+          ..lineTo(o.dx, o.dy + r * 1.75)
+          ..lineTo(o.dx - r * .25, o.dy + r * .25)
+          ..lineTo(o.dx - r * 1.5, o.dy)
+          ..lineTo(o.dx - r * .25, o.dy - r * .25)
+          ..close();
+        final alpha = ((.38 + .62 * shimmer) * (.55 + .45 * glow))
+          .clamp(0.0, 1.0).toDouble();
+        canvas.drawPath(p, Paint()..color = i.isEven
+          ? Color.fromRGBO(255, 245, 179, alpha)
+          : Color.fromRGBO(216, 242, 255, alpha));
+      }
+    }
     canvas.restore();
   }
   @override
