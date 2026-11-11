@@ -2,7 +2,20 @@
 
 An offline-first mobile frog collection game with original pixel-art creatures. The **visual experience v0.4** includes 15 approved pixel-art species, their album personalities, a responsive collection UI, simulated camera flow, repeated specimens (Meu Brejo), and a field guide.
 
-> **Development status:** Visual prototype only. The HTML and Flutter demos simulate discovery, camera framing, and collecting specimens; they do **not** save progress persistently. Real camera/GPS integration, Google sign-in, local database, backend synchronization, and trades are not implemented yet.
+> **Development status:** The new `jogar.html` is a playable browser simulator with local progress saving and real encounter rarity logic. `preview_v04.html` and the Flutter app remain visual prototypes. Android camera/GPS, Google sign-in, backend synchronization and trading are not implemented yet.
+
+## Play the game simulator before the Android APK
+
+Open **`jogar.html`** in Chrome or Edge from this repository's folder. No Flutter or installation required.
+
+- Start with an empty album. Go to **Explorar → Procurar perereca → Fotografar**.
+- The first encounter is Folhinha; later encounters use rarity weights (60/28/10/2) and anti-frustration guarantees.
+- Capture with unlimited attempts; after two misses, the game assists you. One specimen is awarded per encounter.
+- Browse your discoveries in **Álbum** and repeated specimens in **Meu Brejo**.
+- Your progress and pending encounter are saved locally to browser storage when available. To start over, use **Guia → Reiniciar**.
+- This is a **simulator**, not a real phone camera or GPS application. Browser storage is not synced across devices.
+
+The separate `preview_v04.html` is retained unchanged as the approved visual reference.
 
 ## Included in this baseline
 
