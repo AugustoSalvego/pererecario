@@ -59,3 +59,13 @@ The established gameplay rules take precedence over any roadmap suggestion. In p
 
 **Danilo Augusto Salvego dos Santos**  
 GitHub: [AugustoSalvego](https://github.com/AugustoSalvego)
+
+## Atualização v0.3 — movimentos
+
+- Pitanga, Musgo e Brasa não utilizam mais distorção por faixas do atlas.
+- Peculiaridades iniciam logo após abrir a ficha e se repetem em ciclos curtos
+  (3,2–4,0 s), com pausa entre apresentações.
+- HTML e Flutter usam a mesma lógica de comportamento e a arte original.
+- O efeito de inchar é sutil enquanto não houver quadros específicos desenhados.
+
+Abra `preview.html` no navegador para experimentar sem Flutter.

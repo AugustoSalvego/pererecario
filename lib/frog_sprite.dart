@@ -11,7 +11,7 @@ class FrogSprite extends StatefulWidget {
     this.motion = FrogMotion.idle, this.silhouette = false,
     this.reducedMotion = false, this.amplitude = 0.08,
     this.period = const Duration(milliseconds: 3800), this.trait = '',
-    this.phaseOffset = 0, this.onTap});
+    this.phaseOffset = 0, this.immediateTrait = false, this.onTap});
   final ui.Image atlas;
   final Rect source;
   final FrogMotion motion;
@@ -20,6 +20,7 @@ class FrogSprite extends StatefulWidget {
   final Duration period;
   final String trait;
   final double phaseOffset;
+  final bool immediateTrait;
   final VoidCallback? onTap;
   @override
   State<FrogSprite> createState() => _FrogSpriteState();
@@ -28,18 +29,29 @@ class FrogSprite extends StatefulWidget {
 class _FrogSpriteState extends State<FrogSprite>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _controller;
+  bool _playingBurst = false;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(vsync: this, duration: widget.period);
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && _playingBurst && mounted) {
+        _playingBurst = false;
+        // Returning to idle lets the unique album trait repeat after a tap.
+        _controller.duration = widget.period;
+        _controller.repeat();
+      }
+    });
     _configure();
   }
   void _configure() {
     _controller.stop();
+    _playingBurst = false;
     _controller.value = 0;
     if (widget.reducedMotion || widget.silhouette) return;
     if (widget.motion == FrogMotion.hop || widget.motion == FrogMotion.captured) {
+      _playingBurst = true;
       _controller.duration = const Duration(milliseconds: 600);
       _controller.forward();
     } else {
@@ -53,7 +65,8 @@ class _FrogSpriteState extends State<FrogSprite>
     if (oldWidget.motion != widget.motion ||
         oldWidget.reducedMotion != widget.reducedMotion ||
         oldWidget.silhouette != widget.silhouette || oldWidget.trait != widget.trait ||
-        oldWidget.period != widget.period || oldWidget.source != widget.source) {
+        oldWidget.period != widget.period || oldWidget.source != widget.source ||
+        oldWidget.immediateTrait != widget.immediateTrait) {
       _configure();
     }
   }
@@ -66,23 +79,27 @@ class _FrogSpriteState extends State<FrogSprite>
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: widget.onTap,
-    child: AnimatedBuilder(animation: _controller, builder: (context, child) =>
-      CustomPaint(painter: _FrogPainter(widget, _controller.value),
-        child: const SizedBox.expand())),
+    child: AnimatedBuilder(animation: _controller, builder: (context, child) {
+      final motion = _playingBurst ? widget.motion
+        : (widget.motion == FrogMotion.hop || widget.motion == FrogMotion.captured)
+          ? FrogMotion.idle : widget.motion;
+      return CustomPaint(painter: _FrogPainter(widget, _controller.value, motion),
+        child: const SizedBox.expand());
+    }),
   );
 }
 
 class _FrogPainter extends CustomPainter {
-  _FrogPainter(this.sprite, this.phase);
+  _FrogPainter(this.sprite, this.phase, this.motion);
   final FrogSprite sprite;
   final double phase;
+  final FrogMotion motion;
   @override
   void paint(Canvas canvas, Size size) {
     final angle = phase * math.pi * 2;
     final moving = !sprite.reducedMotion && !sprite.silhouette;
-    final camera = sprite.motion == FrogMotion.camera;
-    final hopping = sprite.motion == FrogMotion.hop ||
-      sprite.motion == FrogMotion.captured;
+    final camera = motion == FrogMotion.camera;
+    final hopping = motion == FrogMotion.hop || motion == FrogMotion.captured;
     final dx = moving && camera ? math.sin(angle) * sprite.amplitude * size.width : 0.0;
     final dy = !moving ? 0.0 : hopping ? -math.sin(phase * math.pi) * size.height * .12
       : camera ? -math.max(0.0, math.sin(angle * 2)) * size.height * .05 : 0.0;
@@ -100,19 +117,20 @@ class _FrogPainter extends CustomPainter {
     if (sprite.silhouette) {
       paint.colorFilter = const ColorFilter.mode(Color(0xff5f6470), BlendMode.srcIn);
     }
-    final traitPhase = (phase + sprite.phaseOffset) % 1;
-    final u = traitPhase / .28;
-    final active = u < 1;
+    final traitPhase = (phase + (sprite.immediateTrait ? 0 : sprite.phaseOffset)) % 1;
+    // Start soon after opening: repeat after a short, visible rest.
+    final u = (traitPhase - .025) / .47;
+    final active = u > 0 && u < 1;
     final pulse = active ? math.pow(math.sin(u * math.pi), 2).toDouble() : 0.0;
     final twice = active ? math.pow(math.sin(u * math.pi * 2), 2).toDouble() : 0.0;
-    double sx = 1, sy = 1, lift = 0, rotation = 0, hue = 0, light = 1, puff = 0, zone = .5;
-    if (moving && sprite.motion == FrogMotion.idle) {
+    double sx = 1, sy = 1, lift = 0, rotation = 0, hue = 0, light = 1;
+    if (moving && motion == FrogMotion.idle) {
       switch (sprite.trait) {
         case 'color_shift': hue = pulse * 38; break;
         case 'jade_shift': hue = pulse * 32; break;
-        case 'cheeks': puff = pulse * .17; zone = .40; break;
-        case 'throat': puff = pulse * .20; zone = .58; break;
-        case 'double_croak': puff = twice * .18; zone = .56; break;
+        case 'cheeks': sx += pulse * .045; sy += pulse * .015; break;
+        case 'throat': sx += pulse * .02; sy += pulse * .03; break;
+        case 'double_croak': sx += twice * .035; sy += twice * .02; break;
         case 'puff': sx += pulse * .10; sy += pulse * .045; break;
         case 'double_hop': lift = -twice * height * .09; break;
         case 'crouch_hop':
@@ -142,19 +160,9 @@ class _FrogPainter extends CustomPainter {
     canvas.translate(size.width / 2 + dx, base + dy + lift);
     canvas.rotate(rotation);
     canvas.scale(sx, sy);
-    if (puff > 0) {
-      for (double row = 0; row < sprite.source.height; row += 2) {
-        final slice = math.min(2.0, sprite.source.height - row);
-        final expand = 1 + puff * math.exp(-math.pow((row / sprite.source.height - zone) / .115, 2));
-        canvas.drawImageRect(sprite.atlas,
-          Rect.fromLTWH(sprite.source.left, sprite.source.top + row, sprite.source.width, slice),
-          Rect.fromLTWH(-width * expand / 2, -height + row / sprite.source.height * height,
-            width * expand, slice / sprite.source.height * height), paint);
-      }
-    } else {
-      canvas.drawImageRect(sprite.atlas, sprite.source,
-        Rect.fromLTWH(-width / 2, -height, width, height), paint);
-    }
+    // Draw one intact atlas sprite. Stretching 2px rows distorted cheek/throat pixels.
+    canvas.drawImageRect(sprite.atlas, sprite.source,
+      Rect.fromLTWH(-width / 2, -height, width, height), paint);
     canvas.restore();
   }
   @override

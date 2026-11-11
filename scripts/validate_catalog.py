@@ -30,8 +30,8 @@ for frog in species:
     assert w > 0 and h > 0 and x + w <= width and y + h <= height, frog['id']
     trait = frog['albumInteraction']
     assert trait['type'] and trait['description']
-    assert trait['periodMs'] >= 6000, frog['id']
-    assert 0 < trait['activeFraction'] < 1
-    assert 0 <= trait['phaseOffset'] < 1
+    assert 3000 <= trait['periodMs'] <= 4200, frog['id']
+    assert 0.4 <= trait['activeFraction'] <= 0.55
+    assert 0 <= trait['phaseOffset'] <= 0.10, frog['id']
 assert len({item['albumInteraction']['type'] for item in species}) == 15
 print(f'Catalog OK: {len(species)} species, {width}x{height} atlas, tier counts {dict(counts)}')

@@ -56,7 +56,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               style: Theme.of(context).textTheme.headlineMedium),
             SizedBox(height: 260, child: FrogSprite(key: ValueKey(replay), atlas: atlas!,
               source: rect(frog), motion: motion, silhouette: silhouette,
-              trait: frog['albumInteraction']['type'] as String,
+              trait: frog['albumInteraction']['type'] as String, immediateTrait: true,
               phaseOffset: (frog['albumInteraction']['phaseOffset'] as num).toDouble(),
               period: Duration(milliseconds: frog['albumInteraction']['periodMs'] as int),
               reducedMotion: MediaQuery.of(context).disableAnimations,

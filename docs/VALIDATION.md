@@ -19,3 +19,14 @@ Suggested manual review: open preview.html; inspect all 15 sprites; test common 
 - Added Python atlas/catalog regression check and Flutter catalog test.
 - Added GitHub Actions checks (not yet executed remotely).
 - Android scaffolding and full Flutter validation still need Flutter SDK or GitHub Actions.
+
+## Validações da versão v0.3
+
+- `python scripts/validate_catalog.py` verifica as 15 espécies e os ciclos curtos.
+- `python scripts/validate_preview.py` verifica que o HTML mantém o JSON
+  sincronizado e não introduz distorção por faixas.
+- Sintaxe JS validada com Node.js `--check` e teste manual de navegador
+  Chromium (Pitanga, Musgo, Brasa, sem erros JS).
+- Os arquivos de pixel art existentes não foram modificados.
+- Flutter/Dart não estão disponíveis no ambiente de geração; compilação
+  Flutter deve ser confirmada pelo workflow CI após `git push`.

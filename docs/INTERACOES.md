@@ -45,3 +45,20 @@ Esta seção substitui a decisão anterior de grade estática: espécies descobe
 - **Jade**: Alterna suavemente entre verde e turquesa.
 
 Implementação usa a mesma pose aprovada com transformação, filtro de cor e deformação localizada por faixas para bochechas/garganta. Não há novas poses desenhadas. Na prévia HTML, atualização da grade limitada a 20 fps e cartões fora da área visível são ignorados. O código Flutter usa TickerMode e o ciclo do aplicativo para pausar as animações. A aparência das deformações precisa de validação visual no dispositivo.
+
+
+## Atualização v0.3 — arte intacta e primeira peculiaridade rápida
+
+A técnica de alargar pequenas faixas horizontais foi removida. Ela distorcia o
+contorno e os detalhes da Pitanga, do Musgo e da Brasa. Agora, o atlas original
+é sempre desenhado de uma só vez, preservando os pixels. Para essas três
+espécies, o inchar é sugerido por uma expansão **muito sutil da pose inteira**;
+não temos quadros artísticos específicos que permitam mover apenas bochechas
+ou garganta sem prejudicar a arte. Uma animação mais anatômica exigirá novos
+quadros desenhados e aprovados no mesmo estilo.
+
+O ciclo dura entre 3,2 e 4,0 s, com ativação visível logo após a ficha ser
+aberta (geralmente em cerca de 0,5 s) e descanso entre repetições. A ficha
+inicia um novo ciclo no momento em que é aberta; os cartões recebem offsets
+pequenos para evitar sincronização total, sem esperas longas. A câmera e o
+modo de movimento reduzido mantêm as respectivas regras anteriores.
