@@ -1,8 +1,8 @@
 # Pererecário 🐸
 
-An offline-first mobile frog collection game with original pixel-art creatures. This repository starts from the **Visual Kit v0.2**: 15 species, a sprite atlas, individual album personalities, and a Flutter catalog prototype.
+An offline-first mobile frog collection game with original pixel-art creatures. The **visual experience v0.4** includes 15 approved pixel-art species, their album personalities, a responsive collection UI, simulated camera flow, repeated specimens (Meu Brejo), and a field guide.
 
-> **Development status:** Visual prototype only. The HTML demo simulates discovery and capturing; it does **not** save progress persistently. Real camera/GPS integration, Google sign-in, local database, backend synchronization, and trades are not implemented yet.
+> **Development status:** Visual prototype only. The HTML and Flutter demos simulate discovery, camera framing, and collecting specimens; they do **not** save progress persistently. Real camera/GPS integration, Google sign-in, local database, backend synchronization, and trades are not implemented yet.
 
 ## Included in this baseline
 
@@ -15,9 +15,15 @@ An offline-first mobile frog collection game with original pixel-art creatures. 
 - `docs/ROADMAP.md` — proposed implementation order and persistence/sync architecture.
 - `scripts/validate_catalog.py` — basic catalog/atlas integrity validation.
 
-## Preview without Flutter
+## Visual experience preview (desktop or mobile)
 
-Open `preview.html` in a browser. It is a **non-persistent visual sandbox**; progress resets after refresh.
+Open `preview.html` (which redirects to `preview_v04.html`) in a modern browser directly from the repository folder. The visual demo uses:
+
+- `visual/app.css` — responsive design, rarity palettes, album cards, simulated camera and dialog styling.
+- `visual/app.js` — album, discovery/duplicate demo states, viewfinder, guide and animations.
+- `preview_v04.html` embeds species metadata and references the original atlas file locally. Run `python scripts/build_visual_preview.py` after editing `assets/species.json`.
+
+The demo deliberately keeps **all** state in memory; reload resets sample discoveries and duplicate inventory. It does not access your device camera, GPS, account, or network. For styling and feature boundaries see `docs/VISUAL_SPEC.md`.
 
 ## Run the Flutter demo (Android)
 
@@ -36,6 +42,7 @@ flutter run
 
 ```bash
 python3 scripts/validate_catalog.py
+python3 scripts/validate_visual.py
 flutter analyze
 flutter test
 ```
