@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#faf7ee">
+  <meta name="description" content="Pererecário — jogue no navegador antes de instalar o APK Android.">
+  <title>Pererecário · Simulador jogável</title>
+  <style>
+:root{--cream:#faf7ee;--paper:#fffdf6;--ink:#203e30;--muted:#748477;--forest:#27543d;--deep:#173a2e;--sage:#e6eddf;--line:#dce5d6;--yellow:#f3d990;--shadow:0 20px 50px rgba(28,63,43,.075);color-scheme:light}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--cream);color:var(--ink);font:15px/1.5 system-ui,'Segoe UI',sans-serif;overflow-x:hidden}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #e3ad56;outline-offset:3px}h1,h2,h3,p{margin-top:0}h1,h2,h3,.serif{font-family:Georgia,'Times New Roman',serif;line-height:1.13}h1{font-size:clamp(35px,4vw,54px);letter-spacing:-.04em}h2{font-size:clamp(27px,3.1vw,37px);letter-spacing:-.025em}h3{font-size:23px}small,.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800}.muted{color:var(--muted)}.shell{max-width:1500px;margin:auto;min-height:100vh;display:grid;grid-template-columns:247px minmax(0,1fr)}.sidebar{position:sticky;top:0;height:100vh;padding:34px 20px 23px;background:#f1f3e9;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:28px}.brand{display:flex;gap:12px;align-items:center;padding:3px 8px}.brand-icon{display:grid;place-items:center;width:49px;height:49px;background:#d7e4bf;border:2px solid #b1c49f;border-radius:16px;font-size:28px}.brand b{display:block;font-family:Georgia,'Times New Roman',serif;font-size:23px;letter-spacing:-.05em}.brand small{color:#78906b;letter-spacing:.21em;font-size:9px}.nav{display:grid;gap:8px}.nav button,.bottom-nav button{border:0;background:transparent;color:#68816e;display:flex;align-items:center;text-align:left;gap:14px;padding:13px 16px;border-radius:15px;font-weight:800;width:100%}.nav button svg,.bottom-nav button svg{width:20px;height:20px;flex-shrink:0}.nav button:hover{background:#e8ede0}.nav button.active{background:var(--forest);color:#fff;box-shadow:0 7px 13px #1d46351a}.sidebar-note{margin-top:auto;padding:17px;background:#e3ead6;border:1px solid #cfdec8;border-radius:18px;color:#526d54}.sidebar-note b{display:block;color:#32553e;font:700 18px Georgia,'Times New Roman',serif}.sidebar-note p{font-size:12px;margin:8px 0 0}.shell-main{min-width:0;padding:32px clamp(22px,3.7vw,57px) 90px}.topbar{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:29px}.breadcrumbs{font-size:12px;color:#80907f;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.top-actions{display:flex;align-items:center;gap:12px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #dce4d8;border-radius:999px;padding:8px 13px;background:#fffefa;color:#5d7461;font-size:12px;font-weight:800}.status-dot{height:7px;width:7px;background:#7ea36e;border-radius:50%}.avatar{display:grid;place-items:center;height:39px;width:39px;border-radius:50%;background:#d8e6cd;border:1px solid #c3d6b9;font-size:20px}.screen{display:none;animation:fadeUp .25s ease}.screen.active{display:block}@keyframes fadeUp{from{opacity:.6;transform:translateY(8px)}to{opacity:1;transform:none}}.welcome{background:#234c38;position:relative;isolation:isolate;overflow:hidden;color:#fffaf0;border-radius:28px;min-height:260px;padding:42px clamp(25px,4vw,56px);display:flex;justify-content:space-between;align-items:center;gap:20px}.welcome:before{content:'';position:absolute;right:-100px;top:-170px;width:530px;height:530px;border:100px solid #fff2;opacity:.3;border-radius:50%;z-index:-1}.welcome:after{content:'✧  ✧   ✦  ✧';position:absolute;right:7%;top:25px;font-size:24px;color:#ffe8aa77;letter-spacing:24px}.welcome .eyebrow{color:#d4e5ba}.welcome h1{max-width:520px;margin:12px 0 13px}.welcome p{color:#d2e5cc;max-width:520px;margin-bottom:22px}.welcome-art{height:205px;min-width:215px;position:relative;display:grid;place-items:center}.welcome-art canvas{height:200px;width:210px}.welcome-art .orb{position:absolute;inset:15px 5px;border-radius:50%;background:radial-gradient(circle,#a9be77aa,transparent 65%);z-index:-1}.btn{border:1px solid transparent;padding:12px 18px;border-radius:13px;font-weight:800;display:inline-flex;justify-content:center;align-items:center;gap:9px;transition:transform .15s,background .15s;color:var(--ink);background:#fffdf6}.btn:hover{transform:translateY(-1px)}.btn.primary{background:var(--forest);color:white}.btn.primary:hover{background:#1b3f2f}.btn.light{background:#f0dfa6;color:#234633}.btn.outline{background:transparent;border-color:#d7e2d3}.btn.small{padding:8px 12px;font-size:12px}.btn:active{transform:translateY(0)}.section-title{display:flex;align-items:end;justify-content:space-between;gap:15px;margin:35px 0 18px}.section-title h2{margin:4px 0 0}.section-title p{margin-bottom:0;color:var(--muted);font-size:13px}.link-button{border:0;background:transparent;font-weight:800;color:#3c7054;text-decoration:underline;text-underline-offset:5px}.stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}.stat{border:1px solid var(--line);border-radius:20px;padding:19px;background:#fffdf8;display:flex;gap:13px;align-items:center}.stat .symbol{width:44px;height:44px;border-radius:14px;background:#e9eedc;display:grid;place-items:center;font-size:22px}.stat strong{font-size:28px;line-height:1.1;font-family:Georgia,'Times New Roman',serif;display:block}.stat span:not(.symbol){font-size:12px;color:var(--muted);font-weight:600}.progress-track{height:9px;background:#e2e8db;border-radius:9px;overflow:hidden}.progress-fill{height:100%;border-radius:9px;background:linear-gradient(90deg,#74a276,#b7c481);transition:width .2s}.section-head{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:20px 0}.search{flex:1;min-width:150px;display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);padding:0 13px;border-radius:13px}.search input{width:100%;border:0;outline:0;min-height:44px;background:transparent;color:var(--ink)}.filter{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:11px 12px;color:var(--ink);max-width:100%}.segmented{display:flex;gap:4px;padding:4px;border-radius:13px;background:#e9eedf}.segmented button{border:0;background:transparent;color:#6f8370;padding:9px 12px;border-radius:10px;font-size:12px;font-weight:800}.segmented button.active{background:#fffdf7;color:#29553b;box-shadow:0 1px 5px #21452a12}.album-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}.frog-card{border:1px solid #e0e7d9;background:#fffdf7;border-radius:20px;text-align:left;padding:12px;position:relative;min-width:0;overflow:hidden;transition:transform .16s,box-shadow .16s}.frog-card:hover{transform:translateY(-3px);box-shadow:0 12px 22px #28583b12}.frog-card:focus-visible{outline-offset:3px}.frog-card .card-art{height:152px;border-radius:15px;background:radial-gradient(ellipse at 50% 84%,#d7e3be 0 24%,transparent 25%),linear-gradient(140deg,#f0f3e7,#e4eddd);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}.frog-card .card-art canvas{height:148px;width:100%}.frog-card.is-locked .card-art{background:radial-gradient(ellipse at 50% 90%,#becac1 0 22%,transparent 23%),linear-gradient(140deg,#e3e9e4,#dce3df)}.frog-card .card-name{font-weight:800;font-size:15px;margin:10px 0 4px;display:block}.frog-card .card-meta{display:flex;align-items:center;justify-content:space-between;gap:5px}.frog-card .number{font-size:10px;font-weight:800;color:#a0ad9f;letter-spacing:.09em}.rarity{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;border-radius:999px;padding:5px 9px;white-space:nowrap}.rarity.common{background:#e4edd8;color:#547149}.rarity.uncommon{background:#dcf0e9;color:#43816e}.rarity.rare{background:#e9e1f7;color:#7a5caa}.rarity.special{background:#f8e6b8;color:#906522}.frog-card.is-special{border-color:#ead18a;background:#fffaf0}.frog-card.is-special .card-art{background:radial-gradient(circle at 50% 40%,#fff0a0a6,transparent 48%),linear-gradient(135deg,#343d71,#202c4b)}.frog-card.is-special .card-art:after{content:'✧';position:absolute;right:13px;top:9px;color:#ffe699;font-size:21px}.lockmark{position:absolute;top:13px;right:14px;display:grid;place-items:center;background:#fffdf0d9;border-radius:50%;height:26px;width:26px;font-size:13px}.subtle-note{font-size:12px;color:var(--muted);background:#eef2e7;border-radius:13px;padding:12px 14px;margin-top:18px}.feature-pair{display:grid;grid-template-columns:1.05fr .95fr;gap:16px}.feature-box{background:var(--paper);border:1px solid var(--line);padding:22px;border-radius:23px;min-width:0}.feature-box h3{margin-bottom:7px}.feature-box p{font-size:13px;color:var(--muted)}.rarity-row{display:flex;gap:8px;flex-wrap:wrap}.steps{display:flex;gap:8px;flex-wrap:wrap}.step{font-size:12px;border:1px solid #dae5d5;background:#f4f6eb;border-radius:12px;padding:11px;flex:1;min-width:110px}.step strong{display:block;color:#2e6247}.camera-layout{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(270px,.72fr);gap:20px;align-items:start}.camera-window{aspect-ratio:1.08;max-height:610px;border-radius:27px;background:linear-gradient(#8abbc6 0%,#c3d9c4 45%,#c4dba9 50%,#6c995b 78%,#436b47);position:relative;overflow:hidden;border:7px solid #fffdfa;box-shadow:var(--shadow)}.camera-window:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 78% 18%,#fffbce90 0 5%,transparent 6%),linear-gradient(0deg,#284d3366,transparent 48%);pointer-events:none}.camera-scene{position:absolute;left:0;right:0;bottom:-2%;height:26%;background:radial-gradient(ellipse at 18% 80%,#35693e 0 19%,transparent 20%),radial-gradient(ellipse at 89% 82%,#365b3d 0 24%,transparent 25%),linear-gradient(transparent 15%,#406f42 18%);opacity:.65}.camera-canvas{position:absolute;inset:0;width:100%;height:100%}.camera-overlay{position:absolute;inset:0;pointer-events:none}.camera-label{position:absolute;top:20px;left:20px;background:#133c31bf;color:#fff;padding:8px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.07em}.focus-brackets{position:absolute;left:25%;top:26%;width:50%;height:50%;border:2px dashed #fffbdfd9;border-radius:24px;transition:border-color .2s,box-shadow .2s}.focus-brackets.ready{border-color:#ffedb0;border-style:solid;box-shadow:0 0 0 4px #fff4be33}.shutter-holder{position:absolute;bottom:22px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:22px}.shutter{width:79px;height:79px;border:6px solid white;box-shadow:0 5px 20px #14321c5e;border-radius:50%;background:#fffdf0;padding:7px}.shutter i{display:block;height:100%;width:100%;border-radius:50%;background:#f5d995;box-shadow:inset 0 0 0 2px #e8c778}.shutter:active{transform:scale(.95)}.camera-controls{display:grid;gap:16px}.control-card{background:var(--paper);border:1px solid var(--line);border-radius:21px;padding:23px}.control-card h3{margin-bottom:10px}.control-card p{font-size:13px;color:var(--muted)}.control-card select{width:100%}.camera-status{padding:14px;border-radius:13px;background:#eef3e7;border:1px solid #d6e5cc;font-weight:700;color:#47624b;font-size:13px;min-height:65px}.camera-status.warn{background:#fff3d8;border-color:#f0ddad;color:#846123}.camera-status.win{background:#dceddf;border-color:#b9dcbf;color:#376446}.inventory-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.inventory-card{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:19px;background:#fffef9}.inventory-art{background:linear-gradient(135deg,#eaf0df,#dfeadc);height:104px;width:96px;flex-shrink:0;border-radius:14px;display:grid;place-items:center}.inventory-art canvas{width:94px;height:100px}.inventory-card b{display:block;margin-bottom:4px}.inventory-card small{letter-spacing:0;color:#748875;text-transform:none}.inventory-card .rarity{margin-top:9px}.empty{grid-column:1/-1;border:1px dashed #cbd9ca;background:#f4f7ee;padding:28px;border-radius:20px;text-align:center;color:#70826f}.empty b{display:block;font-family:Georgia;font-size:22px;color:var(--ink)}.profile-card{display:flex;align-items:center;gap:20px;padding:24px;background:var(--paper);border:1px solid var(--line);border-radius:23px}.profile-card .avatar{height:68px;width:68px;font-size:35px}.preference{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:17px 0}.preference:last-child{border:0}.preference b{display:block}.preference p{font-size:12px;color:var(--muted);margin:4px 0 0}.toggle{height:24px;width:45px;accent-color:var(--forest);cursor:pointer}.footnote{margin:35px 0 0;color:#829282;font-size:11px}.bottom-nav{display:none}.modal-backdrop{position:fixed;inset:0;background:#162d25a8;z-index:20;display:grid;place-items:center;padding:18px;backdrop-filter:blur(6px)}.modal-backdrop[hidden]{display:none}.detail{width:min(800px,100%);max-height:min(790px,95vh);overflow:auto;background:#fffef8;border-radius:27px;box-shadow:0 30px 90px #10271c6e;position:relative}.modal-close{position:absolute;right:18px;top:17px;z-index:2;background:#fffdfad9;border:1px solid #dbe5d8;height:38px;width:38px;border-radius:50%;font-size:21px}.detail-wrap{display:grid;grid-template-columns:1fr 1fr;min-height:410px}.detail-art{background:radial-gradient(ellipse at 50% 87%,#c4d9af 0 24%,transparent 25%),linear-gradient(135deg,#ecf2df,#dceadb);position:relative;min-height:370px;overflow:hidden}.detail-art.special-art{background:radial-gradient(circle at 50% 40%,#a6abd066,transparent 50%),linear-gradient(145deg,#323c6e,#172445)}.detail-art canvas{width:100%;height:100%;position:absolute;inset:0}.detail-art .detail-art-label{position:absolute;left:20px;bottom:18px;font-weight:800;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#43634c;background:#fffdf7a6;padding:7px 10px;border-radius:20px}.detail-art.special-art .detail-art-label{color:#fff4cc;background:#182949ba}.detail-copy{padding:38px 30px;display:flex;flex-direction:column;align-items:start}.detail-copy h2{font-size:37px;margin:13px 0}.detail-copy p{font-size:14px;color:#6f806f;line-height:1.7}.trait-chip{padding:12px;background:#f0eee1;border-radius:14px;width:100%;margin-top:10px}.trait-chip b{display:block;font-size:13px}.trait-chip p{margin:4px 0 0;font-size:12px}.detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:18px}.modal-backdrop.success .detail{max-width:510px;text-align:center;padding:25px}.success-stage{height:190px;position:relative;margin:5px auto 12px;width:240px}.success-stage canvas{height:100%;width:100%}.success-title{font-size:32px;margin:5px 0 11px}.success-caption{max-width:370px;margin:0 auto 20px;color:var(--muted)}.confetti{background-image:radial-gradient(#ebcc68 1.5px,transparent 2px),radial-gradient(#82a78e 2px,transparent 3px),radial-gradient(#d8b8ee 1.5px,transparent 2px);background-size:53px 43px,77px 64px,99px 58px}.no-results{grid-column:1/-1;text-align:center;padding:40px;background:#f1f4ea;border-radius:20px}.mobile-only{display:none}
+@media(max-width:1180px){.album-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.inventory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:940px){.shell{grid-template-columns:1fr}.sidebar{display:none}.shell-main{padding:18px 20px 96px}.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:10;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#fffef9ef;backdrop-filter:blur(12px);box-shadow:0 -7px 25px #1e4c371c;padding:6px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #e2eadc}.bottom-nav button{display:grid;justify-items:center;gap:2px;padding:6px 0;font-size:10px;border-radius:12px}.bottom-nav button.active{color:#295a42;background:#e7eedf}.bottom-nav button svg{width:22px;height:22px}.mobile-only{display:block}}
+@media(max-width:640px){.shell-main{padding:17px 14px 96px}.topbar{margin-bottom:16px}.top-actions .pill{display:none}.welcome{padding:27px 22px;min-height:240px;border-radius:22px}.welcome h1{font-size:36px;max-width:280px}.welcome p{font-size:13px;max-width:285px}.welcome-art{position:absolute;right:-29px;bottom:-30px;height:162px;min-width:140px;opacity:.80;pointer-events:none}.welcome-art canvas{width:165px;height:165px}.stat-grid{grid-template-columns:repeat(3,1fr);gap:7px}.stat{padding:12px 9px;display:block;border-radius:15px}.stat .symbol{width:30px;height:30px;font-size:16px;margin-bottom:5px}.stat strong{font-size:23px}.stat span:not(.symbol){font-size:10px;line-height:1.2;display:block}.album-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.frog-card{padding:8px;border-radius:16px}.frog-card .card-art{height:123px}.frog-card .card-art canvas{height:121px}.frog-card .card-name{font-size:13px;margin-top:8px}.frog-card .rarity{font-size:9px;padding:4px 6px}.section-title{margin-top:26px}.section-title h2{font-size:26px}.feature-pair,.camera-layout{grid-template-columns:1fr}.camera-window{aspect-ratio:.89;max-height:66vh}.inventory-grid{grid-template-columns:1fr}.detail-wrap{grid-template-columns:1fr}.detail-art{min-height:260px;height:260px}.detail-copy{padding:22px}.detail-copy h2{font-size:30px}.detail-actions{margin-top:0}.modal-backdrop{padding:10px}.detail{max-height:93vh}.toolbar{margin:15px 0}.toolbar .segmented{order:4;width:100%}.toolbar .segmented button{flex:1}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+
+/* Simulator-specific controls; the approved v0.4 visual styles stay untouched. */
+.wide-game{width:100%;min-height:52px;font-size:15px;box-shadow:0 7px 0 #1b49312b}
+.scouting-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:13px;text-align:center;color:#f9f8e8;text-shadow:0 2px 12px #1b432f9e;padding:30px}
+.scouting-empty strong{font:700 clamp(22px,4vw,32px) Georgia,serif;max-width:260px}
+.scouting-empty span{font-size:13px;max-width:280px;font-weight:700}
+.scouting-emoji{font-size:clamp(48px,8vw,88px);filter:drop-shadow(0 9px 18px #234d3566)}
+.encounter-id{padding:12px 14px;border-radius:12px;background:#ebf1df;color:#365a41!important;font-weight:700}
+.camera-window.scouting{background:radial-gradient(circle at 77% 16%,#f9edb5 0%,transparent 18%),linear-gradient(#72a4a3 0%,#c0d8bb 43%,#8eb16e 53%,#3b714d 100%)}
+@media(max-width:640px){.scouting-emoji{font-size:64px}.wide-game{min-height:58px}.camera-window.scouting{max-height:410px}}
+/* The overlay does not intercept taps except for the actual shutter button. */
+#shutter{pointer-events:auto;touch-action:manipulation}
+
+</style>
+</head>
+<body>
+  <div id="app" role="application" aria-label="Simulador jogável do Pererecário"></div>
+  <script>const DATA={"schemaVersion":2,"atlas":"assets/frogs_atlas.png","atlasSize":[1619,971],"tiers":{"common":{"label":"Comum","weight":60,"periodMs":3800,"amplitude":0.08,"sizeCm":[2,5]},"uncommon":{"label":"Incomum","weight":28,"periodMs":3200,"amplitude":0.15,"sizeCm":[2.5,6]},"rare":{"label":"Rara","weight":10,"periodMs":2800,"amplitude":0.22,"sizeCm":[3,7]},"special":{"label":"Especial","weight":2,"periodMs":2800,"amplitude":0.22,"sizeCm":[3,7]}},"species":[{"id":"frog_leaf","name":"Folhinha","index":1,"tier":"common","description":"Pequena exploradora que adora descansar entre as folhas.","rect":[24,29,266,278],"anchor":[0.5,1.0],"sizeCm":[2,5],"albumInteraction":{"type":"color_shift","name":"Troca de verde","description":"Muda suavemente do verde-folha para um tom mais azulado.","periodMs":3500,"activeFraction":0.47,"phaseOffset":0.0137}},{"id":"frog_pitanga","name":"Pitanga","index":2,"tier":"common","description":"Suas pintinhas lembram frutinhas maduras.","rect":[347,52,282,249],"anchor":[0.5,1.0],"sizeCm":[2,5],"albumInteraction":{"type":"cheeks","name":"Bochechas cheias","description":"Enche as bochechas e solta o ar devagar.","periodMs":3400,"activeFraction":0.47,"phaseOffset":0.0274}},{"id":"frog_drop","name":"Gotinha","index":3,"tier":"common","description":"Uma bolinha azul sempre pronta para um pulinho.","rect":[678,107,233,194],"anchor":[0.5,1.0],"sizeCm":[2,5],"albumInteraction":{"type":"double_hop","name":"Dois pulinhos","description":"Dá dois pulinhos pequenos, um depois do outro.","periodMs":3200,"activeFraction":0.47,"phaseOffset":0.0411}},{"id":"frog_moss","name":"Musgo","index":4,"tier":"common","description":"Prefere observar o movimento com muita calma.","rect":[954,109,336,193],"anchor":[0.5,1.0],"sizeCm":[2,5],"albumInteraction":{"type":"throat","name":"Coaxar preguiçoso","description":"Infla a garganta uma vez e volta a descansar.","periodMs":3900,"activeFraction":0.47,"phaseOffset":0.0548}},{"id":"frog_honey","name":"Mel","index":5,"tier":"uncommon","description":"Seu tom dourado ilumina qualquer coleção.","rect":[1337,26,261,280],"anchor":[0.5,1.0],"sizeCm":[2.5,6],"albumInteraction":{"type":"warm_glow","name":"Banho de sol","description":"Fica um pouquinho mais dourada por alguns instantes.","periodMs":3600,"activeFraction":0.47,"phaseOffset":0.0685}},{"id":"frog_jabuticaba","name":"Jabuticaba","index":6,"tier":"rare","description":"Redondinha, discreta e cheia de pequenas pintas.","rect":[25,394,277,220],"anchor":[0.5,1.0],"sizeCm":[3,7],"albumInteraction":{"type":"puff","name":"Bolinha de jabuticaba","description":"Estufa o corpo e volta ao formato normal.","periodMs":3700,"activeFraction":0.47,"phaseOffset":0.0822}},{"id":"frog_clay","name":"Barro","index":7,"tier":"common","description":"Tem as cores da terra depois da chuva.","rect":[344,359,257,255],"anchor":[0.5,1.0],"sizeCm":[2,5],"albumInteraction":{"type":"crouch_hop","name":"Salto preparado","description":"Se abaixa antes de dar um salto curto.","periodMs":3400,"activeFraction":0.47,"phaseOffset":0.0959}},{"id":"frog_cloud","name":"Nuvem","index":8,"tier":"uncommon","description":"Clara e fofinha, com pezinhos cor de céu.","rect":[650,393,290,211],"anchor":[0.5,1.0],"sizeCm":[2.5,6],"albumInteraction":{"type":"breath","name":"Respiração tranquila","description":"Respira fundo, enchendo e esvaziando o corpo.","periodMs":3900,"activeFraction":0.47,"phaseOffset":0.0096}},{"id":"frog_lagoon","name":"Lagoa","index":9,"tier":"uncommon","description":"Suas manchas lembram reflexos na água.","rect":[983,383,312,228],"anchor":[0.5,1.0],"sizeCm":[2.5,6],"albumInteraction":{"type":"look_around","name":"Curiosa","description":"Inclina o corpo suavemente para os dois lados.","periodMs":3400,"activeFraction":0.47,"phaseOffset":0.0233}},{"id":"frog_guava","name":"Goiabinha","index":10,"tier":"uncommon","description":"Pequena, rosada e curiosa.","rect":[1343,410,244,201],"anchor":[0.5,1.0],"sizeCm":[2.5,6],"albumInteraction":{"type":"shy","name":"Tímida","description":"Se encolhe um pouco e depois se solta.","periodMs":3200,"activeFraction":0.47,"phaseOffset":0.037}},{"id":"frog_star","name":"Estrelinha","index":11,"tier":"special","description":"Carrega um pedacinho do céu em suas pintas.","rect":[15,722,258,207],"anchor":[0.5,1.0],"sizeCm":[3,7],"albumInteraction":{"type":"starlight","name":"Constelação viva","description":"Flutua enquanto estrelas douradas e azuladas brilham ao redor.","periodMs":4000,"activeFraction":0.47,"phaseOffset":0.0507}},{"id":"frog_sprout","name":"Broto","index":12,"tier":"common","description":"Estica o pescoço para descobrir novos caminhos.","rect":[307,660,267,271],"anchor":[0.5,1.0],"sizeCm":[2,5],"albumInteraction":{"type":"stretch","name":"Espreguiçada","description":"Se estica, como quem acabou de acordar.","periodMs":3600,"activeFraction":0.47,"phaseOffset":0.0644}},{"id":"frog_ember","name":"Brasa","index":13,"tier":"rare","description":"Tem cores quentes e um salto cheio de energia.","rect":[621,720,324,212],"anchor":[0.5,1.0],"sizeCm":[3,7],"albumInteraction":{"type":"double_croak","name":"Coaxar animado","description":"Infla a garganta duas vezes seguidas.","periodMs":3400,"activeFraction":0.47,"phaseOffset":0.0781}},{"id":"frog_lavender","name":"Lavanda","index":14,"tier":"rare","description":"Delicada, de pernas compridas e tons suaves.","rect":[989,674,280,256],"anchor":[0.5,1.0],"sizeCm":[3,7],"albumInteraction":{"type":"sway","name":"Balanço delicado","description":"Balança o corpo devagar, com os pés no lugar.","periodMs":3500,"activeFraction":0.47,"phaseOffset":0.0918}},{"id":"frog_jade","name":"Jade","index":15,"tier":"uncommon","description":"Uma joia verde com pintinhas turquesa.","rect":[1313,706,291,218],"anchor":[0.5,1.0],"sizeCm":[2.5,6],"albumInteraction":{"type":"jade_shift","name":"Reflexo de lagoa","description":"Alterna suavemente entre verde e turquesa.","periodMs":3800,"activeFraction":0.47,"phaseOffset":0.0055}}],"rules":{"captureRadiusMeters":35,"maxLocationAccuracyMeters":40,"newSpeciesAfterDuplicateCount":4,"rareOrSpecialAfterCount":9,"specialAfterCount":19,"unlimitedPhotoRetries":true,"escapeEnabled":false,"captureAssistAfterMisses":2,"notes":"Balance inicial para teste. Garantias propostas, não implementadas na prévia. Prioridade: especial, descoberta nova, rara. Garantias adiadas permanecem pendentes."}}; const ATLAS='assets/frogs_atlas.png';</script>
+  <script>
+/* Pererecário browser game simulator — encounters, collection and local save, no device camera/GPS. */
+'use strict';
+const $ = (id) => document.getElementById(id);
+const icons = {
+ album:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 3v18M12 9h5M12 13h4"/></svg>',
+ camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h4l2-3h4l2 3h4v13H4z"/><circle cx="12" cy="13" r="3.6"/></svg>',
+ brejo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-2 5-2 9 0s6 2 9 0M3 21c3-2 5-2 9 0s6 2 9 0M4 13c1-5 3-8 8-11 5 3 7 6 8 11"/><path d="M12 5v12"/></svg>',
+ info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>'
+};
+const art = new Image();
+const speciesById = Object.fromEntries(DATA.species.map(s=>[s.id,s]));
+const tierLabel = t => DATA.tiers[t].label;
+const GAME_KEY = 'pererecario.game.simulator.v1';
+let storageAvailable = true;
+function readProgress(){
+ try {
+  const text = localStorage.getItem(GAME_KEY);
+  if (!text) return null;
+  const p = JSON.parse(text);
+  if (p.version !== 1 || !Array.isArray(p.owned) || !Array.isArray(p.found)) return null;
+  if (!p.owned.every(x => speciesById[x.id] && Number.isFinite(x.cm) && typeof x.code === 'string')) return null;
+  if (!p.found.every(id => speciesById[id])) return null;
+  if (p.encounter && (!speciesById[p.encounter.id] || typeof p.encounter.key !== 'string')) return null;
+  return p;
+ } catch { storageAvailable = false; return null; }
+}
+const previous = readProgress();
+const state = {
+ page:'home', selected:'frog_leaf', filter:'all', search:'', view:'all', revealAll:false,
+ found:new Set(previous?.found || []), owned:previous?.owned || [],
+ reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,
+ modal:null, hopAt:-10000, openAt:performance.now(),
+ encounter:previous?.encounter || null,
+ encounterNumber:Number.isSafeInteger(previous?.encounterNumber) && previous.encounterNumber>0 ? previous.encounterNumber : 1,
+ duplicatesStreak:Math.max(0,previous?.duplicatesStreak || 0),
+ sinceRare:Math.max(0,previous?.sinceRare || 0),
+ sinceSpecial:Math.max(0,previous?.sinceSpecial || 0),
+ captureId:previous?.encounter?.id || 'frog_leaf', cameraStart:performance.now(),
+ misses:0, assist:false, captured:!!previous?.encounter?.captured,
+ cameraMessage:'Enquadre a perereca e pressione o botão de fotografar.',
+ cameraMood:'', cameraPose:0
+};
+function persist(){
+ try {
+  localStorage.setItem(GAME_KEY,JSON.stringify({version:1,found:[...state.found],owned:state.owned,
+   encounter:state.encounter,encounterNumber:state.encounterNumber,
+   duplicatesStreak:state.duplicatesStreak,sinceRare:state.sinceRare,sinceSpecial:state.sinceSpecial}));
+  storageAvailable=true;
+ } catch {storageAvailable=false;}
+}
+function choice(items){return items[Math.floor(Math.random()*items.length)];}
+function weightedSpecies(){
+ const remaining=DATA.species.filter(s=>!state.found.has(s.id));
+ if (state.owned.length===0) return speciesById.frog_leaf;
+ // Guarantees are checked on completed captures, not on abandoned searches.
+ if (state.sinceSpecial>=19) return speciesById.frog_star;
+ if (state.duplicatesStreak>=4 && remaining.length) return choice(remaining);
+ if (state.sinceRare>=9) return choice(DATA.species.filter(s=>s.tier==='rare'||s.tier==='special'));
+ const odds=['common','uncommon','rare','special'];
+ const roll=Math.random()*odds.reduce((sum,t)=>sum+DATA.tiers[t].weight,0);
+ let cumulative=0;
+ for (const tier of odds){
+  cumulative+=DATA.tiers[tier].weight;
+  if (roll<cumulative) return choice(DATA.species.filter(s=>s.tier===tier));
+ }
+ return choice(DATA.species);
+}
+function startEncounter(){
+ // An encounter is immutable until captured; retrying never rerolls its species or size.
+ if (state.encounter && !state.encounter.captured){go('camera');return;}
+ const s=weightedSpecies();
+ const low=s.sizeCm[0],high=s.sizeCm[1];
+ const cm=Number((low+Math.random()*(high-low)).toFixed(1));
+ state.encounter={key:'sim-'+String(state.encounterNumber++).padStart(5,'0'),id:s.id,cm,captured:false};
+ state.captureId=s.id;
+ state.cameraStart=performance.now();
+ state.misses=0;state.assist=false;state.captured=false;
+ state.cameraMessage='Uma perereca apareceu! Espere entrar na moldura e fotografe.';
+ state.cameraMood='';
+ persist();go('camera');
+}
+function registerCapture(){
+ const encounter=state.encounter;
+ if(!encounter || encounter.captured)return null;
+ const s=speciesById[encounter.id];
+ const duplicate=state.found.has(s.id);
+ encounter.captured=true;
+ state.captured=true;
+ state.found.add(s.id);
+ state.owned.push({id:s.id,cm:encounter.cm,code:encounter.key});
+ state.duplicatesStreak=duplicate?state.duplicatesStreak+1:0;
+ state.sinceRare=(s.tier==='rare'||s.tier==='special')?0:state.sinceRare+1;
+ state.sinceSpecial=s.tier==='special'?0:state.sinceSpecial+1;
+ persist();
+ return {s,duplicate};
+}
+const num = i=>String(i).padStart(2,'0');
+const found = s => state.found.has(s.id) || state.revealAll;
+const count = id => state.owned.filter(x=>x.id===id).length;
+function navButton(page,label,icon,cls=''){return `<button class="${cls} ${state.page===page?'active':''}" data-page="${page}" aria-label="${label}" aria-current="${state.page===page?'page':'false'}">${icons[icon]}<span>${label}</span></button>`;}
+function rarity(s){return `<span class="rarity ${s.tier}">${s.tier==='special'?'✧ ':s.tier==='rare'?'◆ ':'● '}${tierLabel(s.tier)}</span>`;}
+function shell(){ $('app').innerHTML=`
+ <div class="shell">
+  <aside class="sidebar"><div class="brand"><div class="brand-icon">🐸</div><div><b>Pererecário</b><small>UM BREJO DE DESCOBERTAS</small></div></div>
+   <nav class="nav" aria-label="Navegação principal">${navButton('home','Meu álbum','album')}${navButton('camera','Explorar','camera')}${navButton('inventory','Meu Brejo','brejo')}${navButton('guide','Guia de campo','info')}</nav>
+   <div class="sidebar-note"><b>Um mundo miudinho.</b><p>Cada perereca tem seu jeitinho. Descubra, observe e complete sua coleção.</p></div>
+  </aside>
+  <div class="shell-main"><div class="topbar"><span class="breadcrumbs" id="crumb">Caderno de campo / álbum</span><div class="top-actions"><span class="pill"><span class="status-dot"></span>Simulador jogável · offline</span><span class="avatar" aria-label="Perfil ilustrativo">🌿</span></div></div>
+    <section class="screen active" id="home"></section><section class="screen" id="camera"></section><section class="screen" id="inventory"></section><section class="screen" id="guide"></section>
+    <p class="footnote">SIMULADOR JOGÁVEL V0.5 · CÂMERA ILUSTRATIVA · PROGRESSO LOCAL NESTE NAVEGADOR · SEM GPS OU CONTAS</p>
+   </div>
+  </div>
+  <nav class="bottom-nav" aria-label="Navegação inferior">${navButton('home','Álbum','album')}${navButton('camera','Explorar','camera')}${navButton('inventory','Meu Brejo','brejo')}${navButton('guide','Guia','info')}</nav>
+  <div id="modal" class="modal-backdrop" hidden></div>`;
+ document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
+ renderAll();
+}
+function go(page){
+ state.page=page;
+ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===page));
+ document.querySelectorAll('[data-page]').forEach(b=>{const yes=b.dataset.page===page;b.classList.toggle('active',yes);b.setAttribute('aria-current',yes?'page':'false')});
+ $('crumb').textContent={home:'Caderno de campo / álbum',camera:'Caderno de campo / explorar',inventory:'Caderno de campo / meu brejo',guide:'Caderno de campo / guia'}[page];
+ if(page==='camera')renderCamera();
+ if(page==='inventory')renderInventory();
+ if(page==='home')renderHome();
+ window.scrollTo({top:0,behavior:state.reduced?'instant':'smooth'});
+}
+function renderAll(){renderHome();renderCamera();renderInventory();renderGuide();}
+function miniCard(s){let locked=!found(s),sp=s.tier==='special';return `<button class="frog-card ${locked?'is-locked':''} ${sp&&!locked?'is-special':''}" data-open="${s.id}" aria-label="${locked?'Espécie desconhecida':'Abrir '+s.name}"><div class="card-art"><canvas width="240" height="170" data-frog="${s.id}" data-locked="${locked?'1':'0'}"></canvas>${locked?'<span class="lockmark">🔒</span>':''}</div><span class="card-name">${locked?'???':s.name}</span><div class="card-meta"><span class="number">Nº ${num(s.index)}</span>${locked?'<span class="rarity common">A descobrir</span>':rarity(s)}</div></button>`;}
+function renderHome(){const total=state.found.size;let list=DATA.species.filter(s=>(state.filter==='all'||s.tier===state.filter)&&(!state.search||s.name.toLowerCase().includes(state.search))&&(state.view==='all'||(state.view==='found'?state.found.has(s.id):!state.found.has(s.id))));$('home').innerHTML=`
+ <div class="welcome"><div><span class="eyebrow">✧ Sua jornada pelo brejo</span><h1>Pequenas criaturas.<br>Grandes descobertas.</h1><p>Explore, fotografe e descubra as 15 pererecas. Sua coleção cresce a cada encontro!</p><button class="btn light" data-goto="camera">📷 Jogar: explorar o brejo &nbsp;›</button></div><div class="welcome-art"><span class="orb"></span><canvas width="270" height="230" data-banner="frog_leaf"></canvas></div></div>
+ <div class="stat-grid"><div class="stat"><span class="symbol">🐸</span><div><strong>${total}<span class="muted">/15</span></strong><span>Espécies descobertas</span></div></div><div class="stat"><span class="symbol">🌱</span><div><strong>${state.owned.length}</strong><span>Exemplares no brejo</span></div></div><div class="stat"><span class="symbol">✧</span><div><strong>${Math.round(total/15*100)}%</strong><span>Álbum completo</span></div></div></div>
+ <div class="section-title"><div><span class="eyebrow muted">SUA COLEÇÃO</span><h2>O Pererecário</h2><p>Toque em uma espécie para conhecer sua personalidade.</p></div><span class="pill">${total} de 15 descobertas</span></div>
+ <div class="progress-track" role="progressbar" aria-label="Progresso do álbum" aria-valuemin="0" aria-valuemax="15" aria-valuenow="${total}"><div class="progress-fill" style="width:${total/15*100}%"></div></div>
+ <div class="toolbar"><label class="search" aria-label="Buscar espécie">⌕ <input id="search" placeholder="Buscar perereca..." value="${state.search.replace(/"/g,'&quot;')}"/></label><select class="filter" id="filter" aria-label="Filtrar raridade"><option value="all">Todas as raridades</option><option value="common">Comuns</option><option value="uncommon">Incomuns</option><option value="rare">Raras</option><option value="special">Especiais</option></select><div class="segmented"><button data-view="all" class="${state.view==='all'?'active':''}">Todas</button><button data-view="found" class="${state.view==='found'?'active':''}">Descobertas</button><button data-view="missing" class="${state.view==='missing'?'active':''}">???</button></div></div>
+ <div class="album-grid">${list.map(miniCard).join('')||'<div class="no-results">Nenhuma perereca encontrada com esse filtro.</div>'}</div>
+ <p class="subtle-note">🔎 <b>Álbum de verdade:</b> espécies ainda não encontradas ficam em silhueta. Cada fotografia bem-sucedida revela a espécie e guarda um exemplar.</p>
+ <div class="section-title"><div><span class="eyebrow muted">A BELEZA DA DESCOBERTA</span><h2>Um carinho em cada detalhe</h2></div></div>
+ <div class="feature-pair"><div class="feature-box"><h3>✧ Raridade com personalidade</h3><p>As raras ganham destaque em lilás e a Estrelinha tem uma cena noturna, com seu brilho especial no álbum principal.</p><div class="rarity-row">${['common','uncommon','rare','special'].map(t=>rarity({tier:t})).join('')}</div></div><div class="feature-box"><h3>🌿 Um brejo só seu</h3><p>Cada captura vira um exemplar. Na ficha da espécie, ela interage; no Meu Brejo, os repetidos ficam tranquilos.</p><button class="btn outline small" data-goto="inventory">Conhecer Meu Brejo ›</button></div></div>`;
+ $('filter').value=state.filter;$('search').oninput=e=>{state.search=e.target.value;renderHome();$('search').focus();$('search').setSelectionRange(state.search.length,state.search.length);};$('filter').onchange=e=>{state.filter=e.target.value;renderHome()};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;renderHome()});bindAlbumButtons();bindGoto();drawStatic();}
+function bindAlbumButtons(){document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDetail(b.dataset.open));}
+function bindGoto(){document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>go(b.dataset.goto));}
+function renderCamera(){
+ const encounter=state.encounter;
+ const active=encounter && !encounter.captured;
+ const s=encounter?speciesById[encounter.id]:null;
+ const isKnown=s && state.found.has(s.id);
+ $('camera').innerHTML=`
+ <div class="section-title" style="margin-top:0"><div><span class="eyebrow muted">EXPLORAR O BREJO</span><h2>${active?'Um encontro especial!':'Hora de explorar!'}</h2><p>${active?'Espere a criatura se aproximar do centro. Fotografar não consome tentativas.':'Procure uma nova perereca para começar o desafio de captura.'}</p></div><span class="pill">🌿 Encontros ${state.owned.length}</span></div>
+ <div class="camera-layout">
+  <div class="camera-window ${!active?'scouting':''}" id="camera-window">
+   <div class="camera-scene"></div>
+   ${active?'<canvas class="camera-canvas" width="700" height="650" id="camera-canvas" aria-label="Perereca em cena ilustrativa"></canvas>':'<div class="scouting-empty"><div class="scouting-emoji">🌿 🐸 🌱</div><strong>O brejo está quietinho...</strong><span>Que tal descobrir quem mora por aqui?</span></div>'}
+   ${active?'<div class="camera-overlay"><span class="camera-label">● ENCONTRO '+encounter.key.toUpperCase()+'</span><div class="focus-brackets" id="focus"></div><div class="shutter-holder"><button class="shutter" id="shutter" aria-label="Fotografar perereca"><i></i></button></div></div>':''}
+  </div>
+  <div class="camera-controls">
+   <div class="control-card"><span class="eyebrow muted">${active?'ENCONTRO ATUAL':'NOVO ENCONTRO'}</span><h3 style="margin:8px 0 12px">${active?(isKnown?s.name:'Quem será?'):'Vamos procurar!'}</h3>${active?(isKnown?rarity(s):'<span class="rarity uncommon">✧ Espécie misteriosa</span>'):'<span class="rarity common">🍃 Brejo ilustrado</span>'}<p style="margin:14px 0 16px">${active?'Essa criatura já está aqui. Se sair da tela, poderá continuar a mesma captura depois.':encounter?.captured?'Sua última fotografia já foi guardada. Inicie outra busca para encontrar uma nova perereca.':'A primeira perereca será a Folhinha. Depois, novas espécies aparecem conforme sua raridade.'}</p>
+   ${!active?'<button class="btn primary wide-game" id="find-encounter">🔎 Procurar perereca</button>':'<p class="encounter-id">📸 Fotografe no botão redondo da cena.</p>'}</div>
+   <div class="control-card"><span class="eyebrow muted">DICAS DE CAPTURA</span><h3 style="margin:8px 0 12px">Sem pressa!</h3><div class="camera-status ${state.cameraMood}" id="camera-status" role="status">${active?state.cameraMessage:'Nenhuma criatura esperando pela foto.'}</div><p style="margin:14px 0 0">Tentativas ilimitadas. Após dois erros, a assistência posiciona a perereca no centro. Nenhuma foge.</p><div class="steps"><span class="step"><strong>01 · Procure</strong>Encontre a espécie</span><span class="step"><strong>02 · Enquadre</strong>Espere o centro</span><span class="step"><strong>03 · Fotografe</strong>Revele no álbum</span></div></div>
+   <button class="btn outline" data-goto="home">‹ Voltar ao álbum</button>
+  </div>
+ </div>`;
+ if($('find-encounter'))$('find-encounter').onclick=startEncounter;
+ if($('shutter'))$('shutter').onclick=shutter;
+ bindGoto();
+}
+function shutter(){
+ if(!state.encounter || state.encounter.captured)return;
+ const ok=Math.abs(state.cameraPose)<=.17 || state.assist || state.reduced;
+ if(!ok){
+  state.misses++;state.assist=state.misses>=2;
+  state.cameraMood='warn';
+  state.cameraMessage=state.assist?'🌿 Ajuda ativada! Ela ficará no centro. Tente outra foto.':'Quase! Espere o corpo entrar na moldura e tente novamente.';
+  $('camera-status').className='camera-status warn';$('camera-status').textContent=state.cameraMessage;
+  return;
+ }
+ const completed=registerCapture();
+ if(!completed)return;
+ state.cameraMood='win';state.cameraMessage='Fotografia salva neste navegador!';
+ $('camera-status').className='camera-status win';$('camera-status').textContent=state.cameraMessage;
+ success(completed.s,completed.duplicate);
+}
+function renderInventory(){const groups=state.owned.reduce((out,f)=>{(out[f.id]??=[]).push(f);return out},{})||{};const duplicates=state.owned.length-state.found.size;$('inventory').innerHTML=`<div class="section-title" style="margin-top:0"><div><span class="eyebrow muted">SEU CANTINHO NO BREJO</span><h2>Meu Brejo</h2><p>Seus exemplares, inclusive aqueles de espécies já descobertas.</p></div><span class="pill">🌿 ${state.owned.length} exemplares</span></div><div class="feature-box" style="margin-bottom:22px"><div class="section-head"><div><h3 style="margin-bottom:8px">Cada um tem seu lugar</h3><p style="margin-bottom:0">Aqui os exemplares ficam parados, sem as animações especiais da ficha principal. Uma mesma espécie pode ter vários exemplares de tamanhos diferentes.</p></div><span class="pill">${Math.max(0,duplicates)} repetidos</span></div></div><div class="inventory-grid">${Object.entries(groups).flatMap(([id,items])=>items.map((item,n)=>{const s=speciesById[id];return `<div class="inventory-card"><div class="inventory-art"><canvas width="95" height="100" data-frog="${id}" data-inventory="1"></canvas></div><div><b>${s.name}</b><small>Exemplar #${item.code}<br>≈ ${item.cm.toFixed(1)} cm · ${n?'Repetido':'Colecionado'}</small><br>${rarity(s)}</div></div>`})).join('')||'<div class="empty"><b>Seu Brejo está vazio</b>Explore para encontrar seu primeiro exemplar.</div>'}</div><p class="subtle-note">♻️ Repetidos não aumentam o número de espécies descobertas. Futuramente eles poderão ser usados em trocas online.</p>`;drawStatic();}
+function renderGuide(){
+ $('guide').innerHTML=`<div class="section-title" style="margin-top:0"><div><span class="eyebrow muted">COMO JOGAR</span><h2>Guia do explorador</h2><p>Descubra criaturas, complete seu álbum e encontre a Estrelinha!</p></div></div>
+ <div class="feature-pair"><div class="feature-box"><h3>🍃 Raridades de verdade</h3><p>As probabilidades são calculadas por categoria a cada novo encontro: 60% comuns, 28% incomuns, 10% raras e 2% especiais.</p><div class="rarity-row">${['common','uncommon','rare','special'].map(t=>rarity({tier:t})).join('')}</div><p style="margin-top:15px">Há proteções contra azar: após 4 repetidas seguidas, a próxima é inédita (se restarem espécies); após 9 encontros sem rara/especial, vem uma rara ou especial; após 19 sem especial, vem a Estrelinha.</p></div><div class="feature-box"><h3>📸 Uma fotografia por encontro</h3><p>Toque em Explorar, procure uma perereca e fotografe quando ela estiver no centro da moldura.</p><p>Errou? Pode tentar novamente. Depois de dois erros, a ajuda mantém a perereca centralizada. Nenhuma escapa.</p><p>Se você sair e voltar, o encontro continua sem trocar de espécie.</p></div></div>
+ <div class="section-title"><div><span class="eyebrow muted">SEU JOGO</span><h2>Opções e progresso</h2></div></div>
+ <div class="feature-box"><label class="preference"><span><b>Reduzir animações</b><p>Reduz saltos e efeitos de movimento. A captura continua possível.</p></span><input class="toggle" id="reduce-motion" type="checkbox" ${state.reduced?'checked':''}></label>
+ <div class="preference"><span><b>Progresso da coleção</b><p>${state.found.size} de 15 espécies e ${state.owned.length} exemplares. ${storageAvailable?'Salvo neste navegador.':'Armazenamento indisponível: o progresso pode ser perdido ao fechar.'}</p></span><span class="pill">${Math.round(state.found.size/15*100)}%</span></div>
+ <div class="preference"><span><b>Reiniciar simulação</b><p>Apaga as capturas e começa de novo com a Folhinha.</p></span><button class="btn outline small" id="reset-demo">Reiniciar</button></div></div>
+ <div class="section-title"><div><span class="eyebrow muted">ANTES DO APK</span><h2>O que ainda falta</h2></div></div>
+ <div class="feature-box"><p style="margin:0">Este jogo funciona no navegador, com um cenário ilustrado em vez de usar câmera e GPS reais. O progresso fica apenas no armazenamento deste navegador e não é sincronizado entre dispositivos. O APK Flutter virá depois desta validação.</p></div>`;
+ $('reduce-motion').onchange=e=>{state.reduced=e.target.checked};
+ $('reset-demo').onclick=()=>{
+  if(!confirm('Quer apagar o progresso local do simulador e voltar à primeira descoberta?'))return;
+  try{localStorage.removeItem(GAME_KEY)}catch{storageAvailable=false}
+  state.found=new Set();state.owned=[];state.encounter=null;state.encounterNumber=1;
+  state.duplicatesStreak=0;state.sinceRare=0;state.sinceSpecial=0;
+  state.captureId='frog_leaf';state.assist=false;state.misses=0;state.captured=false;
+  state.modal=null;closeModal();renderAll();go('home');
+ };
+}
+function openDetail(id){const s=speciesById[id];const locked=!found(s);state.selected=id;state.openAt=performance.now();state.hopAt=-10000;state.modal='detail';const el=$('modal');el.className='modal-backdrop';el.hidden=false;el.innerHTML=`<div class="detail" role="dialog" aria-modal="true" aria-label="Ficha da espécie"><button class="modal-close" id="close-modal" aria-label="Fechar">×</button><div class="detail-wrap"><div class="detail-art ${s.tier==='special'&&!locked?'special-art':''}"><canvas width="420" height="430" id="detail-canvas" aria-label="${locked?'Silhueta':s.name}"></canvas><span class="detail-art-label">${locked?'Mistério do brejo':s.tier==='special'?'✧ Espécie especial':'Caderno de campo'}</span></div><div class="detail-copy"><span class="eyebrow muted">ESPÉCIE ${num(s.index)} / 15</span><h2>${locked?'???':s.name}</h2>${locked?'<span class="rarity common">Ainda não descoberta</span>':rarity(s)}<p style="margin-top:15px">${locked?'Esta pequena habitante ainda não foi encontrada. Continue explorando para revelar seu jeitinho.':s.description}</p>${locked?'<div class="trait-chip"><b>🔒 Uma surpresa por descobrir</b><p>A peculiaridade será revelada após a captura.</p></div>':`<div class="trait-chip"><b>✧ ${s.albumInteraction.name}</b><p>${s.albumInteraction.description}</p></div><p style="font-size:12px;margin:12px 0">${count(s.id)} exemplar(es) no Meu Brejo · Aproximadamente ${s.sizeCm.join('–')} cm</p>`}<div class="detail-actions">${locked?'<button class="btn primary" id="find-this">Ir explorar ›</button>':'<button class="btn primary" id="hop">🐸 Dar um pulinho</button><button class="btn outline" id="find-this">Ir explorar ›</button>'}</div></div></div></div>`;
+ $('close-modal').onclick=closeModal;$('find-this').onclick=()=>{closeModal();go('camera')};if($('hop'))$('hop').onclick=()=>{state.hopAt=performance.now()};}
+function success(s,duplicate){state.modal='success';const el=$('modal');el.hidden=false;el.className='modal-backdrop success';el.innerHTML=`<div class="detail confetti" role="dialog" aria-modal="true" aria-label="Captura realizada"><button class="modal-close" id="close-modal" aria-label="Fechar">×</button><span class="eyebrow muted">✧ ${duplicate?'MAIS UM NOVO AMIGO':'NOVA DESCOBERTA'} ✧</span><div class="success-stage"><canvas id="success-canvas" width="240" height="190"></canvas></div><h2 class="success-title">${duplicate?'Mais um '+s.name+'!':'Você encontrou '+s.name+'!'}</h2><p class="success-caption">${duplicate?'Um novo exemplar entrou no seu Brejo.':'Uma nova espécie foi revelada no seu Pererecário.'} O exemplar está no seu Brejo!</p>${rarity(s)}<div style="display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-top:20px"><button class="btn primary" id="success-album">Ver álbum ›</button><button class="btn outline" id="success-again">Explorar mais</button></div></div>`;
+ $('close-modal').onclick=closeModal;$('success-album').onclick=()=>{closeModal();go('home');openDetail(s.id)};$('success-again').onclick=()=>{closeModal();startEncounter()};drawStatic();}
+function closeModal(){state.modal=null;$('modal').hidden=true;$('modal').innerHTML='';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.modal)closeModal()});
+$('app').addEventListener('click',()=>{});
+function pose(s,now,hero){const cfg=s.albumInteraction,t=(((now-(hero?state.openAt:0))/cfg.periodMs)+(hero?0:cfg.phaseOffset))%1;const u=(t-.025)/.47;const active=u>0&&u<1;const p=active?Math.sin(u*Math.PI)**2:0;const twice=active?Math.sin(u*Math.PI*2)**2:0;const a={sx:1,sy:1,dy:0,angle:0,hue:0,light:1,pulse:p};switch(cfg.type){case 'color_shift':a.hue=p*38;break;case 'jade_shift':a.hue=p*32;break;case 'cheeks':a.sx+=p*.045;a.sy+=p*.015;break;case 'throat':a.sx+=p*.02;a.sy+=p*.03;break;case 'double_croak':a.sx+=twice*.035;a.sy+=twice*.02;break;case 'puff':a.sx+=p*.10;a.sy+=p*.045;break;case 'double_hop':a.dy-=twice*.09;break;case 'crouch_hop':a.dy-=p*.10;break;case 'breath':a.sx+=p*.035;a.sy+=p*.05;break;case 'warm_glow':a.hue=-p*9;a.light+=p*.08;break;case 'starlight':a.light+=p*.42;a.dy-=p*.035;break;case 'look_around':a.angle=active?Math.sin(u*Math.PI*2)*.075*p:0;break;case 'shy':a.sy-=p*.09;break;case 'stretch':a.sy+=p*.10;break;case 'sway':a.angle=active?Math.sin(u*Math.PI*2)*.055*p:0;break;}return a;}
+function sparkle(ctx,x,y,r,alpha,i){ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=i%2?'#d7edff':'#fff2aa';ctx.beginPath();ctx.moveTo(x,y-r*1.7);ctx.lineTo(x+r*.22,y-r*.22);ctx.lineTo(x+r*1.45,y);ctx.lineTo(x+r*.22,y+r*.22);ctx.lineTo(x,y+r*1.7);ctx.lineTo(x-r*.22,y+r*.22);ctx.lineTo(x-r*1.45,y);ctx.lineTo(x-r*.22,y-r*.22);ctx.fill();ctx.restore();}
+function frogCanvas(canvas,s,opts={}){if(!art.complete||!art.naturalWidth)return;const ctx=canvas.getContext('2d');const W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.imageSmoothingEnabled=false;const hero=!!opts.hero,moving=hero&&!state.reduced&&!opts.locked,now=opts.now??performance.now();const a=moving?pose(s,now,true):{sx:1,sy:1,dy:0,angle:0,hue:0,light:1,pulse:0};const [sx,sy,sw,sh]=s.rect;const scale=Math.min(W*(hero?.73:.77)/sw,H*(hero?.66:.76)/sh);const dw=sw*scale,dh=sh*scale;const x=W*.5+(opts.dx||0)*W,baseline=H*(opts.camera?.79:.84)+(opts.dy||0)*H;ctx.save();ctx.translate(x,baseline+a.dy*dh);const hop=(now-state.hopAt)/630;if(moving&&hop>=0&&hop<=1)ctx.translate(0,-Math.sin(hop*Math.PI)*H*.12);ctx.rotate(a.angle);ctx.scale(a.sx,a.sy);
+ if(moving&&s.id==='frog_star'){const glow=.52+a.pulse*.48;const radius=Math.max(dw,dh)*.86;const gradient=ctx.createRadialGradient(0,-dh*.53,2,0,-dh*.53,radius);gradient.addColorStop(0,`rgba(255,246,174,${.35+.34*glow})`);gradient.addColorStop(.48,`rgba(164,212,255,${.13+.18*glow})`);gradient.addColorStop(1,'rgba(164,212,255,0)');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(0,-dh*.53,radius,0,Math.PI*2);ctx.fill();}
+ ctx.filter=`hue-rotate(${a.hue}deg) brightness(${a.light})`;
+ ctx.drawImage(art,sx,sy,sw,sh,-dw*.5,-dh,dw,dh);ctx.filter='none';
+ if(opts.locked){ctx.globalCompositeOperation='source-in';ctx.fillStyle='#71847c';ctx.fillRect(-dw*.5-5,-dh-5,dw+10,dh+10);ctx.globalCompositeOperation='source-over';}
+ if(moving&&s.id==='frog_star'){const spots=[[-.58,-.76],[-.21,-1.16],[.51,-.85],[.6,-.4],[-.62,-.35],[.19,-1.08]];spots.forEach(([xx,yy],i)=>{const shimmer=.62+.38*Math.sin(now/400+i*1.9);sparkle(ctx,xx*dw,yy*dh,Math.max(2.7,dw*.024)*(i%3?1:1.3),shimmer,i)})}
+ ctx.restore();}
+function drawStatic(){document.querySelectorAll('canvas[data-frog]').forEach(c=>frogCanvas(c,speciesById[c.dataset.frog],{locked:c.dataset.locked==='1'}));document.querySelectorAll('canvas[data-banner]').forEach(c=>frogCanvas(c,speciesById[c.dataset.banner]));if($('success-canvas')&&state.modal==='success'&&state.encounter)frogCanvas($('success-canvas'),speciesById[state.captureId]);}
+let previousFrame=0;
+function animate(now){
+ if(!document.hidden&&art.complete&&art.naturalWidth){
+  if(state.modal==='detail'&&$('detail-canvas')){
+   const s=speciesById[state.selected];frogCanvas($('detail-canvas'),s,{locked:!found(s),hero:true,now});
+  }
+  if(state.page==='camera'&&state.encounter&&!state.encounter.captured&&$('camera-canvas')){
+   const s=speciesById[state.encounter.id];
+   const t=(now-state.cameraStart)/DATA.tiers[s.tier].periodMs;
+   const spread=.18+DATA.tiers[s.tier].amplitude*.65;
+   const move=state.reduced||state.assist?0:Math.sin(t*2*Math.PI)*spread;
+   state.cameraPose=move;
+   const dy=state.reduced?0:-Math.max(0,Math.sin(t*Math.PI*4))*.028;
+   frogCanvas($('camera-canvas'),s,{dx:move,dy,camera:true});
+   const f=$('focus');if(f)f.classList.toggle('ready',Math.abs(move)<=.17);
+  }
+  if(now-previousFrame>150){previousFrame=now;
+   if($('success-canvas')&&state.modal==='success'&&state.encounter)frogCanvas($('success-canvas'),speciesById[state.captureId]);
+  }
+ }
+ requestAnimationFrame(animate);
+}
+art.onload=()=>{shell();requestAnimationFrame(animate)};
+art.onerror=()=>{$('app').innerHTML='<p style="padding:40px">Não foi possível carregar a arte das pererecas.</p>'};
+art.src = ATLAS;
+
+</script>
+</body>
+</html>
