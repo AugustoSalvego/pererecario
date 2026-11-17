@@ -1,5 +1,5 @@
 // Tela principal: mapa + HUD + navegação entre Pererecário, Meu Brejo, Amigos e Perfil.
-import { GameMap, tilesAround } from './map.js';
+import { GameMap, tilesAround, tileProvider } from './map.js';
 import { openCapture } from './capture.js';
 import { mountAlbum, renderAlbum, openSpecies } from './album.js';
 import { mountPond, renderPond } from './pond.js';
@@ -18,8 +18,10 @@ import { sensors } from '../sensors.js';
 import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
-  spawnsFor, windowOf, windowEnd, distanceM, offsetLatLng, hash32, captureRange, REVEAL_RANGE_M,
+  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, visibleBrejos,
 } from '../shared/game.js';
+
+const brejosShown = () => visibleBrejos(store.brejos);
 
 let map, current = 'map', ctx, lastWin = null, walkingTimer = null;
 let playerDir = 'down', walking = false, lastPos = null, justRevealed = new Set();
@@ -217,7 +219,7 @@ function renderHint() {
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
   else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
   else {
-    const nearest = store.brejos.map((b) => ({ b, d: distanceM(pos, b) - b.radius })).sort((a, b) => a.d - b.d)[0];
+    const nearest = brejosShown().map((b) => ({ b, d: distanceM(pos, b) - b.radius })).sort((a, b) => a.d - b.d)[0];
     if (nearest && nearest.d > 60) msg = `🧭 Lagoinha mais próxima: <b>${esc(nearest.b.name)}</b>, a ${fmtDist(nearest.d)}`;
   }
   el.innerHTML = msg;
@@ -233,7 +235,7 @@ function visibleSpawns() {
   const w = windowOf(store.now());
   const pos = geo.pos;
   const out = [];
-  for (const b of store.brejos) {
+  for (const b of brejosShown()) {
     if (pos && distanceM(pos, b) > 2500) continue;
     for (const s of spawnsFor(b, w, catalog)) if (!store.view.capturedSpawns.has(s.id)) out.push(s);
   }
@@ -245,15 +247,12 @@ function refreshObjects() {
   const pos = geo.pos;
   const spawns = visibleSpawns();
   const keep = new Set();
-  for (const b of store.brejos) {
-    const left = spawns.filter((s) => s.brejoId === b.id).length;
+  for (const b of brejosShown()) {
     map.setObject(`pond:${b.id}`, {
       lat: b.lat, lng: b.lng, ground: true, className: 'mpond', data: b,
       html: img(hash32(b.id) % 2 ? 'pond-big.png' : 'pond-small.png', hash32(b.id) % 2 ? 132 : 100),
     });
-    const lp = offsetLatLng(b.lat, b.lng, -13, 0); // nome logo abaixo da lagoinha
-    map.setObject(`label:${b.id}`, { lat: lp.lat, lng: lp.lng, className: 'mlabel', html: `<span>${esc(b.name)} <em>${left} 🐸</em></span>`, data: b });
-    keep.add(`pond:${b.id}`); keep.add(`label:${b.id}`);
+    keep.add(`pond:${b.id}`);
   }
   const range = captureRange(pos);
   for (const s of spawns) {
@@ -279,7 +278,7 @@ function refreshObjects() {
     }
     map.setObject(key, { lat: s.lat, lng: s.lng, html, className: cls, data: s });
   }
-  for (const k of map.objectKeys()) if ((k.startsWith('frog:') || k.startsWith('label:') || k.startsWith('pond:')) && !keep.has(k)) map.removeObject(k);
+  for (const k of map.objectKeys()) if ((k.startsWith('frog:') || k.startsWith('pond:')) && !keep.has(k)) map.removeObject(k);
 
   if (pos) {
     drawPlayer();
@@ -339,7 +338,7 @@ function tick() {
 // ---------- interações ----------
 function onTapObject(key, data) {
   unlockAudio();
-  if (key.startsWith('label:') || key.startsWith('pond:')) return brejoSheet(data);
+  if (key.startsWith('pond:')) return brejoSheet(data);
   if (!key.startsWith('frog:')) return;
   const s = data;
   const pos = geo.pos;
@@ -449,9 +448,10 @@ function sensorPermissionSheet() {
 // baixa antecipadamente os tiles ao redor das lagoinhas (ficam em cache para uso offline)
 const prefetched = new Set();
 async function prefetchTiles() {
-  if (api.isOffline() || !('caches' in window)) return;
+  // o servidor de tiles do OpenStreetMap não permite baixar em lote: só pré-carrega com CARTO
+  if (!tileProvider().prefetch || api.isOffline() || !('caches' in window)) return;
   const urls = [];
-  for (const b of store.brejos) {
+  for (const b of brejosShown()) {
     if (prefetched.has(b.id)) continue;
     prefetched.add(b.id);
     urls.push(...tilesAround(b.lat, b.lng, b.radius + 300, 18), ...tilesAround(b.lat, b.lng, b.radius + 120, 19));

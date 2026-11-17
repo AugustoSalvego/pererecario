@@ -97,6 +97,9 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
   const routes = {
     'GET /api/health': async () => ({ ok: true, serverTime: now(), version: VERSION }),
 
+    // configuração pública do app (chave gratuita do mapa CARTO, se houver)
+    'GET /api/config': async () => ({ cartoKey: process.env.CARTO_KEY || null }),
+
     'POST /api/auth/register': async (req, body) => {
       limit(clientIp(req), 'auth', 30);
       const username = String(body.username || '').trim().toLowerCase();

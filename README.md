@@ -39,7 +39,7 @@ Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-a
 
 1. Crie uma conta em [render.com](https://render.com) (pode entrar com o GitHub).
 2. **New → Blueprint** e escolha este repositório. O arquivo [`render.yaml`](render.yaml) cria o servidor Node e um banco **PostgreSQL gratuito**.
-3. Quando pedir `ADMIN_KEY`, invente uma senha (é a do painel `/admin`).
+3. Quando pedir `ADMIN_KEY`, invente uma senha (é a do painel `/admin`). `CARTO_KEY` é opcional: deixe vazio para usar o mapa padrão do OpenStreetMap, ou cole a chave gratuita do CARTO para um mapa mais limpo.
 4. Aguarde o deploy e abra a URL `https://pererecario-xxxx.onrender.com`. Esse é o link para os jogadores (gere um QR code dele para o público).
 
 Observações do plano gratuito do Render: o servidor "dorme" após 15 min sem acesso e leva ~1 min para acordar (o jogo continua funcionando offline nesse meio-tempo e sincroniza depois); o Postgres gratuito expira 30 dias após criado. Por isso o banco é Postgres e não SQLite: no plano grátis, arquivos locais são apagados quando o servidor dorme.
@@ -77,4 +77,4 @@ test/sync.test.js       testes automatizados
 
 **Danilo Augusto Salvego dos Santos** · GitHub: [AugustoSalvego](https://github.com/AugustoSalvego)
 
-Mapa: © colaboradores do OpenStreetMap, © CARTO. Bibliotecas incluídas: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT) e [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0).
+Mapa: © colaboradores do OpenStreetMap (ou CARTO Voyager, se o servidor tiver a variável `CARTO_KEY` com a chave gratuita de carto.com/basemaps/apikey). Bibliotecas incluídas: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT) e [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0).

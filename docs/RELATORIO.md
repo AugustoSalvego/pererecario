@@ -61,7 +61,7 @@ Uma decisão importante é que **as regras do jogo são determinísticas e compa
 | Cliente | HTML, CSS e JavaScript (módulos ES, sem etapa de build), PWA (Web App Manifest + Service Worker) |
 | Armazenamento local | IndexedDB (persistente; `navigator.storage.persist()` pede ao navegador para não apagar) |
 | Cache offline | Cache Storage via Service Worker |
-| Mapa | Renderizador próprio em perspectiva (estilo jogo) sobre tiles raster do OpenStreetMap/CARTO |
+| Mapa | Renderizador próprio, visto de cima, sobre tiles raster do OpenStreetMap (padrão, sem chave) ou do CARTO Voyager (com a chave gratuita em `CARTO_KEY`). Os tiles vistos ficam em cache para o modo offline; com CARTO, os arredores das lagoinhas são baixados antes |
 | Sensores | Geolocation API (`watchPosition`), DeviceMotion (acelerômetro), getUserMedia + BarcodeDetector/jsQR (QR code), Vibration API, Web Audio |
 | Servidor | Node.js 22, módulo `http`, `node:sqlite` (local) ou `pg` (PostgreSQL) |
 | Protocolo | HTTPS com REST/JSON. Autenticação por token assinado com HMAC-SHA256 (cabeçalho `Authorization: Bearer`) |
@@ -98,7 +98,7 @@ O IndexedDB tem três "tabelas" (`client/js/db.js`):
 
 **Persistência entre aberturas:** fechar e abrir o app offline recupera o progresso: o Service Worker serve o app do cache e o IndexedDB devolve sessão, snapshot e fila. O login também fica salvo, então o jogo abre direto mesmo sem internet.
 
-**Recursos para o modo offline:** o Service Worker guarda o "app shell" (HTML, CSS, JS, atlas das pererecas, catálogo, ícones, bibliotecas de QR). Os tiles do mapa ficam em cache conforme são vistos, e os tiles ao redor de cada brejo são baixados antecipadamente quando há conexão. As chamadas `/api/*` nunca passam pelo cache: o offline da API é tratado pelo próprio app.
+**Recursos para o modo offline:** o Service Worker guarda o "app shell" (HTML, CSS, JS, atlas das pererecas, catálogo, ícones, bibliotecas de QR). Os tiles do mapa ficam em cache conforme são vistos (com o CARTO, os arredores de cada brejo também são baixados antes; o servidor do OpenStreetMap não permite baixar em lote). As chamadas `/api/*` nunca passam pelo cache: o offline da API é tratado pelo próprio app.
 
 ## 5. Mecanismo de sincronização
 

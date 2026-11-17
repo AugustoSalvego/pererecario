@@ -4,6 +4,9 @@ import { sync } from './sync.js';
 import { renderLogin } from './ui/login.js';
 import { startGame } from './ui/game.js';
 import { toast } from './ui/common.js';
+import { setTileProvider } from './ui/map.js';
+import { api } from './api.js';
+import * as db from './db.js';
 
 async function boot() {
   if ('serviceWorker' in navigator) {
@@ -21,6 +24,10 @@ async function boot() {
 
   await loadCatalog();
   await store.init();
+  // provedor do mapa: pergunta ao servidor (com tempo curto) e guarda para usar offline
+  let config = await db.kvGet('config');
+  try { config = await api.get('/api/config', { timeout: 2500 }); await db.kvSet('config', config); } catch {}
+  setTileProvider(config || {});
 
   const splash = document.getElementById('splash');
   splash.classList.add('fade');

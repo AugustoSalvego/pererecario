@@ -95,6 +95,16 @@ export const POND_CLEAR_M = 17;   // ninguém nasce em cima da lagoinha (centro 
 export const MIN_SPAWN_GAP_M = 12; // distância mínima entre duas pererecas do mesmo brejo
 export const MIN_BREJO_GAP_M = 15; // folga mínima entre as bordas de dois brejos
 
+// Brejos criados antes da trava de distância podem estar sobrepostos: o jogo mostra
+// só o mais antigo de cada grupo sobreposto (a lista vem em ordem de criação).
+export function visibleBrejos(brejos) {
+  const kept = [];
+  for (const b of brejos) {
+    if (kept.every((k) => distanceM(b, k) >= b.radius + k.radius)) kept.push(b);
+  }
+  return kept;
+}
+
 export function spawnsFor(brejo, win, catalog) {
   const next = rng(hash32(`${brejo.id}|${win}`));          // espécie e tamanho
   const pos = rng(hash32(`${brejo.id}|${win}|pos`));       // posição

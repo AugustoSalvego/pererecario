@@ -1,12 +1,24 @@
-// Mapa do jogo, desenhado à mão: o mapa real (OpenStreetMap, estilo CARTO Voyager,
-// com nomes de rua) visto de cima. Elementos "no chão" (anel de alcance) ficam na
+// Mapa do jogo, desenhado à mão: o mapa real (OpenStreetMap, ou CARTO Voyager com
+// chave) visto de cima. Elementos "no chão" (anel de alcance) ficam na
 // camada do plano; lagoinhas, matinhos, pererecas e o boneco ficam na camada de objetos.
 // O plano aceita inclinação em perspectiva (tilt), mas o jogo usa o mapa reto.
 const TILE = 256;
 const RETINA = (globalThis.devicePixelRatio || 1) > 1.4 ? '@2x' : '';
-const TILE_TEMPLATE = globalThis.PERERECARIO_TILES || `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${RETINA}.png`;
+// Sem chave: tiles padrão do OpenStreetMap (até zoom 19, sem baixar em lote).
+// Com CARTO_KEY no servidor: estilo Voyager do CARTO (chave gratuita em carto.com/basemaps/apikey).
+let provider = { kind: 'osm', template: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19, attribution: '© colaboradores do OpenStreetMap', prefetch: false };
+export function setTileProvider({ cartoKey } = {}) {
+  if (globalThis.PERERECARIO_TILES) {
+    provider = { kind: 'test', template: globalThis.PERERECARIO_TILES, maxZoom: 20, attribution: '© OpenStreetMap', prefetch: false };
+  } else if (cartoKey) {
+    provider = { kind: 'carto', template: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${RETINA}.png?key=${encodeURIComponent(cartoKey)}`, maxZoom: 20, attribution: '© OpenStreetMap · © CARTO', prefetch: true };
+  }
+  return provider;
+}
+setTileProvider();
+export const tileProvider = () => provider;
+const TILE_URL = (z, x, y) => provider.template.replace('{s}', 'abcd'[(x + y) % 4]).replace('{z}', z).replace('{x}', x).replace('{y}', y);
 export const BASE_ZOOM = 19.2;
-const TILE_URL = (z, x, y) => TILE_TEMPLATE.replace('{s}', 'abcd'[(x + y) % 4]).replace('{z}', z).replace('{x}', x).replace('{y}', y);
 const rad = (d) => (d * Math.PI) / 180;
 
 export function worldPx(lat, lng, z) {
@@ -43,11 +55,11 @@ export class GameMap {
     this.tiles = new Map();
     this.features = new Map();
     this.objects = new Map();
-    el.classList.add('map');
+    el.classList.add('map', `tiles-${provider.kind}`);
     if (!tilt) el.classList.add('flat');
     el.innerHTML = `<div class="map-sky"><div class="cloud" style="left:10%"></div><div class="cloud" style="left:60%;animation-delay:-30s;width:60px"></div></div>
       <div class="map-plane"><div class="map-ground"></div><div class="map-tiles"></div><div class="map-features"></div></div>
-      <div class="map-objects"></div><div class="map-fog"></div><div class="map-attrib">© OpenStreetMap · © CARTO</div>`;
+      <div class="map-objects"></div><div class="map-fog"></div><div class="map-attrib">${provider.attribution}</div>`;
     this.plane = el.querySelector('.map-plane');
     this.tileLayer = el.querySelector('.map-tiles');
     this.featLayer = el.querySelector('.map-features');
@@ -151,7 +163,7 @@ export class GameMap {
 
   render() {
     const { W, H, O } = this;
-    const L = Math.floor(this.zoom);
+    const L = Math.min(Math.floor(this.zoom), provider.maxZoom); // acima do máximo, amplia o último nível
     const scale = 2 ** (this.zoom - L);
     const c = worldPx(this.center.lat, this.center.lng, L);
     // região do plano visível (inversa da perspectiva nos cantos da tela)

@@ -610,3 +610,6 @@ svg { display: block; }
 @keyframes mapHop { 0%, 82%, 100% { transform: translateY(0) scale(1, 1); } 85% { transform: translateY(0) scale(1.08, .9); } 90% { transform: translateY(-14px) scale(.95, 1.07); } 95% { transform: translateY(0) scale(1.06, .94); } 98% { transform: translateY(0) scale(1, 1); } }
 @keyframes mapHopShadow { 0%, 84%, 100% { transform: scale(1); opacity: 1; } 90% { transform: scale(.65); opacity: .55; } 95% { transform: scale(1); opacity: 1; } }
 .mfrog.near .body::before { width: 50px; height: 16px; bottom: -8px; }
+
+/* mapa padrão do OpenStreetMap: cores mais suaves, no estilo de mapa claro */
+.map.tiles-osm .map-tiles img { filter: saturate(.55) brightness(1.08) contrast(.92); }

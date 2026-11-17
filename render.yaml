@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: ADMIN_KEY
         sync: false # o Render pede o valor na criação: é a senha do painel /admin
+      - key: CARTO_KEY
+        sync: false # opcional: chave gratuita do mapa CARTO (carto.com/basemaps/apikey); vazio = OpenStreetMap
 
 databases:
   - name: pererecario-db
