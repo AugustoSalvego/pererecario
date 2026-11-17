@@ -66,6 +66,9 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     return { brejos: rows, version };
   }
 
+  // atrás do proxy do Render todo mundo chega com o mesmo IP: usa o X-Forwarded-For
+  const clientIp = (req) => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+
   function limit(ip, key, max) {
     const k = `${key}:${ip}`;
     const t = now();
@@ -95,7 +98,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     'GET /api/health': async () => ({ ok: true, serverTime: now(), version: VERSION }),
 
     'POST /api/auth/register': async (req, body) => {
-      limit(req.socket.remoteAddress, 'auth', 20);
+      limit(clientIp(req), 'auth', 30);
       const username = String(body.username || '').trim().toLowerCase();
       const displayName = String(body.displayName || '').trim().replace(/\s+/g, ' ');
       const password = String(body.password || '');
@@ -118,7 +121,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     },
 
     'POST /api/auth/login': async (req, body) => {
-      limit(req.socket.remoteAddress, 'auth', 20);
+      limit(clientIp(req), 'auth', 30);
       const username = String(body.username || '').trim().toLowerCase();
       const p = await db.one('SELECT * FROM players WHERE username=$1', [username]);
       if (!p || !(await verifyPassword(String(body.password || ''), p.pass_hash))) throw new HttpError(401, 'Usuário ou senha incorretos');
