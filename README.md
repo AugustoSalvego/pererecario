@@ -1,5 +1,10 @@
 # Pererecário 🐸 — Aventura no Campus
 
+## Mobile-first game redesign (v2)
+
+The web game now has a portrait-first, colorful game UI: an illustrated welcome screen, immersive campus map and habitat clusters, edge-to-edge photo capture, larger album cards, the original **Meu Brejo**, and a themed explorer profile with ranking, history and sync. For design decisions and explicit device-validation limitations see [docs/DESIGN_MOBILE_V2.md](docs/DESIGN_MOBILE_V2.md). The existing 15 approved frog sprites and the server contract were preserved.
+
+
 **PWA mobile-first** para explorar o Campus Luiz Meneghel da UENP, em Bandeirantes (PR), e colecionar 15 pererequinhas originais. A versão web funciona no celular e no computador, sem APK.
 
 > **Estado em 17/11/2026:** pacote de implementação testável, **não publicado na internet**. A lógica principal e o backend passaram nos testes automatizados. Ainda são necessários testes de navegador/celular, validação física das zonas e implantação com HTTPS e armazenamento permanente. O código do Flutter anterior e as prévias foram preservados no repositório original.

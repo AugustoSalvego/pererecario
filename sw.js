@@ -1,5 +1,5 @@
 /* Cache somente do app-shell local. Tiles OSM não são pré-baixados em massa. */
-const VERSION='pererecario-v1-20261117';
+const VERSION='pererecario-v2-game-first-20261117';
 const ASSETS=['/','/index.html','/src/app.js','/src/app.css','/src/db.js','/src/engine.js','/src/map.js','/src/sync.js','/data/campus.json','/assets/species.json','/assets/frogs_atlas.png','/assets/campus_pond.webp','/assets/icon-192.png','/assets/icon-512.png','/manifest.webmanifest'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(VERSION).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));

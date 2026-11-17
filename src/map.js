@@ -4,8 +4,8 @@ function mercator(p,z){const n=256*2**z;const lat=Math.max(-85.0511,Math.min(85.
 function inverse(p,z){const n=256*2**z;const y=Math.PI*(1-2*p[1]/n);return [Math.atan(Math.sinh(y))/rad,p[0]/n*360-180];}
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 export class CampusMap{
- constructor(element,{campus,species,atlas,onEncounter,getLocation,getProgress}){
-  this.el=element;this.campus=campus;this.species=species;this.atlas=atlas;this.onEncounter=onEncounter;this.getLocation=getLocation;this.getProgress=getProgress;
+ constructor(element,{campus,species,atlas,onEncounter,onZone,getLocation,getProgress}){
+  this.el=element;this.campus=campus;this.species=species;this.atlas=atlas;this.onEncounter=onEncounter;this.onZone=onZone;this.getLocation=getLocation;this.getProgress=getProgress;
   this.center=[...campus.center];this.zoom=16;this.tileKey='';this.spawns=[];this.currentSlot=-1;this.pointers=new Map();this.drawn=false;
   this.el.innerHTML='<div class="map-scene"></div><div class="map-tiles" aria-hidden="true"></div><svg class="map-polygons" aria-label="Áreas do campus"></svg><div class="map-spawns"></div><div class="map-gps"></div><div class="map-topnote">🗺️ CAMPUS LUIZ MENEGHEL</div><div class="map-attribution">© <a target="_blank" rel="noopener noreferrer" href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors</div><div class="map-control"><button data-map="plus" title="Aproximar" aria-label="Aproximar mapa">+</button><button data-map="minus" title="Afastar" aria-label="Afastar mapa">−</button><button data-map="gps" title="Minha posição" aria-label="Centralizar na minha posição">⌖</button></div>';
   this.el.querySelector('[data-map="plus"]').onclick=()=>this.zoomBy(1);
@@ -19,6 +19,7 @@ export class CampusMap{
  }
  zoomBy(dir){this.zoom=clamp(this.zoom+dir,14,18);this.tileKey='';this.draw();}
  centerGPS(){const l=this.getLocation();if(l){this.center=[l.latitude,l.longitude];this.draw();}}
+ centerZone(zone){const points=zone.boundary;this.center=[points.reduce((s,p)=>s+p[0],0)/points.length,points.reduce((s,p)=>s+p[1],0)/points.length];this.zoom=18;this.tileKey='';this.draw();}
  update(){this.draw();}
  point(p){const rect=this.el.getBoundingClientRect(),c=mercator(this.center,this.zoom),g=mercator(p,this.zoom);return [rect.width/2+g[0]-c[0],rect.height/2+g[1]-c[1]];}
  refreshSpawns(){const slot=Math.floor(Date.now()/(30*60*1000));if(this.currentSlot===slot)return;this.currentSlot=slot;this.spawns=generateSpawns(Date.now(),this.campus.zones,this.species);}
@@ -26,7 +27,34 @@ export class CampusMap{
   for(const tile of tiles.children){const x=+tile.dataset.x,y=+tile.dataset.y;tile.style.left=`${Math.round(width/2+x*256-c[0])}px`;tile.style.top=`${Math.round(height/2+y*256-c[1])}px`;}
   const svg=this.el.querySelector('.map-polygons');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
   svg.innerHTML=this.campus.zones.map(zone=>`<polygon points="${zone.boundary.map(p=>this.point(p).map(n=>n.toFixed(1)).join(',')).join(' ')}" fill="${zone.color}" stroke="${zone.color}" stroke-width="3.5" fill-opacity=".24" stroke-opacity=".95"/>`).join('');
-  const progress=this.getProgress();const already=new Set(progress.captures.map(c=>c.encounterId));const layer=this.el.querySelector('.map-spawns');layer.replaceChildren();for(const spawn of this.spawns){if(already.has(spawn.id))continue;const [x,y]=this.point(spawn.position);if(x<-70||x>width+70||y<-70||y>height+70)continue;const btn=document.createElement('button');btn.className='spawn-marker';btn.style.left=`${x}px`;btn.style.top=`${y}px`;btn.setAttribute('aria-label','Ver encontro de perereca');btn.innerHTML='<span class="spawn-ring"></span><canvas width="74" height="74"></canvas>';btn.onclick=()=>this.onEncounter(spawn);layer.append(btn);this.drawSprite(btn.querySelector('canvas'),spawn.speciesId);}
+  const progress=this.getProgress();
+  const already=new Set(progress.captures.map(c=>c.encounterId));
+  const visible=this.spawns.filter(s=>!already.has(s.id));
+  const layer=this.el.querySelector('.map-spawns');layer.replaceChildren();
+  if(z<18){
+    // One inviting marker per habitat. At campus scale, individual pins overlapped and
+    // misleadingly appeared to sit on top of buildings. Zoom in to inspect exact points.
+    for(const zone of this.campus.zones){
+      const spawns=visible.filter(s=>s.zoneId===zone.id);if(!spawns.length)continue;
+      const lat=zone.boundary.reduce((sum,p)=>sum+p[0],0)/zone.boundary.length;
+      const lon=zone.boundary.reduce((sum,p)=>sum+p[1],0)/zone.boundary.length;
+      const [x,y]=this.point([lat,lon]);if(x<-95||x>width+95||y<-95||y>height+95)continue;
+      const btn=document.createElement('button');btn.className='zone-marker';btn.style.left=`${x}px`;btn.style.top=`${y}px`;
+      btn.style.setProperty('--marker-accent',zone.color);
+      btn.setAttribute('aria-label',`${zone.name}: ${spawns.length} encontros disponíveis`);
+      btn.innerHTML=`<span class="zone-marker-emoji">${zone.emoji}</span><span class="zone-marker-count">${spawns.length}</span>`;
+      btn.onclick=()=>this.onZone?.(zone,spawns);layer.append(btn);
+    }
+  } else {
+    for(const spawn of visible){
+      const [x,y]=this.point(spawn.position);if(x<-50||x>width+50||y<-50||y>height+50)continue;
+      const btn=document.createElement('button');const species=this.species.find(v=>v.id===spawn.speciesId);
+      btn.className='spawn-marker'+(species?.tier==='special'?' special-spawn':'');btn.style.left=`${x}px`;btn.style.top=`${y}px`;
+      btn.setAttribute('aria-label','Ver encontro de perereca');
+      btn.innerHTML='<span class="spawn-ring"></span><canvas width="74" height="74"></canvas>';
+      btn.onclick=()=>this.onEncounter(spawn);layer.append(btn);this.drawSprite(btn.querySelector('canvas'),spawn.speciesId);
+    }
+  }
   const marker=this.el.querySelector('.map-gps');const gps=this.getLocation();marker.replaceChildren();if(gps){const [x,y]=this.point([gps.latitude,gps.longitude]);if(x>-30&&x<width+30&&y>-30&&y<height+30){const dot=document.createElement('span');dot.className='player-marker';dot.style.left=`${x}px`;dot.style.top=`${y}px`;dot.innerHTML='<i></i>';marker.append(dot);}}
  }
  drawSprite(canvas,speciesId){const s=this.species.find(v=>v.id===speciesId);if(!s||!this.atlas.complete||!this.atlas.naturalWidth)return;const [x,y,w,h]=s.rect,ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;const scale=Math.min(60/w,56/h);ctx.clearRect(0,0,74,74);ctx.drawImage(this.atlas,x,y,w,h,(74-w*scale)/2,(70-h*scale),w*scale,h*scale);}
