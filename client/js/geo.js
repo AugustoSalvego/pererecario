@@ -25,7 +25,7 @@ class Geo extends EventTarget {
 
   defaultSimPos() {
     const b = store.brejos[0];
-    return b ? { lat: b.lat - 0.0006, lng: b.lng } : null;
+    return b ? { lat: b.lat - 0.0006, lng: b.lng } : { lat: -23.1068, lng: -50.3602 };
   }
 
   watch() {

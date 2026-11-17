@@ -15,7 +15,7 @@ function slides(look) {
   return [
     {
       title: 'Bem-vindo ao Pererecário!',
-      text: 'As pererecas vivem nas <b>lagoinhas do campus</b>. São 15 espécies para descobrir: complete o seu Pererecário!',
+      text: 'As pererecas vivem nas <b>lagoinhas</b> espalhadas pelo mapa, em qualquer lugar. São 15 espécies para descobrir: complete o seu Pererecário!',
       art: `${img('pond-big.png', 280, '')}
         <div style="left:62px;top:40px">${frogImg('frog_drop', 54)}</div>
         <div style="left:150px;top:20px">${frogImg('frog_pitanga', 66)}</div>
@@ -24,7 +24,7 @@ function slides(look) {
     },
     {
       title: 'Ande até uma lagoinha',
-      text: 'Use o GPS e caminhe pelo campus. O <b>círculo verde</b> em volta de você mostra o seu alcance: <b>10 metros</b>.',
+      text: 'Use o GPS e caminhe por aí. A setinha no topo aponta a lagoinha mais próxima. O <b>círculo verde</b> em volta de você mostra o seu alcance: <b>10 metros</b>.',
       art: `<div style="left:150px;top:60px">${img('pond-small.png', 140)}</div>
         <div style="left:20px;top:120px;width:120px;height:44px;border-radius:50%;border:3px solid rgba(70,190,60,.95);box-shadow:0 0 12px rgba(110,230,80,.85);background:rgba(120,230,90,.16)"></div>
         <div style="left:54px;top:68px">${charHtml(look, { dir: 'right', walking: true, scale: 3 })}</div>`,

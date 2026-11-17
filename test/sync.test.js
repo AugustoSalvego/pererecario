@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { spawnsFor, windowOf, giftFor, dayOf, maskFromSpecies, autoBrejos, allBrejos } from '../client/js/shared/game.js';
+import { spawnsFor, windowOf, giftFor, dayOf, maskFromSpecies, pondsNear, brejosNear, distanceM } from '../client/js/shared/game.js';
 
 let server, base, app, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
@@ -82,23 +82,35 @@ test('pererecas de um brejo nascem afastadas entre si e da lagoinha', async () =
   }
 });
 
-test('lagoinhas automáticas da área do campus: mesmas no cliente e no servidor', async () => {
+test('lagoinhas automáticas em qualquer lugar: o servidor aceita, sem cadastro', async () => {
   const p = await newPlayer('nina');
-  const campus = { lat: -23.2, lng: -50.4, radius: 500 };
-  const r = await call('POST', '/api/admin/campus', campus, { 'X-Admin-Key': ADMIN });
-  assert.equal(r.status, 200);
-  const auto = autoBrejos(campus);
-  assert.ok(auto.length >= 20, `poucas lagoinhas: ${auto.length}`);
-  const shown = allBrejos(r.body.brejos, r.body.campus);
-  for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) {
-    const { distanceM: dm } = await import('../client/js/shared/game.js');
-    assert.ok(dm(shown[i], shown[j]) >= shown[i].radius + shown[j].radius, 'lagoinhas sobrepostas');
+  // um lugar qualquer, longe de todos os brejos cadastrados
+  const here = { lat: 48.8584, lng: 2.2945 };
+  const ponds = pondsNear(here, 400);
+  assert.ok(ponds.length >= 12, `poucas lagoinhas: ${ponds.length}`);
+  for (let i = 0; i < ponds.length; i++) for (let j = i + 1; j < ponds.length; j++) {
+    assert.ok(distanceM(ponds[i], ponds[j]) >= ponds[i].radius + ponds[j].radius, 'lagoinhas sobrepostas');
   }
-  const b = auto[0];
-  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[0];
+  const spawn = spawnsFor(ponds[0], windowOf(clock), app.catalog)[0];
+  const ok = await sync(p, 'c1', [captureOp(spawn, clock)]);
+  assert.equal(ok.body.results[0].status, 'applied', JSON.stringify(ok.body.results[0]));
+  // id de lagoinha que não existe (o sorteio daquele ponto da grade deu "sem lagoinha") é recusado
+  const fake = { ...spawn, id: spawn.id.replace(ponds[0].id, 'p1_99999999') };
+  const bad = await sync(p, 'c1', [captureOp(fake, clock)]);
+  assert.notEqual(bad.body.results[0].status, 'applied');
+});
+
+test('brejo cadastrado à mão esconde a lagoinha automática que está em cima dele', async () => {
+  const p = await newPlayer('otto');
+  const pond = pondsNear({ lat: -22.95, lng: -43.21 }, 300)[0];
+  const r = await call('POST', '/api/admin/brejos', { name: 'Brejo da Sala', lat: pond.lat, lng: pond.lng + 0.0001, radius: 30 }, { 'X-Admin-Key': ADMIN });
+  assert.equal(r.status, 200);
+  const shown = brejosNear(r.body.brejos, pond, 300);
+  assert.ok(!shown.some((b) => b.id === pond.id), 'a automática deveria sumir');
+  assert.ok(shown.some((b) => b.name === 'Brejo da Sala'));
+  const spawn = spawnsFor(pond, windowOf(clock), app.catalog)[0];
   const res = await sync(p, 'c1', [captureOp(spawn, clock)]);
-  assert.equal(res.body.results[0].status, 'applied', JSON.stringify(res.body.results[0]));
-  await call('POST', '/api/admin/campus', { clear: true }, { 'X-Admin-Key': ADMIN });
+  assert.equal(res.body.results[0].status, 'rejected');
 });
 
 test('o servidor recalcula as mesmas pererecas que o cliente', async () => {

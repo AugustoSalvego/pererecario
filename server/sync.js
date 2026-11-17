@@ -12,7 +12,7 @@
 import crypto from 'node:crypto';
 import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
-  distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, allBrejos,
+  distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo,
 } from '../client/js/shared/game.js';
 
 const GPS_TOLERANCE_M = 45;
@@ -21,7 +21,7 @@ const MAX_FUTURE_MS = 5 * 60 * 1000;
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v, max = 80) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : null);
 
-export function makeSync({ db, catalog, now = () => Date.now(), log = () => {}, getCampus = async () => null }) {
+export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }) {
   const speciesIds = new Set(catalog.species.map((s) => s.id));
   const stats = { duplicates: 0 };
 
@@ -33,10 +33,11 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {}, 
     if (caughtAt > now() + MAX_FUTURE_MS) return { error: 'Captura com horário no futuro' };
 
     if (parsed.kind === 'wild') {
+      // brejo cadastrado à mão, ou lagoinha automática (recalculada a partir do próprio id)
       let b = await q.one('SELECT * FROM brejos WHERE id=$1', [parsed.brejoId]);
-      if (!b && /^a\d+x\d+$/.test(parsed.brejoId)) {
+      if (!b) {
         const manual = await q.query('SELECT id, name, lat, lng, radius FROM brejos WHERE active=1 ORDER BY created_at, id');
-        b = allBrejos(manual, await getCampus(q)).find((x) => x.id === parsed.brejoId) || null;
+        b = findBrejo(parsed.brejoId, manual);
       }
       if (!b) return { error: 'Brejo não existe' };
       const spawn = spawnsFor(b, parsed.win, catalog)[parsed.index];

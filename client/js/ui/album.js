@@ -75,7 +75,7 @@ export function openSpecies(id) {
         <div style="grid-column:span 2"><span>Primeira captura</span><b>${fmtDateTime(info.first.caughtAt)}</b></div>
       </div>
       <button class="btn ${isAvatar ? 'ghost' : 'sun'} block" data-act="avatar" ${isAvatar ? 'disabled' : ''}>${isAvatar ? 'Já é o seu avatar' : 'Usar como avatar'}</button>`
-    : `<p class="lead" style="margin-top:10px">Você ainda não encontrou esta perereca. Procure nos brejos do campus${s.tier === 'special' || s.tier === 'rare' ? ' (ela é difícil de achar: chacoalhe o celular perto das moitas!)' : ''}.</p>
+    : `<p class="lead" style="margin-top:10px">Você ainda não encontrou esta perereca. Procure nas lagoinhas do mapa${s.tier === 'special' || s.tier === 'rare' ? ' (ela é difícil de achar: chacoalhe o celular perto das moitas!)' : ''}.</p>
       <button class="btn block" data-act="close">Vou procurar!</button>`}
   `);
   $('[data-act=close]', sheet)?.addEventListener('click', () => closeSheet());

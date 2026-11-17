@@ -1,7 +1,7 @@
 {
   "name": "Pererecário",
   "short_name": "Pererecário",
-  "description": "Ande pelo campus e capture as pererecas dos brejos. Funciona online e offline.",
+  "description": "Ande por aí e capture as pererecas das lagoinhas. Funciona online e offline.",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",

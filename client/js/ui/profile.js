@@ -6,7 +6,7 @@ import { api } from '../api.js';
 import * as db from '../db.js';
 import { icons } from './icons.js';
 import { headHtml, lookOf } from './sprites.js';
-import { dayOf } from '../shared/game.js';
+import { dayOf, findBrejo } from '../shared/game.js';
 import { $, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
 import { sfx } from '../audio.js';
 
@@ -96,8 +96,8 @@ export function renderProfile(el) {
   const recent = v.captures.slice(0, 12);
   $('.history', el).innerHTML = recent.length ? recent.map((c) => {
     const sp = species(c.speciesId);
-    const brejo = store.brejos.find((b) => b.id === c.brejoId);
-    const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha do campus');
+    const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos) : null;
+    const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha');
     return `<div class="card list-item diary">
       <div class="avatar" style="width:46px;height:46px">${frogImg(c.speciesId, 36)}</div>
       <div class="grow"><div class="t">${esc(sp.name)} ${rarityBadge(c.speciesId)}</div>

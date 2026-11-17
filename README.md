@@ -1,6 +1,6 @@
 # Pererecário 🐸
 
-Jogo para celular no estilo "anda e captura": as pererecas ficam esperando nos **brejos do campus**, você caminha até elas com o GPS e **toca rápido** para capturá-las. O jogo funciona **online e offline**: tudo fica salvo no aparelho e é sincronizado com o servidor quando a conexão volta.
+Jogo para celular no estilo "anda e captura": as pererecas ficam esperando nas **lagoinhas** espalhadas pelo mapa (em qualquer lugar, como no Pokémon GO), você caminha até elas com o GPS e **toca rápido** para capturá-las. O jogo funciona **online e offline**: tudo fica salvo no aparelho e é sincronizado com o servidor quando a conexão volta.
 
 Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 
@@ -14,7 +14,7 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 
 1. Abra o link do jogo no celular (Chrome no Android ou Safari no iPhone), crie a conta e permita **localização** e **sensores de movimento**.
 2. Na primeira vez, um tutorial curto explica o jogo e você escolhe o seu explorador.
-3. Ande até uma **lagoinha** do campus. As pererecas comuns ficam à vista, pulando em volta dela; as mais raras se escondem nos **matinhos com "?"**.
+3. Ande até uma **lagoinha** (a setinha no topo aponta a mais próxima). As pererecas comuns ficam à vista, pulando em volta dela; as mais raras se escondem nos **matinhos com "?"**.
 4. Chegou a 20 m de um matinho? **Toque nele** ou **chacoalhe o celular** (revela todos por perto) para a perereca sair.
 5. A até **10 m**, toque na perereca para escolhê-la. Na captura, **toque rápido** nela várias vezes, enquanto ela pula entre as vitórias-régias, até encher o pote.
 6. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
@@ -44,16 +44,13 @@ Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-a
 
 Observações do plano gratuito do Render: o servidor "dorme" após 15 min sem acesso e leva ~1 min para acordar (o jogo continua funcionando offline nesse meio-tempo e sincroniza depois); o Postgres gratuito expira 30 dias após criado. Por isso o banco é Postgres e não SQLite: no plano grátis, arquivos locais são apagados quando o servidor dorme.
 
-## Lagoinhas do campus
+## Onde aparecem as lagoinhas
 
-O jeito mais fácil é **definir a área do campus** (centro + raio): o jogo espalha sozinho umas 30 lagoinhas nessa área, uma a cada ~130 m, e cada uma tem 4 pererecas que mudam a cada **15 minutos**. Celular e servidor calculam as mesmas lagoinhas, sem precisar cadastrar uma por uma.
+**Em qualquer lugar, sem cadastro.** O mundo inteiro é coberto por uma grade invisível de ~130 m, e cada ponto da grade tem um sorteio fixo que decide se ali existe uma lagoinha (75 % de chance). Cada lagoinha tem 4 pererecas, que mudam a cada **15 minutos**. Celular e servidor fazem o mesmo sorteio, então chegam às mesmas lagoinhas e pererecas, mesmo com o celular offline.
 
-- **No local, pelo celular:** Perfil → Painel de demonstração → chave de administrador → raio (ex.: 500) → **Definir campus aqui**.
-- **Pelo computador:** `/admin` → "Área do campus" → cole as coordenadas do centro copiadas do Google Maps e o raio.
+No mapa, as pererecas e os matinhos só aparecem a até 70 m do jogador (mais longe, somem), e as lagoinhas a até 400 m. Quando não há perereca por perto, uma setinha no topo aponta a lagoinha mais próxima.
 
-Também dá para criar **brejos à mão** em lugares específicos (Painel de demonstração → "Criar brejo onde estou", ou `/admin` → Brejos). Dois brejos não podem ficar em cima nem colados um no outro (o servidor recusa).
-
-No mapa, as pererecas e os matinhos só aparecem a até 70 m do jogador (mais longe, somem), e as lagoinhas a até 400 m. Quando não há nenhuma perereca por perto, uma setinha no topo aponta a lagoinha mais próxima.
+Se quiser uma lagoinha num ponto exato (por exemplo, a sala da apresentação), crie um **brejo à mão**: Perfil → Painel de demonstração → chave de administrador → "Criar brejo onde estou", ou `/admin` → Brejos. O brejo cadastrado esconde a lagoinha automática que estiver em cima dele, e dois brejos cadastrados não podem ficar colados (o servidor recusa).
 
 Para deixar o jogo com mais ou menos pererecas, veja [`docs/BALANCEAMENTO.md`](docs/BALANCEAMENTO.md): todos os números ficam num lugar só.
 

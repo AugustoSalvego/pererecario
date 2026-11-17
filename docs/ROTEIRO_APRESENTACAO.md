@@ -6,7 +6,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 - **Dois celulares** (A e B) com o jogo aberto no link do servidor, logados **na mesma conta** de demonstração (ex.: `demo`).
 - **Notebook no projetor** com o painel do servidor aberto: `https://SEU-APP.onrender.com/admin` (com a `ADMIN_KEY`). Ele mostra capturas, log de operações, conflitos e atualiza a cada 3 s.
-- **Área do campus**: no celular, Perfil → Painel de demonstração → chave de admin → raio 500 → **Definir campus aqui** (ou pelo `/admin` → "Área do campus"). Isso espalha as lagoinhas pelo campus para o público jogar.
+- As lagoinhas aparecem sozinhas em qualquer lugar: o público só precisa abrir o link e criar uma conta.
 - **Um brejo na sala**: no celular, Perfil → Painel de demonstração → chave de admin → nome "Brejo da Sala" → raio 40 → **Criar brejo onde estou**. (Faça isso antes, no lugar da apresentação.)
 - Se o GPS dentro do prédio estiver ruim, ligue **GPS simulado** no painel de demonstração e toque no mapa para o explorador andar (ou use "Ir" ao lado do brejo).
 - Abra o servidor uns minutos antes: no plano grátis ele "dorme" e leva ~1 min para acordar.

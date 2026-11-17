@@ -18,19 +18,22 @@ import { sensors } from '../sensors.js';
 import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
-  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, allBrejos,
+  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, findBrejo,
   FROG_VIEW_M, POND_VIEW_M,
 } from '../shared/game.js';
 
-// lagoinhas cadastradas + automáticas da área do campus (recalculadas só quando mudam)
-let shownCache = { key: null, list: [] };
-function brejosShown() {
-  const key = `${store.brejosVersion}|${store.brejos.length}`;
-  if (shownCache.key !== key) shownCache = { key, list: allBrejos(store.brejos, store.campus) };
-  return shownCache.list;
-}
 // ponto de referência para o raio de visão: o jogador (ou o centro do mapa, sem GPS)
 const viewPoint = () => geo.pos || map?.center;
+// lagoinhas em volta do jogador: as automáticas (que existem em qualquer lugar) e as
+// cadastradas à mão. Recalcula só quando o jogador anda uns 20 m ou os brejos mudam.
+let shownCache = { key: null, list: [] };
+function brejosShown() {
+  const vp = viewPoint();
+  if (!vp) return [];
+  const key = `${store.brejosVersion}|${store.brejos.length}|${Math.round(vp.lat * 5000)}|${Math.round(vp.lng * 5000)}`;
+  if (shownCache.key !== key) shownCache = { key, list: brejosNear(store.brejos, vp, POND_VIEW_M + 60) };
+  return shownCache.list;
+}
 
 let map, current = 'map', ctx, lastWin = null, walkingTimer = null;
 let playerDir = 'down', walking = false, lastPos = null, justRevealed = new Set();
@@ -97,7 +100,7 @@ export function startGame({ firstTime = false } = {}) {
   $('.recenter', root).addEventListener('click', recenter);
   $('.status-pill', root).addEventListener('click', statusSheet);
   $('.compass', root).addEventListener('click', () => {
-    const b = brejosShown().find((x) => x.id === $('.compass', root).dataset.target);
+    const b = findBrejo($('.compass', root).dataset.target, store.brejos);
     if (b) { map.follow = false; $('.recenter', root).classList.remove('hidden'); map.setCenter(b.lat, b.lng, true); }
   });
   $('.shake-btn', root).addEventListener('click', () => doShake());
@@ -229,7 +232,6 @@ function renderHint() {
   if (geo.mode === 'real' && geo.error === 'denied') msg = '📍 Localização bloqueada. Permita o acesso à localização no navegador para encontrar as lagoinhas.';
   else if (geo.mode === 'real' && geo.error === 'unsupported') msg = 'Este aparelho não informa a localização.';
   else if (!pos) msg = '📡 Procurando sinal de GPS…';
-  else if (!brejosShown().length) msg = 'Nenhuma lagoinha ainda. O organizador precisa definir a área do campus no painel.';
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
   else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
   el.innerHTML = msg;
@@ -333,6 +335,7 @@ function onGeo() {
   }
   refreshObjects();
   renderHint();
+  prefetchTiles();
   renderExpedition();
 }
 
@@ -476,17 +479,17 @@ function sensorPermissionSheet() {
   });
 }
 
-// baixa antecipadamente os tiles ao redor das lagoinhas (ficam em cache para uso offline)
+// baixa antecipadamente os tiles ao redor do jogador (ficam em cache para uso offline)
 const prefetched = new Set();
 async function prefetchTiles() {
   // o servidor de tiles do OpenStreetMap não permite baixar em lote: só pré-carrega com CARTO
   if (!tileProvider().prefetch || api.isOffline() || !('caches' in window)) return;
-  const urls = [];
-  for (const b of brejosShown()) {
-    if (prefetched.has(b.id)) continue;
-    prefetched.add(b.id);
-    urls.push(...tilesAround(b.lat, b.lng, b.radius + 300, 18), ...tilesAround(b.lat, b.lng, b.radius + 120, 19));
-  }
+  const pos = geo.pos;
+  if (!pos) return;
+  const key = `${Math.round(pos.lat * 400)}|${Math.round(pos.lng * 400)}`; // a cada ~250 m andados
+  if (prefetched.has(key)) return;
+  prefetched.add(key);
+  const urls = [...tilesAround(pos.lat, pos.lng, 450, 18), ...tilesAround(pos.lat, pos.lng, 250, 19)];
   for (const u of urls) {
     try { await fetch(u, { mode: 'no-cors' }); } catch { return; }
     await new Promise((r) => setTimeout(r, 40));

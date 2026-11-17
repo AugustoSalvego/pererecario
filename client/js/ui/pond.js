@@ -1,4 +1,5 @@
 // Meu Brejo: todas as pererecas capturadas (inclusive repetidas).
+import { findBrejo } from '../shared/game.js';
 import { frogImg, species, rarityBadge, getCatalog } from '../catalog.js';
 import { store } from '../store.js';
 import { icons } from './icons.js';
@@ -51,7 +52,7 @@ export function renderPond(el) {
   if (!list.length) {
     grid.style.display = 'block';
     grid.innerHTML = `<div class="empty">${frogImg('frog_moss', 110)}<h3>${sort === 'fav' ? 'Nenhuma favorita ainda' : 'Seu brejo está vazio'}</h3>
-      <p>${sort === 'fav' ? 'Toque na estrela de uma perereca para favoritar.' : 'Vá até um brejo do campus e capture sua primeira perereca!'}</p></div>`;
+      <p>${sort === 'fav' ? 'Toque na estrela de uma perereca para favoritar.' : 'Vá até uma lagoinha do mapa e capture sua primeira perereca!'}</p></div>`;
     return;
   }
   grid.style.display = '';
@@ -73,7 +74,7 @@ function openSpecimen(spawnId) {
   if (!c) return;
   const s = species(c.speciesId);
   const cat = getCatalog();
-  const brejo = store.brejos.find((b) => b.id === c.brejoId);
+  const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos) : null;
   const friend = store.view.friends.find((f) => f.id === c.friendId);
   const sheet = openSheet(`
     <div class="stage-lg" style="--tier:${cat.tiers[s.tier].color}">${frogImg(c.speciesId, 150)}</div>
@@ -82,7 +83,7 @@ function openSpecimen(spawnId) {
       <div><span>Tamanho</span><b>${fmtCm(c.sizeCm)}</b></div>
       <div><span>XP ganho</span><b>+${store.view.perCapture.get(c.id)?.xp || 0}</b></div>
       <div style="grid-column:span 2"><span>Capturada em</span><b>${fmtDateTime(c.caughtAt)}</b></div>
-      <div style="grid-column:span 2"><span>Origem</span><b>${c.kind === 'gift' ? `🎁 Presente de ${esc(friend?.displayName || 'um amigo')}` : `📍 ${esc(brejo?.name || 'Brejo do campus')}`}</b></div>
+      <div style="grid-column:span 2"><span>Origem</span><b>${c.kind === 'gift' ? `🎁 Presente de ${esc(friend?.displayName || 'um amigo')}` : `📍 ${esc(brejo?.name || 'Lagoinha')}`}</b></div>
       <div><span>Aparelho</span><b style="font-size:13px">${esc(c.deviceId)}${c.deviceId === store.deviceId ? ' (este)' : ''}</b></div>
       <div><span>Servidor</span><b style="font-size:14px">${c.pending ? '☁️ pendente' : '✅ sincronizada'}</b></div>
     </div>

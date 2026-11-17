@@ -37,8 +37,7 @@ export function openDemo(ctx) {
     <div class="inline-input"><input class="admin-key" type="password" placeholder="Chave de administrador" value="${esc(s.adminKey || '')}"></div>
     <div class="inline-input" style="margin-top:8px"><input class="brejo-name" placeholder="Nome do novo brejo (ex.: Lago do Bloco C)"><input class="brejo-radius" type="number" value="35" min="10" max="200" style="max-width:76px"></div>
     <button class="btn small block" data-act="create" style="margin-top:8px">${icons.plus} Criar brejo onde estou</button>
-    <div class="inline-input" style="margin-top:10px"><input class="campus-radius" type="number" value="${store.campus?.radius || 500}" min="100" max="3000" style="max-width:96px"><button class="btn small water" data-act="campus" style="flex:1">Definir campus aqui (raio em m)</button></div>
-    <div class="s" style="font-size:12.5px;color:var(--ink-soft);margin-top:6px">${store.campus ? `Campus definido: raio de ${store.campus.radius} m.` : 'Sem área do campus: só aparecem os brejos criados à mão.'} Dentro da área, o jogo espalha lagoinhas sozinho.</div>
+    <div class="s" style="font-size:12.5px;color:var(--ink-soft);margin-top:6px">As lagoinhas já aparecem sozinhas em qualquer lugar. Crie um brejo só se quiser uma lagoinha num ponto exato (por exemplo, na sala da apresentação).</div>
     <a class="btn small ghost block" href="admin" target="_blank" style="margin-top:8px;text-decoration:none">Abrir painel do servidor</a>
 
     <h4>Fila de sincronização <span class="qn"></span></h4>
@@ -123,18 +122,10 @@ export function openDemo(ctx) {
         const radius = Number($('.brejo-radius', sheet).value) || 35;
         if (!name) throw new Error('Dê um nome ao brejo');
         const r = await adminCall('/api/admin/brejos', { name, lat: geo.pos.lat, lng: geo.pos.lng, radius });
-        await store.setBrejos(r.brejos, r.version, r.campus);
+        await store.setBrejos(r.brejos, r.version);
         $('.brejo-name', sheet).value = '';
         renderBrejos();
         toast(`Brejo "${esc(name)}" criado aqui!`, 'ok', 'check');
-        ctx.refresh();
-      }
-      if (act === 'campus') {
-        if (!geo.pos) throw new Error('Ainda sem posição: ative o GPS ou o GPS simulado');
-        const radius = Number($('.campus-radius', sheet).value) || 500;
-        const r = await adminCall('/api/admin/campus', { lat: geo.pos.lat, lng: geo.pos.lng, radius });
-        await store.setBrejos(r.brejos, r.version, r.campus);
-        toast(`Campus definido aqui (raio ${radius} m): lagoinhas espalhadas!`, 'ok', 'check');
         ctx.refresh();
       }
       if (go) {
@@ -147,7 +138,7 @@ export function openDemo(ctx) {
       }
       if (del) {
         const r = await adminCall('/api/admin/brejos/remove', { id: del });
-        await store.setBrejos(r.brejos, r.version, r.campus);
+        await store.setBrejos(r.brejos, r.version);
         renderBrejos();
         ctx.refresh();
       }

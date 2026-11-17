@@ -9,7 +9,7 @@
 //  (Raridade das espécies, XP e toques para capturar ficam em assets/species.json.)
 // =====================================================================================
 export const BALANCO = {
-  // --- lagoinhas automáticas (aparecem dentro da área do campus definida no painel) ---
+  // --- lagoinhas (aparecem sozinhas em qualquer lugar do mapa, como no Pokémon GO) ---
   lagoinhaACadaM: 130,       // distância média entre lagoinhas. Menor = mais lagoinhas.
   chanceDeLagoinha: 0.75,    // 0 a 1: chance de cada ponto da grade ganhar lagoinha. 1 = todos.
   raioDaLagoinhaM: 30,       // tamanho da área de cada lagoinha (onde as pererecas nascem).
@@ -127,39 +127,74 @@ export const POND_CLEAR_M = BALANCO.vaoDaLagoinhaM;
 export const MIN_SPAWN_GAP_M = BALANCO.vaoEntrePererecasM;
 export const MIN_BREJO_GAP_M = BALANCO.vaoEntreBrejosM;
 
-// ---------- lagoinhas automáticas na área do campus ----------
-// O organizador define o campus (centro + raio). O jogo espalha lagoinhas numa grade
-// (BALANCO.lagoinhaACadaM), com sorteio determinístico: celular e servidor chegam às mesmas lagoinhas.
+// ---------- lagoinhas automáticas em qualquer lugar ----------
+// O mundo inteiro é coberto por uma grade fixa de ~130 m (BALANCO.lagoinhaACadaM). Cada ponto
+// da grade tem um sorteio próprio, com semente fixa, que decide se ali existe uma lagoinha,
+// onde exatamente ela fica e qual o nome dela. Como o sorteio depende só do ponto da grade,
+// qualquer celular (mesmo offline) e o servidor chegam às mesmas lagoinhas, sem cadastro.
 export const AUTO = { cell: BALANCO.lagoinhaACadaM, radius: BALANCO.raioDaLagoinhaM, chance: BALANCO.chanceDeLagoinha };
 export const FROG_VIEW_M = BALANCO.vePererecasAteM;
 export const POND_VIEW_M = BALANCO.veLagoinhasAteM;
 const POND_NAMES = ['Lagoinha Serena', 'Poça do Girino', 'Brejinho da Taboa', 'Lagoa do Musgo', 'Poça Cristalina',
   'Brejo do Ipê', 'Lagoinha da Garça', 'Brejo das Vitórias-Régias', 'Lagoinha do Sol', 'Poça do Orvalho',
   'Brejinho Escondido', 'Lagoa da Libélula', 'Poça do Sabiá', 'Brejinho do Capim', 'Lagoinha da Chuva', 'Poça da Lua'];
+const M_PER_DEG = 111320;
+const rowLat = (i) => (i * AUTO.cell) / M_PER_DEG;                                  // latitude da linha i
+const colStep = (i) => AUTO.cell / (M_PER_DEG * Math.cos(rad(rowLat(i))));          // graus de longitude por coluna
+const POND_ID = /^p(-?\d+)_(-?\d+)$/;
 
-export function autoBrejos(campus) {
-  if (!campus || !(campus.radius > 0)) return [];
+// a lagoinha do ponto (i, j) da grade, ou null se o sorteio disse que ali não tem
+export function pondAt(i, j) {
+  const next = rng(hash32(`lagoinha|${i}|${j}`));
+  if (next() > AUTO.chance) return null;
+  const north = (next() - 0.5) * AUTO.cell * 0.4;   // leve desvio, para não ficar tudo alinhado
+  const east = (next() - 0.5) * AUTO.cell * 0.4;
+  const name = POND_NAMES[Math.floor(next() * POND_NAMES.length)];
+  const p = offsetLatLng(rowLat(i), j * colStep(i), north, east);
+  return { id: `p${i}_${j}`, name, lat: p.lat, lng: p.lng, radius: AUTO.radius, auto: true };
+}
+
+export function pondById(id) {
+  const m = POND_ID.exec(String(id));
+  return m ? pondAt(Number(m[1]), Number(m[2])) : null;
+}
+
+// todas as lagoinhas automáticas a até radiusM de um ponto
+export function pondsNear(p, radiusM) {
+  if (!p) return [];
   const out = [];
-  const n = Math.ceil(campus.radius / AUTO.cell);
-  const salt = `${Math.round(campus.lat * 1e5)}|${Math.round(campus.lng * 1e5)}`;
-  for (let i = -n; i <= n; i++) {
-    for (let j = -n; j <= n; j++) {
-      const next = rng(hash32(`auto|${i}|${j}|${salt}`));
-      if (next() > AUTO.chance) continue;
-      const north = i * AUTO.cell + (next() - 0.5) * AUTO.cell * 0.4;
-      const east = j * AUTO.cell + (next() - 0.5) * AUTO.cell * 0.4;
-      const name = POND_NAMES[Math.floor(next() * POND_NAMES.length)];
-      if (Math.hypot(north, east) > campus.radius) continue;
-      const p = offsetLatLng(campus.lat, campus.lng, north, east);
-      out.push({ id: `a${i + 100}x${j + 100}`, name, lat: p.lat, lng: p.lng, radius: AUTO.radius, auto: true });
+  const i0 = Math.floor((p.lat * M_PER_DEG - radiusM) / AUTO.cell) - 1;
+  const i1 = Math.ceil((p.lat * M_PER_DEG + radiusM) / AUTO.cell) + 1;
+  for (let i = i0; i <= i1; i++) {
+    const step = colStep(i);
+    const dLng = radiusM / (M_PER_DEG * Math.cos(rad(rowLat(i))));
+    const j0 = Math.floor((p.lng - dLng) / step) - 1, j1 = Math.ceil((p.lng + dLng) / step) + 1;
+    for (let j = j0; j <= j1; j++) {
+      const b = pondAt(i, j);
+      if (b && distanceM(p, b) <= radiusM) out.push(b);
     }
   }
   return out;
 }
 
-// todas as lagoinhas do jogo: as cadastradas à mão primeiro, depois as automáticas
-export function allBrejos(manual, campus) {
-  return visibleBrejos([...(manual || []), ...autoBrejos(campus)]);
+// Lagoinhas do jogo perto de um ponto: os brejos cadastrados à mão têm prioridade e
+// escondem a lagoinha automática que estiver em cima deles.
+export function brejosNear(manual, p, radiusM) {
+  const kept = visibleBrejos(manual || []);
+  if (!p) return kept;
+  const mine = kept.filter((b) => distanceM(p, b) <= radiusM + b.radius);
+  const auto = pondsNear(p, radiusM).filter((a) => kept.every((m) => distanceM(a, m) >= a.radius + m.radius));
+  return [...mine, ...auto];
+}
+
+// acha um brejo pelo id: cadastrado à mão ou automático (null se não existe ou está escondido)
+export function findBrejo(id, manual) {
+  const kept = visibleBrejos(manual || []);
+  const m = (manual || []).find((b) => b.id === id);
+  if (m) return m;
+  const a = pondById(id);
+  if (!a || !kept.every((k) => distanceM(a, k) >= a.radius + k.radius)) return null;
+  return a;
 }
 
 // Brejos criados antes da trava de distância podem estar sobrepostos: o jogo mostra

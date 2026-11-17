@@ -34,7 +34,7 @@ export function renderLogin(onDone) {
     </div>
     <div class="login-top">
       <h1 class="logo">Pererecário<small>caça às pererecas</small></h1>
-      <span class="tagline">🐸 Ande pelo campus e capture todas!</span>
+      <span class="tagline">🐸 Ande por aí e capture todas!</span>
     </div>
     <div class="login-stage">
       ${img('pond-big.png', 380, 'pond-img')}
