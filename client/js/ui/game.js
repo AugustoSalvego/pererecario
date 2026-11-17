@@ -419,7 +419,7 @@ function statusSheet() {
 function sensorPermissionSheet() {
   const sheet = openSheet(`
     <h3>📳 Ativar sensores de movimento</h3>
-    <p class="lead">O Pererecário usa o acelerômetro (chacoalhar para tirar as pererecas do matinho) e o giroscópio (virar o celular para procurá-las na captura).</p>
+    <p class="lead">O Pererecário usa o acelerômetro do celular: chacoalhe perto dos matinhos para as pererecas saírem.</p>
     <button class="btn block" data-act="ok">Ativar sensores</button>`);
   $('[data-act=ok]', sheet).addEventListener('click', async () => {
     const ok = await sensors.request();

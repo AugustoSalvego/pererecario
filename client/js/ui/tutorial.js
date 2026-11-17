@@ -38,7 +38,7 @@ function slides(look) {
     },
     {
       title: 'Toque rápido!',
-      text: 'Na captura, <b>vire o celular</b> para achar a perereca entre as vitórias-régias e <b>toque rápido</b> nela até encher o pote.',
+      text: 'Toque na perereca no mapa para escolher qual quer pegar. Depois, <b>toque rápido</b> nela várias vezes, enquanto ela pula, até encher o pote.',
       art: `<div style="left:40px;top:150px">${img('lilypad.png', 150)}</div>
         <div style="left:62px;top:56px">${frogImg('frog_ember', 106)}</div>
         <div style="left:140px;top:80px" class="tut-tap"></div>

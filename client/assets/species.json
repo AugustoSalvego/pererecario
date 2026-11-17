@@ -159,7 +159,7 @@
   {
    "id": "frog_honey",
    "name": "Mel",
-   "index": 5,
+   "index": 7,
    "tier": "uncommon",
    "description": "Seu tom dourado ilumina qualquer coleção.",
    "rect": [
@@ -184,7 +184,7 @@
   {
    "id": "frog_jabuticaba",
    "name": "Jabuticaba",
-   "index": 6,
+   "index": 12,
    "tier": "rare",
    "description": "Redondinha, discreta e cheia de pequenas pintas.",
    "rect": [
@@ -209,7 +209,7 @@
   {
    "id": "frog_clay",
    "name": "Barro",
-   "index": 7,
+   "index": 5,
    "tier": "common",
    "description": "Tem as cores da terra depois da chuva.",
    "rect": [
@@ -309,7 +309,7 @@
   {
    "id": "frog_star",
    "name": "Estrelinha",
-   "index": 11,
+   "index": 15,
    "tier": "special",
    "description": "Carrega um pedacinho do céu em suas pintas.",
    "rect": [
@@ -334,7 +334,7 @@
   {
    "id": "frog_sprout",
    "name": "Broto",
-   "index": 12,
+   "index": 6,
    "tier": "common",
    "description": "Estica o pescoço para descobrir novos caminhos.",
    "rect": [
@@ -409,7 +409,7 @@
   {
    "id": "frog_jade",
    "name": "Jade",
-   "index": 15,
+   "index": 11,
    "tier": "uncommon",
    "description": "Uma joia verde com pintinhas turquesa.",
    "rect": [

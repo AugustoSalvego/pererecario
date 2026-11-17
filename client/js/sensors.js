@@ -1,6 +1,6 @@
 // Sensores de movimento (computação ubíqua):
 //  - acelerômetro: detectar o gesto de chacoalhar o celular;
-//  - giroscópio/bússola: virar o celular para procurar a perereca na captura.
+//  - orientação (bússola): disponível, mas a captura não depende dela.
 class Sensors extends EventTarget {
   granted = null;
   hasMotion = false;

@@ -37,7 +37,7 @@ export function renderAlbum(el) {
   const found = v.discovered.size;
   $('.sub', el).textContent = `${found} de ${total} espécies descobertas`;
   $('.progress i', el).style.width = `${(found / total) * 100}%`;
-  $('.dex', el).innerHTML = cat.species
+  $('.dex', el).innerHTML = [...cat.species].sort((a, b) => a.index - b.index)
     .filter((s) => filter === 'all' || s.tier === filter)
     .map((s) => {
       const known = v.discovered.has(s.id);

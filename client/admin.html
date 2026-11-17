@@ -59,6 +59,7 @@
       <section><h2>Jogadores (ranking)</h2><table id="players"></table></section>
       <section><h2>Capturas recebidas</h2><p class="muted">"Atraso" = tempo entre a captura no celular e a chegada ao servidor (capturas feitas offline).</p><table id="captures"></table></section>
       <section><h2>Log de operações (idempotência)</h2><table id="ops"></table></section>
+      <section><h2>Partidas (caçada do dia)</h2><p class="muted">Uma partida por jogador por dia. "Aparelhos" = quantos celulares jogaram a mesma partida.</p><table id="partidas"></table></section>
       <section><h2>Conflitos resolvidos</h2><p class="muted">Mesma perereca capturada em dois aparelhos: fica a captura mais antiga.</p><table id="conflicts"></table></section>
       <section style="grid-column:1/-1"><h2>Brejos</h2>
         <div class="row" style="margin-bottom:10px">
@@ -101,6 +102,7 @@ async function load() {
       [...d.players].sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, i: i + 1 })));
     table($('#captures'), [['Jogador', (r) => esc(r.username)], ['Espécie', (r) => esc(r.species_id.replace('frog_', ''))], ['Tipo', (r) => r.kind], ['Aparelho', (r) => esc(r.device_id)], ['Capturada', (r) => t(r.caught_at)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.caught_at)}</span>`]], d.captures);
     table($('#ops'), [['Recebida', (r) => t(r.received_at)], ['Jogador', (r) => esc(r.username)], ['Tipo', (r) => r.type], ['Resultado', (r) => `<span class="tag ${r.status}">${r.status}</span>`], ['Aparelho', (r) => esc(r.device_id)], ['op_id', (r) => r.op_id.slice(0, 8)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.client_ts)}</span>`]], d.operations);
+    table($('#partidas'), [['Jogador', (r) => esc(r.username)], ['Início', (r) => t(r.started_at)], ['Última atividade', (r) => t(r.updated_at)], ['Pererecas', (r) => r.captures], ['Distância', (r) => `${Math.round(r.meters)} m`], ['Aparelhos', (r) => r.devices]], d.partidas || []);
     table($('#conflicts'), [['Quando', (r) => t(r.resolved_at)], ['Jogador', (r) => esc(r.username)], ['Perereca', (r) => esc(r.spawn_id)], ['Mantida', (r) => `${esc(r.kept_device)} @ ${t(r.kept_at)}`], ['Descartada', (r) => `${esc(r.discarded_device)} @ ${t(r.discarded_at)}`]], d.conflicts);
     table($('#brejos'), [['Nome', (r) => esc(r.name)], ['Posição', (r) => `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`], ['Raio', (r) => `${r.radius} m`], ['', (r) => `<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target="_blank">ver no mapa</a> · <a href="#" data-del="${r.id}">remover</a>`]], d.brejos);
   } catch (e) {

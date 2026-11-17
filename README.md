@@ -16,9 +16,9 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 2. Na primeira vez, um tutorial curto explica o jogo e você escolhe o seu explorador.
 3. Ande até uma **lagoinha** do campus. As pererecas ficam escondidas nos **matinhos com "?"** em volta dela.
 4. Chegou a 20 m? **Chacoalhe o celular** para elas saírem do matinho.
-5. A até **10 m**, toque na perereca. Na captura, **vire o celular** (giroscópio) para achá-la entre as vitórias-régias e **toque rápido** nela até encher o pote.
+5. A até **10 m**, toque na perereca para escolhê-la. Na captura, **toque rápido** nela várias vezes, enquanto ela pula entre as vitórias-régias, até encher o pote.
 6. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
-7. Complete o **Pererecário** (15 espécies) e veja suas repetidas no **Meu Brejo**. Cada dia em que você joga é uma **caçada** e vira uma página do seu **Diário de campo**, no Perfil.
+7. Complete o **Pererecário** (15 espécies, das comuns até a especial) e veja suas repetidas no **Meu Brejo**. Cada dia em que você joga é uma **caçada**; no Perfil ficam a caçada de hoje, o ranking e o **Diário de campo** com as últimas capturas.
 
 Para instalar como app: no Android, menu ⋮ → "Instalar app"/"Adicionar à tela inicial"; no iPhone, Compartilhar → "Adicionar à Tela de Início".
 
@@ -62,7 +62,7 @@ client/                 PWA (HTML/CSS/JS sem build)
   js/db.js              IndexedDB (armazenamento local persistente)
   js/store.js           estado = último estado do servidor + fila de operações
   js/sync.js            módulo de sincronização (conectividade, reenvio, backoff)
-  js/geo.js, sensors.js GPS (real ou simulado), acelerômetro e giroscópio
+  js/geo.js, sensors.js GPS (real ou simulado) e acelerômetro (chacoalhar)
   js/ui/                telas: login, mapa, captura, álbum, Meu Brejo, amigos, perfil, demonstração
   admin.html            painel do servidor (dados, conflitos, simulação de queda)
   assets/               atlas com as 15 pererecas + catálogo das espécies

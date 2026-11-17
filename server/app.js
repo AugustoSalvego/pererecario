@@ -192,6 +192,13 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
         operations: await db.query(
           `SELECT o.op_id, o.type, o.status, o.device_id, o.client_ts, o.received_at, p.username
            FROM operations o JOIN players p ON p.id = o.player_id ORDER BY o.received_at DESC LIMIT 60`),
+        partidas: await db.query(
+          `SELECT e.id, e.started_at, e.updated_at, p.username,
+             (SELECT COUNT(*) FROM captures c WHERE c.expedition_id = e.id) AS captures,
+             (SELECT COALESCE(SUM(d.meters), 0) FROM expedition_distance d WHERE d.expedition_id = e.id) AS meters,
+             (SELECT COUNT(*) FROM (SELECT device_id FROM captures WHERE expedition_id = e.id
+                UNION SELECT device_id FROM expedition_distance WHERE expedition_id = e.id) x) AS devices
+           FROM expeditions e JOIN players p ON p.id = e.player_id ORDER BY e.updated_at DESC LIMIT 30`),
         conflicts: await db.query(
           `SELECT c.*, p.username FROM conflicts c JOIN players p ON p.id = c.player_id ORDER BY c.resolved_at DESC LIMIT 30`),
         brejos: (await brejos()).brejos,

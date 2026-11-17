@@ -36,7 +36,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 ## Teste 5: recuperar o progresso em outro aparelho
 
 1. No celular B (ou num navegador anônimo), entre com a mesma conta.
-2. O Pererecário, o Meu Brejo, o nível e o Diário de campo aparecem iguais aos do celular A.
+2. O Pererecário, o Meu Brejo, o nível e o Diário de campo aparecem iguais aos do celular A. No `/admin`, a tabela **Partidas** mostra a caçada do dia com **2 aparelhos**.
 
 ## Teste 6: servidor indisponível, reenvio e conflito
 
@@ -61,5 +61,4 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 ## Extras de computação ubíqua (para mostrar)
 
 - **Chacoalhar** o celular perto de um matinho com "?" faz as pererecas saírem.
-- Na captura, **girar o corpo com o celular** para encontrar a perereca.
 - **QR code**: dois colegas abrem a aba Amigos e um escaneia o QR do outro: a perereca-presente aparece.

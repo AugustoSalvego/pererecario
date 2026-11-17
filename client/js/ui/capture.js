@@ -1,9 +1,8 @@
-// Minijogo de captura: a perereca pula entre as vitórias-régias; o jogador vira o
-// celular (giroscópio) ou arrasta a tela para encontrá-la e toca rápido nela.
+// Minijogo de captura: a perereca pula entre as vitórias-régias da tela e o jogador
+// toca rápido nela até encher o pote (2 a 5 toques, conforme a raridade).
 import { species, tier, frogImg, rarityBadge } from '../catalog.js';
 import { store } from '../store.js';
 import { geo } from '../geo.js';
-import { sensors } from '../sensors.js';
 import { sfx, vibrate } from '../audio.js';
 import { icons } from './icons.js';
 import { $, h, esc, fmtCm, toast } from './common.js';
@@ -50,52 +49,40 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
   const t = tier(spawn.speciesId);
   const known = store.view.discovered.has(sp.id);
   const W = app.clientWidth, H = app.clientHeight;
-  const WORLD = Math.round(W * 2.6);
   const need = t.taps;
 
-  // vitórias-régias espalhadas pela lagoa
-  const pads = [];
-  const cols = 9;
-  for (let i = 0; i < cols; i++) {
-    pads.push({ x: (WORLD / cols) * (i + 0.5) + rand(-30, 30), y: H * rand(0.56, 0.86) });
-  }
-  const startView = (WORLD - W) / 2;
-  let padIdx = Math.random() < 0.5 ? 1 : cols - 2; // começa fora da tela: é preciso procurar
+  // vitórias-régias espalhadas pela lagoa, todas dentro da tela
+  const pads = [[0.24, 0.6], [0.76, 0.6], [0.5, 0.72], [0.22, 0.86], [0.78, 0.86]]
+    .map(([fx, fy]) => ({ x: W * fx + rand(-12, 12), y: H * fy + rand(-8, 8) }));
+  let padIdx = 2;
   let frog = { x: pads[padIdx].x, y: pads[padIdx].y };
+  const view = 0;
 
   const el = h(`<div class="capture">
-    <div class="cap-world" style="width:${WORLD}px">
+    <div class="cap-world" style="width:${W}px">
       <div class="cap-sky"></div>
-      ${treeline(WORLD, Math.round(H * 0.18))}
+      ${treeline(W, Math.round(H * 0.18))}
       <div class="cap-water"></div>
       ${pads.map((p) => `<img class="px cap-lily" src="assets/sprites/lilypad.png" style="left:${p.x}px;top:${p.y}px" alt="">`).join('')}
-      ${reeds(rand(0, W * 0.4), 140)}${reeds(WORLD * 0.45, 160)}${reeds(WORLD - 170, 150)}
-      <div class="cap-frog"><div class="hitbox"></div>${frogImg(sp.id, Math.min(150, W * 0.36))}</div>
+      ${reeds(-20, 130)}${reeds(W - 120, 140)}
+      <div class="cap-frog"><div class="hitbox"></div>${frogImg(sp.id, Math.min(140, W * 0.34))}</div>
     </div>
     <div class="cap-hud">
       <button class="icon-btn" data-act="close" aria-label="Voltar">${icons.close}</button>
       <div class="cap-title">${spawn.kind === 'gift' ? '<small>🎁 Presente</small>' : ''}<b>${known ? esc(sp.name) : '???'}</b>${rarityBadge(sp.id)}</div>
       <div class="jar"><div class="glass"><i style="height:0%"></i></div><span class="jar-n">0/${need}</span></div>
     </div>
-    <button class="cap-arrow left hidden" aria-label="Procure à esquerda">${icons.back}</button>
-    <button class="cap-arrow right hidden" aria-label="Procure à direita">${icons.back}</button>
-    <div class="cap-help">${icons.phone}<span>Vire o celular para procurar e <b>toque rápido</b> na perereca!</span></div>
+    <div class="cap-help">${icons.sparkle}<span><b>Toque rápido</b> na perereca ${need} vezes para pegar!</span></div>
   </div>`);
   app.appendChild(el);
 
-  const world = $('.cap-world', el);
   const frogEl = $('.cap-frog', el);
   const jarFill = $('.jar .glass i', el);
   const jarN = $('.jar-n', el);
-  const arrowL = $('.cap-arrow.left', el), arrowR = $('.cap-arrow.right', el);
   const help = $('.cap-help', el);
 
-  let view = startView, target = startView;
   let hits = 0, misses = 0, assist = false, done = false;
-  let hopTimer = null, hopAnim = null, raf = null;
-  let baseHeading = null;
-  const pxPerDeg = (WORLD - W) / 110;
-  const clampView = (v) => Math.max(0, Math.min(WORLD - W, v));
+  let hopTimer = null, hopAnim = null;
 
   function place() {
     frogEl.style.transform = `translate(${frog.x}px, ${frog.y}px)`;
@@ -104,9 +91,9 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
 
   function hop() {
     if (done) return;
-    // escolhe outra vitória-régia por perto
-    const options = pads.map((p, i) => i).filter((i) => i !== padIdx && Math.abs(pads[i].x - pads[padIdx].x) < W * 0.95);
-    const next = options[Math.floor(Math.random() * options.length)] ?? 0;
+    // pula para outra vitória-régia
+    const options = pads.map((p, i) => i).filter((i) => i !== padIdx);
+    const next = options[Math.floor(Math.random() * options.length)];
     const from = { ...frog }, to = pads[next];
     padIdx = next;
     const t0 = performance.now(), dur = 360;
@@ -114,7 +101,7 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
     const step = (now) => {
       const k = Math.min(1, (now - t0) / dur);
       frog.x = from.x + (to.x - from.x) * k;
-      frog.y = from.y + (to.y - from.y) * k - Math.sin(Math.PI * k) * 90;
+      frog.y = from.y + (to.y - from.y) * k - Math.sin(Math.PI * k) * 80;
       place();
       if (k < 1) hopAnim = requestAnimationFrame(step);
     };
@@ -127,51 +114,13 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
   }
   scheduleHop();
 
-  function loop() {
-    view += (target - view) * 0.18;
-    world.style.transform = `translateX(${-view}px)`;
-    const sx = frog.x - view;
-    arrowL.classList.toggle('hidden', sx > -10 || done);
-    arrowR.classList.toggle('hidden', sx < W + 10 || done);
-    raf = requestAnimationFrame(loop);
-  }
-  raf = requestAnimationFrame(loop);
-
-  // giroscópio / bússola
-  const onOrient = (e) => {
-    const hd = e.detail.heading;
-    if (baseHeading == null) baseHeading = hd - (target - startView) / pxPerDeg;
-    let d = hd - baseHeading;
-    d = ((d + 540) % 360) - 180;
-    target = clampView(startView + d * pxPerDeg);
-  };
-  sensors.addEventListener('orientation', onOrient);
-
-  // arrastar com o dedo (alternativa ao giroscópio)
-  let drag = null;
+  // tocar: na perereca conta ponto; na água, espirra
   el.addEventListener('pointerdown', (e) => {
-    if (done) return;
+    if (done || e.target.closest('button')) return;
     if (e.target.closest('.hitbox') || e.target.closest('.cap-frog')) { e.preventDefault(); onHit(); return; }
-    if (e.target.closest('button')) return;
-    drag = { x: e.clientX, y: e.clientY, view: target, moved: 0 };
-  });
-  el.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    const dx = e.clientX - drag.x;
-    drag.moved = Math.max(drag.moved, Math.abs(dx));
-    target = clampView(drag.view - dx);
-    if (baseHeading != null) baseHeading += 0; // giroscópio recalibra no próximo evento
-  });
-  el.addEventListener('pointerup', (e) => {
-    if (!drag) return;
-    const wasTap = drag.moved < 10;
-    drag = null;
-    if (baseHeading != null) baseHeading = null; // recalibra o giroscópio a partir da nova posição
-    if (wasTap && !done) onMiss(e);
+    onMiss(e);
   });
 
-  arrowL.addEventListener('click', () => { target = clampView(target - W * 0.8); baseHeading = null; });
-  arrowR.addEventListener('click', () => { target = clampView(target + W * 0.8); baseHeading = null; });
   $('[data-act=close]', el).addEventListener('click', () => close());
 
   function floatText(text, x, y) {
@@ -257,8 +206,6 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
     done = true;
     clearTimeout(hopTimer);
     cancelAnimationFrame(hopAnim);
-    cancelAnimationFrame(raf);
-    sensors.removeEventListener('orientation', onOrient);
     el.style.transition = 'opacity .25s';
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 260);

@@ -4,7 +4,7 @@ Trabalho prático de Sistemas Distribuídos: jogo para computação móvel com f
 
 ## 1. Descrição do jogo
 
-O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são lugares reais do campus (centro + raio), cadastrados no servidor e desenhados no mapa como **lagoinhas**. Em volta de cada lagoinha vivem de 3 a 7 pererecas, que mudam a cada 15 minutos. Toda perereca começa **escondida num matinho com "?"**: o jogador caminha até lá (GPS) e, a até 20 m, **chacoalha o celular** para ela sair. Depois, a até **10 m**, toca nela e entra no minijogo de captura: a perereca pula entre vitórias-régias, o jogador **vira o celular** (giroscópio) para encontrá-la e **toca rápido** nela até encher o pote (2 a 5 toques, conforme a raridade).
+O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são lugares reais do campus (centro + raio), cadastrados no servidor e desenhados no mapa como **lagoinhas**. Em volta de cada lagoinha vivem de 3 a 7 pererecas, que mudam a cada 15 minutos. Toda perereca começa **escondida num matinho com "?"**: o jogador caminha até lá (GPS) e, a até 20 m, **chacoalha o celular** para ela sair. Depois, a até **10 m**, toca nela no mapa para escolhê-la e entra no minijogo de captura: a perereca pula entre as vitórias-régias da tela e o jogador **toca rápido** nela até encher o pote (2 a 5 toques, conforme a raridade).
 
 Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu explorador (2 modelos × 3 tons de pele), que anda no mapa nas 4 direções. Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
@@ -13,7 +13,7 @@ Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especi
 | Identificação do jogador | Conta com usuário e senha; token assinado guardado no aparelho |
 | Estado e progresso das partidas | **Caçada do dia** = a partida: criada automaticamente no primeiro movimento ou captura do dia; acumula capturas, XP e distância. O identificador é fixo por jogador e por dia (`dia:<jogador>:<dia>`), então dois aparelhos no mesmo dia jogam **a mesma partida** |
 | Pontuações e resultados | XP por captura (10/25/60/150 + 50 por espécie nova), nível, ranking do campus |
-| Histórico das partidas | **Diário de campo** no Perfil: uma página por dia, com as pererecas capturadas, XP e distância |
+| Histórico das partidas | No servidor, cada partida fica registrada com jogador, dia, pererecas, distância e quantos aparelhos jogaram nela (visível no painel `/admin`). No app, o **Diário de campo** mostra as últimas capturas e o Perfil mostra a caçada de hoje |
 
 | Tela | |
 |---|---|
@@ -26,7 +26,7 @@ Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especi
 flowchart LR
   subgraph Celular["Cliente (PWA no celular)"]
     UI["Interface do jogo<br/>mapa, captura, álbum, perfil"]
-    SENS["Sensores<br/>GPS · acelerômetro · giroscópio · câmera (QR)"]
+    SENS["Sensores<br/>GPS · acelerômetro · câmera (QR)"]
     STORE["Estado do jogo<br/>snapshot + operações pendentes"]
     IDB[("IndexedDB<br/>kv · outbox · log")]
     SW["Service Worker<br/>cache do app e do mapa"]
@@ -62,7 +62,7 @@ Uma decisão importante é que **as regras do jogo são determinísticas e compa
 | Armazenamento local | IndexedDB (persistente; `navigator.storage.persist()` pede ao navegador para não apagar) |
 | Cache offline | Cache Storage via Service Worker |
 | Mapa | Renderizador próprio em perspectiva (estilo jogo) sobre tiles raster do OpenStreetMap/CARTO |
-| Sensores | Geolocation API (`watchPosition`), DeviceMotion (acelerômetro), DeviceOrientation (giroscópio/bússola), getUserMedia + BarcodeDetector/jsQR (QR code), Vibration API, Web Audio |
+| Sensores | Geolocation API (`watchPosition`), DeviceMotion (acelerômetro), getUserMedia + BarcodeDetector/jsQR (QR code), Vibration API, Web Audio |
 | Servidor | Node.js 22, módulo `http`, `node:sqlite` (local) ou `pg` (PostgreSQL) |
 | Protocolo | HTTPS com REST/JSON. Autenticação por token assinado com HMAC-SHA256 (cabeçalho `Authorization: Bearer`) |
 | Senhas | scrypt com sal aleatório |
@@ -187,7 +187,6 @@ O jogo muda conforme o ambiente físico do jogador:
 |---|---|---|
 | **Localização geográfica** | GPS (`watchPosition`, alta precisão) | As lagoinhas são lugares reais do campus, sobre o mapa real (OpenStreetMap). Captura a até **10 m** da perereca, com até 10 m de folga automática quando o próprio GPS informa imprecisão. O boneco anda na direção do movimento. A distância caminhada entra na caçada do dia. Sinal ruim (precisão > 60 m) gera aviso, e leituras imprecisas não contam distância. |
 | **Movimento: chacoalhar** | Acelerômetro (`devicemotion`) | Toda perereca começa escondida num matinho com "?". A 20 m, o matinho "espia" (aparecem olhinhos) e o jogo pede para **chacoalhar o celular**; os coaxos e a vibração fazem as pererecas saírem. |
-| **Orientação: virar o celular** | Giroscópio/bússola (`deviceorientation`) | Na captura, a lagoa é um panorama mais largo que a tela: o jogador **gira o corpo com o celular** para encontrar a perereca, que fica "presa no mundo". Sem giroscópio, dá para arrastar com o dedo. |
 | **Proximidade entre jogadores** | Câmera + QR code | Cada jogador tem um QR no perfil. Escanear o de outra pessoa exige estar perto dela: cria a amizade e libera uma perereca-presente. O QR carrega os dados necessários, então funciona até offline. |
 | **Contexto temporal** | Relógio corrigido pelo servidor | As pererecas de cada brejo mudam a cada 15 min; os presentes são diários. |
 | **Retorno físico** | Vibração e som (Web Audio) | Vibra a cada toque certeiro, ao capturar e ao chacoalhar. |
@@ -225,5 +224,5 @@ Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reab
 - O conjunto de brejos precisa ser cadastrado pelos organizadores (no local, pelo celular, ou pelo `/admin`).
 - As artes atuais do boneco, das lagoinhas e dos matinhos são provisórias (ver `docs/ARTES.md`).
 - O mapa offline mostra apenas a região já vista ou baixada antecipadamente ao redor dos brejos; fora disso aparece o gramado do jogo.
-- No iPhone, os sensores de movimento só podem ser liberados após um toque do usuário (o app pede na primeira abertura).
+- No iPhone, o sensor de movimento só pode ser liberado após um toque do usuário (o app pede na primeira abertura).
 - O relógio do aparelho é corrigido a cada sincronização; se o celular nunca ficou online depois de ter o relógio muito alterado, uma captura pode cair fora da janela e ser rejeitada.

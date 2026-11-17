@@ -1,13 +1,13 @@
 // Perfil: nível, estatísticas, expedição atual (a "partida"), histórico, ranking e sincronização.
-import { getCatalog, frogImg } from '../catalog.js';
+import { getCatalog, frogImg, species, rarityBadge } from '../catalog.js';
 import { store } from '../store.js';
 import { sync } from '../sync.js';
 import { api } from '../api.js';
 import * as db from '../db.js';
 import { icons } from './icons.js';
 import { headHtml, lookOf } from './sprites.js';
-import { dayFromExpeditionId, dayOf } from '../shared/game.js';
-import { $, esc, openSheet, closeSheet, toast, fmtDist, ago } from './common.js';
+import { dayOf } from '../shared/game.js';
+import { $, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
 import { sfx } from '../audio.js';
 
 let ctx = null;
@@ -20,9 +20,9 @@ export function mountProfile(el, context) {
       <div class="stats"></div>
       <div class="section-title">Caçada de hoje</div>
       <div class="exp-slot"></div>
-      <div class="section-title">Ranking do campus <small class="rk-note"></small></div>
+      <div class="section-title">Ranking <small class="rk-note"></small></div>
       <div class="list rank"></div>
-      <div class="section-title">Diário de campo <small>suas caçadas</small></div>
+      <div class="section-title">Diário de campo <small>últimas capturas</small></div>
       <div class="list history"></div>
       <div class="section-title">Sincronização</div>
       <div class="card sync-card" style="padding:14px"></div>
@@ -57,7 +57,7 @@ export async function loadRanking(el) {
 function renderRanking(el) {
   const box = $('.rank', el);
   if (!ranking) { box.innerHTML = '<div class="card list-item"><div class="s">Conecte-se para ver o ranking.</div></div>'; return; }
-  $('.rk-note', el).textContent = `${ranking.players} jogadores`;
+  $('.rk-note', el).textContent = `${ranking.players} jogador${ranking.players === 1 ? '' : 'es'}`;
   const me = store.view.player?.id;
   const rows = ranking.top.slice(0, 10);
   if (ranking.me && !rows.some((r) => r.id === me)) rows.push({ ...ranking.me, pos: ranking.me.rank });
@@ -78,12 +78,12 @@ export function renderProfile(el) {
     </div>
     <div class="xpline">Nível ${lv.level} · ${lv.into}/${lv.need} XP para o próximo<div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div></div>`;
 
-  const finished = v.expeditions.filter((e) => e.status === 'finished');
+  const huntDays = new Set(v.captures.map((c) => dayOf(c.caughtAt))).size;
   $('.stats', el).innerHTML = [
     ['book', '#4cb944', `${v.discovered.size}/${cat.species.length}`, 'espécies'],
     ['pond', '#3bb5cf', v.captures.length, 'capturas'],
     ['route', '#ff7a5c', fmtDist(v.totalMeters), 'caminhados'],
-    ['flag', '#9b67e0', v.expeditions.length, v.expeditions.length === 1 ? 'dia de caçada' : 'dias de caçada'],
+    ['flag', '#9b67e0', huntDays, huntDays === 1 ? 'dia de caçada' : 'dias de caçada'],
   ].map(([ic, c, b, s]) => `<div class="card stat"><div class="ico" style="background:${c}">${icons[ic]}</div><div><b>${b}</b><span>${s}</span></div></div>`).join('');
 
   const cur = store.currentExpedition();
@@ -93,12 +93,17 @@ export function renderProfile(el) {
       <div class="frogs-row">${(cur?.captures || []).slice(0, 12).map((c) => frogImg(c.speciesId, 30)).join('') || '<span class="s" style="font-size:13px;color:var(--ink-soft)">Nenhuma perereca hoje ainda. Bora caçar!</span>'}</div>
     </div>`;
 
-  const past = v.expeditions.filter((e) => e.id !== cur?.id).sort((a, b) => b.startedAt - a.startedAt);
-  $('.history', el).innerHTML = past.length ? past.slice(0, 20).map((e) => `<div class="card list-item diary">
-      <div class="grow"><div class="t">${fmtDay(dayFromExpeditionId(e.id) || dayOf(e.startedAt))}</div>
-      <div class="s">${e.captures.length} perereca${e.captures.length === 1 ? '' : 's'} · ${fmtDist(e.meters)}${e.pending ? ' · ☁️ pendente' : ''}</div>
-      <div class="frogs">${e.captures.slice(0, 10).map((c) => frogImg(c.speciesId, 24)).join('')}</div></div>
-      <span class="pill-xp">+${e.xp} XP</span></div>`).join('') : '<div class="card list-item"><div class="s">Cada dia em que você caça vira uma página do seu diário.</div></div>';
+  const recent = v.captures.slice(0, 12);
+  $('.history', el).innerHTML = recent.length ? recent.map((c) => {
+    const sp = species(c.speciesId);
+    const brejo = store.brejos.find((b) => b.id === c.brejoId);
+    const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha do campus');
+    return `<div class="card list-item diary">
+      <div class="avatar" style="width:46px;height:46px">${frogImg(c.speciesId, 36)}</div>
+      <div class="grow"><div class="t">${esc(sp.name)} ${rarityBadge(c.speciesId)}</div>
+      <div class="s">${fmtDay(dayOf(c.caughtAt))} às ${fmtTime(c.caughtAt)} · ${where}${c.pending ? ' · ☁️ pendente' : ''}</div></div>
+      <span class="pill-xp">+${v.perCapture.get(c.id)?.xp || 0} XP</span></div>`;
+  }).join('') : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>';
 
   renderSyncCard(el);
   if (ranking) renderRanking(el);
