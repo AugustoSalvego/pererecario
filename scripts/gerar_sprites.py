@@ -464,7 +464,10 @@ def save(im, name):
 def main():
     for model in ('explorer', 'froghood'):
         for skin in SKINS:
-            save(character_sheet(model, skin), f'char-{model}-{skin}.png')
+            sheet = character_sheet(model, skin)
+            save(sheet, f'char-{model}-masculino-{skin}.png')
+            # provisório: a versão "feminino" usa a mesma arte até a definitiva ser desenhada
+            save(sheet, f'char-{model}-feminino-{skin}.png')
     save(pond(60, 34, 7), 'pond-big.png')
     save(pond(40, 24, 3, rocks=False), 'pond-small.png')
     save(grid(BUSH, BUSH_PAL), 'bush.png')

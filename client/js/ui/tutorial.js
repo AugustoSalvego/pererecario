@@ -2,13 +2,14 @@
 import { store } from '../store.js';
 import { sensors } from '../sensors.js';
 import { frogImg } from '../catalog.js';
-import { LOOK_MODELS, LOOK_SKINS } from '../shared/game.js';
+import { LOOK_MODELS, LOOK_GENDERS, LOOK_SKINS } from '../shared/game.js';
 import { charHtml, img, lookOf } from './sprites.js';
 import { icons } from './icons.js';
 import { $, $$, h, esc } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
 const MODEL_NAME = { froghood: 'Capuz de sapinho', explorer: 'Explorador' };
+const GENDER_NAME = { masculino: 'Masculino', feminino: 'Feminino' };
 
 function slides(look) {
   return [
@@ -55,9 +56,10 @@ function slides(look) {
 
 export function openTutorial({ first = false, firstTime = false, onDone } = {}) {
   document.querySelector('.tutorial')?.remove();
-  const [m0, s0] = lookOf(store.view.player).split('-');
-  let model = m0, skin = s0, idx = 0;
-  const list = slides(`${model}-${skin}`);
+  const [m0, g0, s0] = lookOf(store.view.player).split('-');
+  let model = m0, gender = g0, skin = s0, idx = 0;
+  const cur = () => `${model}-${gender}-${skin}`;
+  const list = slides(cur());
   const total = list.length + 1;
   const el = h(`<div class="tutorial">
     <button class="skip">Pular</button>
@@ -70,11 +72,11 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
   const next = $('.next', el);
 
   function picker() {
-    const look = `${model}-${skin}`;
     return `<div style="display:flex;flex-direction:column;align-items:center;width:100%">
-      <div style="height:170px;display:grid;place-items:center">${charHtml(look, { dir: 'down', walking: true, scale: 5.5 })}</div>
+      <div style="height:150px;display:grid;place-items:center">${charHtml(cur(), { dir: 'down', walking: true, scale: 5 })}</div>
       <div class="picker-models">${LOOK_MODELS.map((m) => `<button data-model="${m}" class="${m === model ? 'on' : ''}">${MODEL_NAME[m]}</button>`).join('')}</div>
-      <div class="picker">${LOOK_SKINS.map((s) => `<button data-skin="${s}" class="${s === skin ? 'on' : ''}" aria-label="Tom de pele ${s}">${charHtml(`${model}-${s}`, { scale: 2.6 })}</button>`).join('')}</div>
+      <div class="picker-models">${LOOK_GENDERS.map((g) => `<button data-gender="${g}" class="${g === gender ? 'on' : ''}">${GENDER_NAME[g]}</button>`).join('')}</div>
+      <div class="picker">${LOOK_SKINS.map((s) => `<button data-skin="${s}" class="${s === skin ? 'on' : ''}" aria-label="Tom de pele ${s}">${charHtml(`${model}-${gender}-${s}`, { scale: 2.4 })}</button>`).join('')}</div>
     </div>`;
   }
 
@@ -99,6 +101,8 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
   stage.addEventListener('click', (e) => {
     const mb = e.target.closest('[data-model]');
     const sb = e.target.closest('[data-skin]');
+    const gb = e.target.closest('[data-gender]');
+    if (gb) { gender = gb.dataset.gender; sfx.tap(); render(); }
     if (mb) { model = mb.dataset.model; sfx.tap(); render(); }
     if (sb) { skin = sb.dataset.skin; sfx.tap(); render(); }
   });
@@ -107,7 +111,7 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
     unlockAudio();
     sfx.tap();
     if (idx < list.length) { idx++; render(); return; }
-    const look = `${model}-${skin}`;
+    const look = cur();
     if (look !== lookOf(store.view.player)) await store.setLook(look);
     await store.saveSettings({ tutorialDone: true, onboarded: true });
     if (first) await sensors.request();

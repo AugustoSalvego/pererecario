@@ -139,7 +139,9 @@ test('boneco escolhido sincroniza com "última escrita vence"', async () => {
   await sync(p, 'A', [look('explorer-escura', clock + 20)]);
   const r = await sync(p, 'B', [look('froghood-media', clock + 10)]);
   assert.equal(r.body.state.player.look, 'explorer-escura');
-  const bad = await sync(p, 'B', [look('dragao-azul', clock + 30)]);
+  const r2 = await sync(p, 'B', [look('froghood-feminino-media', clock + 40)]);
+  assert.equal(r2.body.state.player.look, 'froghood-feminino-media');
+  const bad = await sync(p, 'B', [look('dragao-azul', clock + 50)]);
   assert.equal(bad.body.results[0].status, 'rejected');
 });
 

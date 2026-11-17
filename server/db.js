@@ -171,7 +171,7 @@ async function openPostgres(url) {
 
 // Colunas adicionadas depois da primeira versão (bancos já existentes recebem via ALTER TABLE)
 const MIGRATIONS = [
-  "ALTER TABLE players ADD COLUMN look TEXT NOT NULL DEFAULT 'froghood-clara'",
+  "ALTER TABLE players ADD COLUMN look TEXT NOT NULL DEFAULT 'froghood-masculino-clara'",
   'ALTER TABLE players ADD COLUMN look_ts BIGINT NOT NULL DEFAULT 0',
 ];
 

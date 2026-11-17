@@ -191,10 +191,18 @@ export function captureRange(pos) {
 export const dayExpeditionId = (playerId, day) => `dia:${playerId}:${day}`;
 export const dayFromExpeditionId = (id) => Number(String(id).split(':')[2]);
 
+// Boneco: modelo-gênero-tom, ex.: "froghood-feminino-media".
+// (O formato antigo "modelo-tom" continua aceito e vale como "masculino".)
 export const LOOK_MODELS = ['froghood', 'explorer'];
+export const LOOK_GENDERS = ['masculino', 'feminino'];
 export const LOOK_SKINS = ['clara', 'media', 'escura'];
-export const DEFAULT_LOOK = 'froghood-clara';
-export const validLook = (look) => /^(froghood|explorer)-(clara|media|escura)$/.test(String(look));
+export const DEFAULT_LOOK = 'froghood-masculino-clara';
+export const validLook = (look) => /^(froghood|explorer)(-(masculino|feminino))?-(clara|media|escura)$/.test(String(look));
+export function normalizeLook(look) {
+  if (!validLook(look)) return DEFAULT_LOOK;
+  const p = String(look).split('-');
+  return p.length === 2 ? `${p[0]}-masculino-${p[1]}` : look;
+}
 
 export function levelFor(xp) {
   let level = 1, need = 120, rest = xp;

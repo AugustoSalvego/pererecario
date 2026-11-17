@@ -7,12 +7,13 @@ Regras gerais:
 - Pixel art pode ficar pequena: o jogo amplia sem borrar (`image-rendering: pixelated`). Desenhe no tamanho "de pixel" e não amplie antes.
 - Depois de trocar, aumente a versão em `client/sw.js` (`const VERSION = 'pererecario-v1.1.1'`, por exemplo). Sem isso, celulares que já abriram o jogo continuam com a arte antiga guardada no cache.
 
-## Bonecos: `char-<modelo>-<tom>.png` (6 arquivos)
+## Bonecos: `char-<modelo>-<gênero>-<tom>.png` (12 arquivos)
 
-| Arquivo | |
-|---|---|
-| `char-froghood-clara.png`, `char-froghood-media.png`, `char-froghood-escura.png` | Capuz de sapinho, 3 tons de pele |
-| `char-explorer-clara.png`, `char-explorer-media.png`, `char-explorer-escura.png` | Explorador de chapéu, 3 tons de pele |
+| Modelo | Gênero | Tom de pele |
+|---|---|---|
+| `froghood` (capuz de sapinho), `explorer` (explorador de chapéu) | `masculino`, `feminino` | `clara`, `media`, `escura` |
+
+Exemplo: `char-froghood-feminino-media.png`. Hoje os arquivos `feminino` são **cópias provisórias** dos `masculino`: é só desenhar por cima.
 
 Cada arquivo é uma **folha de 3 colunas × 4 linhas**, todos os quadros do mesmo tamanho:
 

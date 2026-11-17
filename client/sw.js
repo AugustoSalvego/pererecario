@@ -3,7 +3,7 @@
 //  - tiles do mapa e fontes guardados conforme são usados (cache-first);
 //  - chamadas /api/* NUNCA passam pelo cache: o próprio app trata o offline
 //    com IndexedDB e fila de sincronização.
-const VERSION = 'pererecario-v1.1.0';
+const VERSION = 'pererecario-v1.2.0';
 const SHELL = `${VERSION}-shell`;
 const TILES = 'pererecario-tiles';
 const FONTS = 'pererecario-fonts';
@@ -23,12 +23,18 @@ const ASSETS = [
   'assets/sprites/bubble-q.png',
   'assets/sprites/bush-peek.png',
   'assets/sprites/bush.png',
-  'assets/sprites/char-explorer-clara.png',
-  'assets/sprites/char-explorer-escura.png',
-  'assets/sprites/char-explorer-media.png',
-  'assets/sprites/char-froghood-clara.png',
-  'assets/sprites/char-froghood-escura.png',
-  'assets/sprites/char-froghood-media.png',
+  'assets/sprites/char-explorer-feminino-clara.png',
+  'assets/sprites/char-explorer-feminino-escura.png',
+  'assets/sprites/char-explorer-feminino-media.png',
+  'assets/sprites/char-explorer-masculino-clara.png',
+  'assets/sprites/char-explorer-masculino-escura.png',
+  'assets/sprites/char-explorer-masculino-media.png',
+  'assets/sprites/char-froghood-feminino-clara.png',
+  'assets/sprites/char-froghood-feminino-escura.png',
+  'assets/sprites/char-froghood-feminino-media.png',
+  'assets/sprites/char-froghood-masculino-clara.png',
+  'assets/sprites/char-froghood-masculino-escura.png',
+  'assets/sprites/char-froghood-masculino-media.png',
   'assets/sprites/icon-book.png',
   'assets/sprites/icon-heart.png',
   'assets/sprites/lilypad.png',

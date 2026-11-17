@@ -1,5 +1,5 @@
 // Sprites em pixel art (gerados por scripts/gerar_sprites.py).
-import { DEFAULT_LOOK, validLook } from '../shared/game.js';
+import { normalizeLook } from '../shared/game.js';
 
 // URL absoluta: url() dentro de variável CSS seria resolvida a partir da pasta do .css
 export const SPR = new URL('assets/sprites/', document.baseURI).href;
@@ -10,17 +10,17 @@ export const DIR_ROW = { down: 0, left: 1, right: 2, up: 3 };
 export const CHAR = { fw: 20, fh: 27, head: 15 };
 const charVars = `--fw:${CHAR.fw};--fh:${CHAR.fh};--hh:${CHAR.head}`;
 
-export const lookOf = (player) => (validLook(player?.look) ? player.look : DEFAULT_LOOK);
+export const lookOf = (player) => normalizeLook(player?.look);
 
 // Boneco inteiro (20x27 pixels de arte), escalado sem borrar.
 export function charHtml(look, { dir = 'down', scale = 3, walking = false, cls = '' } = {}) {
-  const l = validLook(look) ? look : DEFAULT_LOOK;
+  const l = normalizeLook(look);
   return `<div class="char ${walking ? 'walking' : ''} ${cls}" data-dir="${dir}" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.fw};--row:${DIR_ROW[dir] ?? 0};${charVars}"></div>`;
 }
 
 // Só a cabeça (para avatar, navegação e perfil).
 export function headHtml(look, scale = 2) {
-  const l = validLook(look) ? look : DEFAULT_LOOK;
+  const l = normalizeLook(look);
   return `<div class="char-head" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.fw};${charVars}"></div>`;
 }
 
