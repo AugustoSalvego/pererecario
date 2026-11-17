@@ -63,7 +63,7 @@
       <section style="grid-column:1/-1"><h2>Brejos</h2>
         <div class="row" style="margin-bottom:10px">
           <input id="bname" placeholder="Nome do brejo" style="flex:1;min-width:160px">
-          <input id="bcoords" placeholder="lat, lng (copie do Google Maps)" style="flex:1;min-width:220px">
+          <input id="bcoords" placeholder="coordenadas do Google Maps: -23.1068, -50.3602" style="flex:1;min-width:220px">
           <input id="bradius" type="number" value="35" min="10" max="200" style="width:90px" title="raio em metros">
           <button id="badd">Criar brejo</button>
         </div>
@@ -114,8 +114,28 @@ document.addEventListener('click', async (e) => {
   const del = e.target.dataset.del;
   if (del) { e.preventDefault(); if (confirm('Remover este brejo?')) { await call('POST', '/api/admin/brejos/remove', { id: del }); load(); } }
 });
+// aceita "-23.1068, -50.3602" (decimal) ou 23°06'24.5"S 50°21'36.9"W (graus, minutos, segundos)
+function parseCoords(text) {
+  const t = String(text).trim();
+  if (/[°º]/.test(t)) {
+    const parts = [...t.matchAll(/(\d+(?:[.,]\d+)?)\s*[°º]\s*(?:(\d+(?:[.,]\d+)?)\s*['′’]\s*)?(?:(\d+(?:[.,]\d+)?)\s*(?:["″”]|'')\s*)?([NSLOEW])/gi)];
+    if (parts.length !== 2) return null;
+    const val = (m) => {
+      const n = (x) => Number(String(x || 0).replace(',', '.'));
+      const v = n(m[1]) + n(m[2]) / 60 + n(m[3]) / 3600;
+      return /[SWO]/i.test(m[4]) ? -v : v;
+    };
+    const [a, b] = parts;
+    return /[NS]/i.test(a[4]) ? { lat: val(a), lng: val(b) } : { lat: val(b), lng: val(a) };
+  }
+  const nums = t.match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 2) return null;
+  return { lat: Number(nums[0]), lng: Number(nums[1]) };
+}
 $('#badd').onclick = async () => {
-  const [lat, lng] = $('#bcoords').value.split(',').map((s) => Number(s.trim()));
+  const c = parseCoords($('#bcoords').value);
+  if (!c || Math.abs(c.lat) > 90 || Math.abs(c.lng) > 180) { alert('Não entendi as coordenadas. Use -23.106806, -50.360250 ou 23°06\'24.5"S 50°21\'36.9"W'); return; }
+  const { lat, lng } = c;
   try {
     await call('POST', '/api/admin/brejos', { name: $('#bname').value, lat, lng, radius: Number($('#bradius').value) });
     $('#bname').value = ''; $('#bcoords').value = '';
