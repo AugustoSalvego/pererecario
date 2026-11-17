@@ -1,0 +1,29 @@
+name: Pererecario Web Game
+
+on:
+  push:
+    branches: [main, feat/campus-gps-pwa]
+  pull_request:
+
+jobs:
+  web-game:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check JavaScript syntax
+        run: |
+          node --check src/app.js
+          node --check src/engine.js
+          node --check src/map.js
+          node --check src/db.js
+          node --check src/sync.js
+      - name: Test game rules
+        run: node --test tests/engine.test.mjs
+      - name: Test server, HTTP sync and mobile assets
+        run: python -m unittest discover -s tests -v

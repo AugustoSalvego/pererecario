@@ -1,0 +1,14 @@
+const NAME=new URLSearchParams(location.search).get('demo')==='1'&&['localhost','127.0.0.1'].includes(location.hostname)?'pererecario-demo-v1':'pererecario-offline-v1';
+export const DB_VERSION=1;
+let connection;
+export function openDB(){if(connection)return connection;connection=new Promise((resolve,reject)=>{const req=indexedDB.open(NAME,DB_VERSION);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains('meta'))d.createObjectStore('meta');if(!d.objectStoreNames.contains('events')){const s=d.createObjectStore('events',{keyPath:'id'});s.createIndex('status','status');}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return connection;}
+export async function dbGet(store,key){const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly');const request=tx.objectStore(store).get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+export async function dbSet(store,value,key){const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readwrite');const request=key===undefined?tx.objectStore(store).put(value):tx.objectStore(store).put(value,key);tx.oncomplete=()=>resolve(value);tx.onerror=()=>reject(tx.error);});}
+export async function dbAll(store){const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readonly');const request=tx.objectStore(store).getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+export async function dbMany(store,values){if(!values.length)return;const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readwrite');for(const v of values)tx.objectStore(store).put(v);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
+export async function dbDelete(store,key){const db=await openDB();return new Promise((resolve,reject)=>{const tx=db.transaction(store,'readwrite');tx.objectStore(store).delete(key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
+export const newId=()=>crypto.randomUUID();
+export function randomKey(){const bytes=crypto.getRandomValues(new Uint8Array(24));return [...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');}
+export async function createPlayer(name){const player={id:newId(),secret:randomKey(),deviceId:newId(),name:name.trim().slice(0,32)||'Explorador(a)',createdAt:Date.now()};await dbSet('meta',player,'player');return player;}
+export const recoveryCode=player=>`${player.id}.${player.secret}`;
+export async function adoptPlayer(code){const [id,secret,...extra]=code.trim().split('.');if(extra.length||!(/^[0-9a-f-]{36}$/.test(id))||!(/^[0-9a-f]{48}$/.test(secret)))throw Error('Código inválido. Confira os caracteres.');return {id,secret,deviceId:newId(),name:'Explorador(a)',createdAt:Date.now()};}

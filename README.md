@@ -1,91 +1,98 @@
-# Pererecário 🐸
+# Pererecário 🐸 — Aventura no Campus
 
-An offline-first mobile frog collection game with original pixel-art creatures. The **visual experience v0.4** includes 15 approved pixel-art species, their album personalities, a responsive collection UI, simulated camera flow, repeated specimens (Meu Brejo), and a field guide.
+## Mobile-first game redesign (v2)
 
-> **Development status:** The new `jogar.html` is a playable browser simulator with local progress saving and real encounter rarity logic. `preview_v04.html` and the Flutter app remain visual prototypes. Android camera/GPS, Google sign-in, backend synchronization and trading are not implemented yet.
+The web game now has a portrait-first, colorful game UI: an illustrated welcome screen, immersive campus map and habitat clusters, edge-to-edge photo capture, larger album cards, the original **Meu Brejo**, and a themed explorer profile with ranking, history and sync. For design decisions and explicit device-validation limitations see [docs/DESIGN_MOBILE_V2.md](docs/DESIGN_MOBILE_V2.md). The existing 15 approved frog sprites and the server contract were preserved.
 
-## Play the game simulator before the Android APK
 
-Open **`jogar.html`** in Chrome or Edge from this repository's folder. No Flutter or installation required.
+**PWA mobile-first** para explorar o Campus Luiz Meneghel da UENP, em Bandeirantes (PR), e colecionar 15 pererequinhas originais. A versão web funciona no celular e no computador, sem APK.
 
-- Start with an empty album. Go to **Explorar → Procurar perereca → Fotografar**.
-- The first encounter is Folhinha; later encounters use rarity weights (60/28/10/2) and anti-frustration guarantees.
-- Capture with unlimited attempts; after two misses, the game assists you. One specimen is awarded per encounter.
-- Browse your discoveries in **Álbum** and repeated specimens in **Meu Brejo**.
-- Your progress and pending encounter are saved locally to browser storage when available. To start over, use **Guia → Reiniciar**.
-- This is a **simulator**, not a real phone camera or GPS application. Browser storage is not synced across devices.
+> **Estado em 17/11/2026:** pacote de implementação testável, **não publicado na internet**. A lógica principal e o backend passaram nos testes automatizados. Ainda são necessários testes de navegador/celular, validação física das zonas e implantação com HTTPS e armazenamento permanente. O código do Flutter anterior e as prévias foram preservados no repositório original.
 
-The separate `preview_v04.html` is retained unchanged as the approved visual reference.
+## Executar localmente
 
-## Included in this baseline
+Requisitos: **Python 3.11+** e navegador moderno (Chrome, Edge, Safari ou Firefox). **Não é preciso npm, Flutter nem banco externo.** O backend usa SQLite.
 
-- `assets/frogs_atlas.png` — approved pixel-art atlas for all 15 species.
-- `assets/species.json` — persistent species IDs, rarities, image rectangles, and album personalities.
-- `lib/frog_sprite.dart` — reusable Flutter painter for pixel-perfect animation, silhouettes and reduced-motion support.
-- `lib/main.dart` — Flutter visual catalog demonstration.
-- `preview.html` — self-contained browser preview; open locally, no server needed.
-- `docs/INTERACOES.md` — original gameplay and interaction decisions (Portuguese).
-- `docs/ROADMAP.md` — proposed implementation order and persistence/sync architecture.
-- `scripts/validate_catalog.py` — basic catalog/atlas integrity validation.
+No Windows, você pode dar dois cliques em **`INICIAR_NO_WINDOWS.bat`**. Ou usar o PowerShell nesta pasta:
 
-## Visual experience preview (desktop or mobile)
-
-Open `preview.html` (which redirects to `preview_v04.html`) in a modern browser directly from the repository folder. The visual demo uses:
-
-- `visual/app.css` — responsive design, rarity palettes, album cards, simulated camera and dialog styling.
-- `visual/app.js` — album, discovery/duplicate demo states, viewfinder, guide and animations.
-- `preview_v04.html` embeds species metadata and references the original atlas file locally. Run `python scripts/build_visual_preview.py` after editing `assets/species.json`.
-
-The demo deliberately keeps **all** state in memory; reload resets sample discoveries and duplicate inventory. It does not access your device camera, GPS, account, or network. For styling and feature boundaries see `docs/VISUAL_SPEC.md`.
-
-## Run the Flutter demo (Android)
-
-Install the Flutter SDK and Android SDK first. From the repository directory:
-
-```bash
-flutter doctor
-flutter create --platforms=android .
-flutter pub get
-flutter run
+```powershell
+py -3 -m server.server
 ```
 
-`flutter create` fills in the missing Android project scaffolding without replacing the existing app source files. If asked to overwrite existing files, stop and review the proposed changes. Android-generated files can be committed to this repository after verification.
+Se `py` não existir, tente `python -m server.server`.
 
-## Validate
+Abra **http://localhost:8000**. Crie um explorador, ative a localização e use o mapa.
+
+Para testar **sem estar fisicamente no campus**, use **http://localhost:8000/?demo=1**. Esse modo só é habilitado em `localhost` ou `127.0.0.1`, usa um banco local separado e **não envia capturas ao servidor**. Clique em **Simular no campus**, toque numa perereca e fotografe. O modo oficial precisa de GPS real válido e proximidade de 35 m de um encontro na zona correta. GPS do navegador funciona em `localhost` ou em site HTTPS.
+
+## Como jogar
+
+- **Mapa:** cinco zonas geográficas com 3 espécies exclusivas cada, pontos de encontro por rodadas de 30 minutos, GPS e raio de 35 m. Os encontros são determinísticos; a espécie e o tamanho ficam fixos pelo encontro.
+- **Captura:** alinhe a perereca e fotografe; depois de duas tentativas erradas, o jogo ajuda. Sem limite de tentativas ou fuga.
+- **Álbum:** 15 espécies com silhuetas das não descobertas, peculiaridades animadas e raridades.
+- **Meu Brejo:** exemplares individuais, tamanhos e favoritos.
+- **Perfil:** pontuação, histórico, ranking e código privado de recuperação.
+- **Offline:** cache da PWA + IndexedDB. A fila de captura é enviada quando a comunicação voltar; ao sincronizar, o mesmo evento não premia duas vezes.
+
+Os pontos são calculados no servidor a partir das capturas aceitas: comum 10, incomum 20, rara 45, especial 120, mais 25 por primeira descoberta. Não são subtraídos pontos por estar offline.
+
+## Arquitetura
+
+| Camada | Implementação |
+|---|---|
+| Interface | HTML/CSS/JavaScript ES Modules, desenho original em atlas PNG e novo cenário pixel art WebP |
+| PWA | `manifest.webmanifest` e `sw.js` com cache local do app-shell |
+| Local | IndexedDB (`src/db.js`) e log de eventos, sempre persistido antes da recompensa visual |
+| Geografia | Geolocalização Web (`watchPosition`), geofence ponto-em-polígono, mapa OSM online e fallback ilustrado offline |
+| Servidor remoto | Python `http.server` + SQLite com WAL e índice único por encontro |
+| Protocolo | HTTPS e API JSON (`/api/v1/register`, `/api/v1/sync`, `/api/v1/state`, `/api/v1/health`, `/api/v1/leaderboard`) |
+| Sincronização | Fila pendente, retry periódico/ao reconectar, eventos imutáveis, UUID e resposta de confirmação |
+| Conflitos | Mesmo encontro em aparelhos diferentes: primeira captura confirmada vence; favoritos: controle de versão por evento (`baseEventId`), versão confirmada do servidor vence colisões |
+| Identificação | Nome + ID UUID + código de recuperação aleatório de 192 bits, necessário no segundo aparelho |
+
+**Importante:** o código de recuperação é uma credencial. Não deve ser divulgado. Este MVP não usa login Google; proteção contra fraude de GPS e rate limit são extensões para produção pública de longo prazo.
+
+## Implantação Web com HTTPS
+
+1. Conecte o repositório ao serviço de hospedagem que permita Python, **disco persistente** e HTTPS (ex.: Render com plano e disco persistente). O `render.yaml` descreve um exemplo de serviço; **confira os preços atuais antes de ativar**.
+2. O comando de execução é `python -m server.server`, porta definida por `PORT`, banco gravado em `DATA_DIR` montado num volume persistente.
+3. Não use hospedagem com armazenamento efêmero para demonstrar recuperação após reiniciar o servidor: o banco SQLite precisa de persistência.
+4. Abra o domínio HTTPS no celular e permita GPS. O mapa externo é um complemento: o cenário, zonas e jogo têm fallback local offline.
+5. Use **Perfil → Código de recuperação** para restaurar os dados sincronizados em outro navegador/dispositivo. A sincronização só confirma quando o servidor responde.
+
+### Limites e segurança
+
+- **Zonas provisórias:** polígonos inspirados nas zonas acadêmicas do projeto público `Juuhgb/pokemon-campus`; são uma referência, não uma delimitação oficial da UENP. Revisar zonas e pontos de encontro com o campus antes de incentivar circulação. Não gerar capturas em locais restritos, rodovias ou terrenos de risco.
+- Precisão do GPS melhor ou igual a **40 m** para iniciar um encontro; evitar permitir captura por geolocalização imprecisa.
+- Service Worker armazena os arquivos do jogo após o primeiro acesso online. Os tiles de terceiros não são pré-baixados em massa; quando não aparecem, o cenário ilustrado permanece utilizável.
+- Não há garantia de localização real em um computador sem GPS. Em alguns navegadores o GPS não funciona sem permissão/HTTPS.
+- O servidor verifica duplicidade, posse de exemplar, categoria/zona e versões de favoritos, mas não oferece validação criptográfica de presença física no campus; para publicação pública com ranking competitivo, revisar o modelo antifraude.
+- Não há suporte a trocas de exemplares nesta versão. Não é requisito obrigatório do enunciado.
+
+## Testes
 
 ```bash
-python3 scripts/validate_catalog.py
-python3 scripts/validate_visual.py
-flutter analyze
-flutter test
+node --test tests/engine.test.mjs
+python -m unittest discover -s tests -v
 ```
 
-Flutter/Android compilation requires a Flutter toolchain; it has not been confirmed in the environment that prepared this repository. The project includes a CI workflow to run validation and basic Flutter checks on pushes.
+Os testes cobrem catálogo/zonas, determinismo, raridades, restrições de captura, reenvio idempotente, conflito do mesmo encontro, favoritos concorrentes, autenticação e HTTP real. **Testes manuais no smartphone com GPS e modo avião ainda são obrigatórios**: siga `docs/DEMONSTRACAO.md`.
 
-## GitHub workflow
+## Estrutura
 
-Clone once; then use `git pull` to receive changes and `git add` / `git commit` / `git push` to publish your own. See `docs/GIT_WORKFLOW.md` for the initial publication steps.
+```text
+assets/       atlas original, novo cenário pixel art, ícones da PWA
+src/          game engine, mapa, IndexedDB, sincronização, interface
+server/       servidor HTTP e banco SQLite
+assets/species.json  catálogo com IDs originais
+ data/campus.json    zonas geográficas provisórias
+sw.js         cache offline e modo instalável
+render.yaml   exemplo de deploy HTTPS com volume
+```
 
-## Roadmap
-
-1. Local SQLite persistence for encounters, unique captures and inventory.
-2. Real camera overlay and GPS-gated encounters, using fair capture mechanics.
-3. Google login and backend API with PostgreSQL + idempotent synchronization.
-4. Trading, encounter balancing, Android device validation, and release polish.
-
-The established gameplay rules take precedence over any roadmap suggestion. In particular: no impossible catches; assistance after two missed attempts; no loss of a captured frog because connectivity fails; and special album animations only for each discovered species in the main album.
-
-## Author
+## Autoria
 
 **Danilo Augusto Salvego dos Santos**  
 GitHub: [AugustoSalvego](https://github.com/AugustoSalvego)
 
-## Atualização v0.3 — movimentos
-
-- Pitanga, Musgo e Brasa não utilizam mais distorção por faixas do atlas.
-- Peculiaridades iniciam logo após abrir a ficha e se repetem em ciclos curtos
-  (3,2–4,0 s), com pausa entre apresentações.
-- HTML e Flutter usam a mesma lógica de comportamento e a arte original.
-- O efeito de inchar é sutil enquanto não houver quadros específicos desenhados.
-
-Abra `preview.html` no navegador para experimentar sem Flutter.
+Arte das 15 pererecas originais preservada do projeto Pererecário. Novo cenário pixel-art criado para a ambientação do jogo.
