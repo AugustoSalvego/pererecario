@@ -470,9 +470,7 @@ def main():
             save(sheet, f'char-{model}-feminino-{skin}.png')
     save(pond(60, 34, 7), 'pond-big.png')
     save(pond(40, 24, 3, rocks=False), 'pond-small.png')
-    save(grid(BUSH, BUSH_PAL), 'bush.png')
-    save(grid(BUSH_PEEK, BUSH_PAL), 'bush-peek.png')
-    save(grid(QBUBBLE, {'O': hx('17352a'), 'W': hx('ffffff')}), 'bubble-q.png')
+    # bush.png, bush-peek.png e bubble-q.png já são a arte definitiva: não sobrescrever
     save(grid(EXCL, {'O': hx('5a3a00'), 'Y': hx('ffd84a')}), 'bubble-ex.png')
     save(grid(LILYPAD, {'O': hx('2b6b2e'), 'G': hx('5fbf4a'), 'g': hx('86d873')}), 'lilypad.png')
     save(grid(HEART, {'O': hx('5a1424'), 'R': hx('ff5a6e'), 'r': hx('c7364b'), 'W': hx('ffd1d8')}), 'icon-heart.png')

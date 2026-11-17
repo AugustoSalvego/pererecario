@@ -2,7 +2,7 @@
 
 Todas as artes ficam em **`client/assets/sprites/`**. As atuais são provisórias, geradas por `scripts/gerar_sprites.py`. Para trocar, salve o seu PNG **com o mesmo nome por cima do arquivo antigo**: o jogo carrega sozinho, sem mexer em código.
 
-Regras gerais:
+Regras gerais (o matinho e o balão "?" já são arte definitiva em alta resolução e são reduzidos suavemente; o resto é pixel art pequena):
 - **PNG com fundo transparente**.
 - Pixel art pode ficar pequena: o jogo amplia sem borrar (`image-rendering: pixelated`). Desenhe no tamanho "de pixel" e não amplie antes.
 - Depois de trocar, aumente a versão em `client/sw.js` (`const VERSION = 'pererecario-v1.1.1'`, por exemplo). Sem isso, celulares que já abriram o jogo continuam com a arte antiga guardada no cache.
@@ -42,9 +42,9 @@ Quer um terceiro boneco ou mais tons de pele? Me avise: aí é preciso mexer nas
 |---|---|---|---|
 | `pond-big.png` | Lagoinha no mapa (metade dos brejos) e tela de login | 60 × 34 | Mostrada com ~132 px de largura no mapa |
 | `pond-small.png` | Lagoinha no mapa (outra metade) e ícone "Meu Brejo" | 40 × 24 | Mostrada com ~100 px no mapa |
-| `bush.png` | Matinho escondendo uma perereca | 22 × 14 | Base do matinho na borda de baixo |
-| `bush-peek.png` | Matinho quando você chega a 20 m (olhinhos espiando) | 22 × 14 | Mesmo tamanho do `bush.png` |
-| `bubble-q.png` | Balão "?" em cima do matinho | 11 × 13 | A ponta do balão fica embaixo, à esquerda |
+| `bush.png` | Matinho escondendo uma perereca (incomum, rara ou especial) | 118 × 84 ✅ arte definitiva | Exibido com 56 px de largura, redução suave |
+| `bush-peek.png` | Matinho quando você chega a 20 m (olhinhos espiando) | 126 × 125 ✅ arte definitiva | Exibido com 60 px; os risquinhos amarelos ficam no próprio PNG |
+| `bubble-q.png` | Balão "?" em cima do matinho | 52 × 56 ✅ arte definitiva | Exibido com 26 px |
 | `bubble-ex.png` | Balão "!" quando a perereca sai do matinho | 11 × 13 | |
 | `lilypad.png` | Vitórias-régias da captura e do login | 16 × 7 | |
 | `sparkle.png` | Brilho quando a perereca aparece | 44 × 11 | **Tira de 4 quadros de 11 × 11** lado a lado |

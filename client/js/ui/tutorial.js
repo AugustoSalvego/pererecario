@@ -31,9 +31,8 @@ function slides(look) {
     },
     {
       title: 'Chacoalhe o celular',
-      text: 'Toda perereca começa <b>escondida num matinho</b> com "?". Chegou perto? <b>Chacoalhe o celular</b> para ela sair!',
-      art: `<div style="left:40px;top:90px">${img('bush-peek.png', 132)}</div>
-        <div style="left:140px;top:40px">${img('bubble-q.png', 48)}</div>
+      text: 'As comuns ficam à vista, pulando no mapa. As mais raras se escondem num <b>matinho com "?"</b>: chegou perto? <b>Chacoalhe o celular</b> para elas saírem!',
+      art: `<div style="left:30px;top:70px">${img('bush-peek.png', 150)}</div>
         <div style="left:200px;top:60px" class="tut-phone"></div>`,
     },
     {

@@ -102,7 +102,7 @@ export function spawnsFor(brejo, win, catalog) {
     const dist = brejo.radius * (0.3 + 0.55 * next());
     const pos = offsetLatLng(brejo.lat, brejo.lng, dist * Math.cos(ang), dist * Math.sin(ang));
     next(); // mantém a sequência pseudoaleatória estável
-    const hidden = true; // toda perereca começa escondida num matinho
+    const hidden = sp.tier !== 'common'; // comuns ficam à vista; as demais se escondem num matinho
     out.push({
       id: `${brejo.id}:${win}:${i}`,
       kind: 'wild',

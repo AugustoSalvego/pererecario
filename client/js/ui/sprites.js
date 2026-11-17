@@ -24,7 +24,10 @@ export function headHtml(look, scale = 2) {
   return `<div class="char-head" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.fw};${charVars}"></div>`;
 }
 
-export const img = (name, width, cls = '') => `<img class="px ${cls}" src="${SPR}${name}" style="width:${width}px" alt="" draggable="false">`;
+// Artes desenhadas em alta resolução (matinho, balão "?") são reduzidas suavemente;
+// as demais são pixel art pequena, ampliada sem borrar.
+const SMOOTH = new Set(['bush.png', 'bush-peek.png', 'bubble-q.png']);
+export const img = (name, width, cls = '') => `<img class="${SMOOTH.has(name) ? 'smooth' : 'px'} ${cls}" src="${SPR}${name}" style="width:${width}px" alt="" draggable="false">`;
 
 export function sparkleHtml(scale = 4) {
   return `<div class="sparkle" style="--s:${scale}"></div>`;

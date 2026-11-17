@@ -225,7 +225,7 @@ function renderHint() {
 }
 
 // ---------- mapa: lagoinhas, matinhos, pererecas e jogador ----------
-const isHidden = (s) => s.kind === 'wild' && !store.revealed[s.id];
+const isHidden = (s) => s.kind === 'wild' && s.hidden && !store.revealed[s.id];
 
 function visibleSpawns() {
   const catalog = getCatalog();
@@ -264,7 +264,7 @@ function refreshObjects() {
     if (hidden) {
       const peek = d <= REVEAL_RANGE_M;
       cls = `mbush ${peek ? 'peek' : 'far'}`;
-      html = `<div class="body">${img(peek ? 'bush-peek.png' : 'bush.png', 50, 'bush')}${img('bubble-q.png', 24, 'bubble')}</div>`;
+      html = `<div class="body">${peek ? img('bush-peek.png', 60, 'bush') : img('bush.png', 56, 'bush') + img('bubble-q.png', 26, 'bubble')}</div>`;
     } else {
       const fresh = justRevealed.has(s.id);
       const delay = -((hash32(s.id) % 2400) / 1000);
@@ -390,7 +390,7 @@ function brejoSheet(b) {
       ${spawns.length ? spawns.map((s) => {
         const hidden = isHidden(s);
         const known = store.view.discovered.has(s.speciesId);
-        return `<div class="card" style="padding:8px;width:84px;text-align:center">${hidden ? `<div style="height:56px;display:grid;place-items:center">${img('bush.png', 48)}</div><small>escondida</small>` : `<div style="height:56px;display:grid;place-items:center;${known ? '' : 'filter:brightness(0) opacity(.25)'}">${frogImg(s.speciesId, 52)}</div><small>${known ? esc(species(s.speciesId).name) : '???'}</small>`}</div>`;
+        return `<div class="card" style="padding:8px;width:84px;text-align:center">${hidden ? `<div style="height:56px;display:grid;place-items:center">${img('bush.png', 56)}</div><small>escondida</small>` : `<div style="height:56px;display:grid;place-items:center;${known ? '' : 'filter:brightness(0) opacity(.25)'}">${frogImg(s.speciesId, 52)}</div><small>${known ? esc(species(s.speciesId).name) : '???'}</small>`}</div>`;
       }).join('') : '<p class="lead">Você já pegou todas daqui. Volte em alguns minutos!</p>'}
     </div>
     <button class="btn block" data-act="ok">Bora caçar!</button>`);

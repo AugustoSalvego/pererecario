@@ -588,3 +588,11 @@ svg { display: block; }
 .screen-body::-webkit-scrollbar, .sheet::-webkit-scrollbar { display: none; }
 
 .cap-lily { position: absolute; width: 132px; margin-left: -66px; margin-top: -26px; filter: drop-shadow(0 6px 0 rgba(0,0,0,.15)); }
+
+.smooth { image-rendering: auto; }
+/* pulinho das pererecas à vista no mapa */
+.mfrog .frog { animation: mapHop 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); transform-origin: 50% 100%; }
+.mfrog .shadow { animation: mapHopShadow 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.mfrog.near .frog, .mfrog.near .shadow { animation-duration: 1.6s; }
+@keyframes mapHop { 0%, 62%, 100% { transform: translateY(0) scale(1, 1); } 68% { transform: translateY(0) scale(1.08, .9); } 78% { transform: translateY(-18px) scale(.95, 1.07); } 88% { transform: translateY(0) scale(1.06, .94); } 94% { transform: translateY(0) scale(1, 1); } }
+@keyframes mapHopShadow { 0%, 66%, 100% { transform: scale(1); opacity: 1; } 78% { transform: scale(.65); opacity: .55; } 88% { transform: scale(1); opacity: 1; } }
