@@ -8,7 +8,7 @@
 
 Requisitos: **Python 3.11+** e navegador moderno (Chrome, Edge, Safari ou Firefox). **Não é preciso npm, Flutter nem banco externo.** O backend usa SQLite.
 
-No Windows PowerShell, dentro desta pasta:
+No Windows, você pode dar dois cliques em **`INICIAR_NO_WINDOWS.bat`**. Ou usar o PowerShell nesta pasta:
 
 ```powershell
 py -3 -m server.server
