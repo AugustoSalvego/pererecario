@@ -596,3 +596,16 @@ svg { display: block; }
 .mfrog.near .frog, .mfrog.near .shadow { animation-duration: 1.6s; }
 @keyframes mapHop { 0%, 62%, 100% { transform: translateY(0) scale(1, 1); } 68% { transform: translateY(0) scale(1.08, .9); } 78% { transform: translateY(-18px) scale(.95, 1.07); } 88% { transform: translateY(0) scale(1.06, .94); } 94% { transform: translateY(0) scale(1, 1); } }
 @keyframes mapHopShadow { 0%, 66%, 100% { transform: scale(1); opacity: 1; } 78% { transform: scale(.65); opacity: .55; } 88% { transform: scale(1); opacity: 1; } }
+
+/* matinho: o "?" aparece e some; ao tocar, espia por 1 s antes da perereca sair */
+.mbush .bubble { animation: qBlink 3.6s steps(1) infinite; animation-delay: var(--qd, 0s); }
+@keyframes qBlink { 0%, 45% { opacity: 0; transform: translateY(4px) scale(.6); } 50% { opacity: 1; transform: translateY(0) scale(1.08); } 55%, 90% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; transform: translateY(4px) scale(.6); } }
+.mbush.peek .bush { animation: peekShake .25s ease-in-out infinite; }
+@keyframes peekShake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+/* pererecas à vista: menores e com pulinhos mais espaçados */
+.mfrog .frog { animation: mapHop 5.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.mfrog .shadow { width: 34px; height: 9px; margin-top: -4px; animation: mapHopShadow 5.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.mfrog.near .frog, .mfrog.near .shadow { animation-duration: 3.4s; }
+@keyframes mapHop { 0%, 82%, 100% { transform: translateY(0) scale(1, 1); } 85% { transform: translateY(0) scale(1.08, .9); } 90% { transform: translateY(-14px) scale(.95, 1.07); } 95% { transform: translateY(0) scale(1.06, .94); } 98% { transform: translateY(0) scale(1, 1); } }
+@keyframes mapHopShadow { 0%, 84%, 100% { transform: scale(1); opacity: 1; } 90% { transform: scale(.65); opacity: .55; } 95% { transform: scale(1); opacity: 1; } }
+.mfrog.near .body::before { width: 50px; height: 16px; bottom: -8px; }

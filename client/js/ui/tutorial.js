@@ -30,8 +30,8 @@ function slides(look) {
         <div style="left:54px;top:68px">${charHtml(look, { dir: 'right', walking: true, scale: 3 })}</div>`,
     },
     {
-      title: 'Chacoalhe o celular',
-      text: 'As comuns ficam à vista, pulando no mapa. As mais raras se escondem num <b>matinho com "?"</b>: chegou perto? <b>Chacoalhe o celular</b> para elas saírem!',
+      title: 'Matinho com "?"',
+      text: 'As comuns ficam à vista, pulando no mapa. As mais raras se escondem num <b>matinho</b> que mostra um <b>"?"</b>: chegou perto? <b>Toque no matinho</b> ou <b>chacoalhe o celular</b> para ela sair!',
       art: `<div style="left:30px;top:70px">${img('bush-peek.png', 150)}</div>
         <div style="left:200px;top:60px" class="tut-phone"></div>`,
     },

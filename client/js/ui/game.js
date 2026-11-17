@@ -23,6 +23,7 @@ import {
 
 let map, current = 'map', ctx, lastWin = null, walkingTimer = null;
 let playerDir = 'down', walking = false, lastPos = null, justRevealed = new Set();
+const revealing = new Set(); // matinhos no meio da animação (espiando por 1 s antes de virar perereca)
 const screens = {};
 
 export function startGame({ firstTime = false } = {}) {
@@ -214,7 +215,7 @@ function renderHint() {
   else if (!pos) msg = '📡 Procurando sinal de GPS…';
   else if (!store.brejos.length) msg = 'Nenhuma lagoinha cadastrada ainda. Peça ao organizador para criar as lagoinhas do campus.';
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
-  else if (hiddenNearby().length) { msg = '📳 Tem perereca escondida aqui! <b>Chacoalhe o celular</b>'; shake = true; }
+  else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
   else {
     const nearest = store.brejos.map((b) => ({ b, d: distanceM(pos, b) - b.radius })).sort((a, b) => a.d - b.d)[0];
     if (nearest && nearest.d > 60) msg = `🧭 Lagoinha mais próxima: <b>${esc(nearest.b.name)}</b>, a ${fmtDist(nearest.d)}`;
@@ -262,14 +263,19 @@ function refreshObjects() {
     keep.add(key);
     let html, cls;
     if (hidden) {
-      const peek = d <= REVEAL_RANGE_M;
-      cls = `mbush ${peek ? 'peek' : 'far'}`;
-      html = `<div class="body">${peek ? img('bush-peek.png', 60, 'bush') : img('bush.png', 56, 'bush') + img('bubble-q.png', 26, 'bubble')}</div>`;
+      const qDelay = -((hash32(`${s.id}?`) % 3600) / 1000);
+      if (revealing.has(s.id)) {
+        cls = 'mbush peek';
+        html = `<div class="body">${img('bush-peek.png', 60, 'bush')}</div>`;
+      } else {
+        cls = 'mbush';
+        html = `<div class="body" style="--qd:${qDelay}s">${img('bush.png', 56, 'bush')}${img('bubble-q.png', 26, 'bubble')}</div>`;
+      }
     } else {
       const fresh = justRevealed.has(s.id);
-      const delay = -((hash32(s.id) % 2400) / 1000);
+      const delay = -((hash32(s.id) % 5000) / 1000);
       cls = `mfrog ${d <= range ? 'near' : 'far'}`;
-      html = `<div class="body" style="--d:${delay}s">${fresh ? img('bubble-ex.png', 24, 'ex') + sparkleHtml(5) : ''}${frogImg(s.speciesId, 50)}<div class="shadow"></div></div>`;
+      html = `<div class="body" style="--d:${delay}s">${fresh ? img('bubble-ex.png', 22, 'ex') + sparkleHtml(4) : ''}${frogImg(s.speciesId, 38)}<div class="shadow"></div></div>`;
     }
     map.setObject(key, { lat: s.lat, lng: s.lng, html, className: cls, data: s });
   }
@@ -339,10 +345,11 @@ function onTapObject(key, data) {
   const pos = geo.pos;
   const d = pos ? distanceM(pos, s) : Infinity;
   if (isHidden(s)) {
-    sfx.tap();
-    if (d > REVEAL_RANGE_M) return toast(`Algo se mexe no matinho… Chegue mais perto (faltam ${fmtDist(Math.ceil(d - REVEAL_RANGE_M))}).`, '', 'walk');
-    if (sensors.needsPermission() && !sensors.granted) return sensorPermissionSheet();
-    return toast('<b>Chacoalhe o celular</b> para a perereca sair do matinho!', '', 'shake', 3500);
+    if (revealing.has(s.id)) return;
+    if (d > REVEAL_RANGE_M) { sfx.tap(); return toast(`Algo se mexe no matinho… Chegue mais perto (faltam ${fmtDist(Math.ceil(d - REVEAL_RANGE_M))}).`, '', 'walk'); }
+    sfx.croak();
+    vibrate(40);
+    return revealFrom([s]);
   }
   const range = captureRange(pos);
   if (d > range) {
@@ -369,14 +376,23 @@ function doShake() {
   if (!pos) return toast('Sem posição ainda: espere o GPS.', 'warn');
   map.setFeature('wave', { lat: pos.lat, lng: pos.lng, radiusM: REVEAL_RANGE_M, className: 'shake-wave' });
   setTimeout(() => map.removeFeature('wave'), 1400);
-  const close = hiddenNearby();
+  const close = hiddenNearby().filter((s) => !revealing.has(s.id));
   if (close.length) {
-    for (const s of close) justRevealed.add(s.id);
-    setTimeout(() => { for (const s of close) justRevealed.delete(s.id); refreshObjects(); }, 2600);
-    store.reveal(close.map((s) => s.id));
+    revealFrom(close);
     toast(`Coaxos! ${close.length} perereca${close.length > 1 ? 's saíram' : ' saiu'} do matinho!`, 'ok', 'sound');
   } else if (visibleSpawns().some(isHidden)) toast('Silêncio… Chegue mais perto dos matinhos e chacoalhe de novo.', '', 'sound');
   else toast('Nenhuma perereca escondida por aqui.', '', 'sound');
+}
+
+// matinho -> espiando (1 s) -> perereca com "!" e brilho
+function revealFrom(list) {
+  for (const s of list) revealing.add(s.id);
+  refreshObjects();
+  setTimeout(async () => {
+    for (const s of list) { revealing.delete(s.id); justRevealed.add(s.id); }
+    await store.reveal(list.map((s) => s.id));
+    setTimeout(() => { for (const s of list) justRevealed.delete(s.id); refreshObjects(); }, 2400);
+  }, 1000);
 }
 
 function brejoSheet(b) {
