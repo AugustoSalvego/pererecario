@@ -8,15 +8,17 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 
 - **Documentação completa do trabalho:** [`docs/RELATORIO.md`](docs/RELATORIO.md) (armazenamento local, sincronização, conflitos, falhas, computação ubíqua)
 - **Roteiro da apresentação (testes obrigatórios):** [`docs/ROTEIRO_APRESENTACAO.md`](docs/ROTEIRO_APRESENTACAO.md)
+- **Artes (o que trocar e em que formato):** [`docs/ARTES.md`](docs/ARTES.md)
 
 ## Como jogar
 
 1. Abra o link do jogo no celular (Chrome no Android ou Safari no iPhone), crie a conta e permita **localização** e **sensores de movimento**.
-2. Ande até um brejo do campus. As pererecas aparecem pulando dentro dele.
-3. Chegou perto (até 30 m)? Toque na perereca. Na captura, **vire o celular** (giroscópio) para achá-la entre as vitórias-régias e **toque rápido** nela até encher o pote.
-4. Viu uma **moita com "?"**? Tem perereca escondida: **chacoalhe o celular** perto dela para ouvir os coaxos e fazê-la aparecer.
-5. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
-6. Complete o **Pererecário** (15 espécies) e veja suas repetidas no **Meu Brejo**. Cada saída para caçar é uma **expedição**, com pontuação, distância e histórico.
+2. Na primeira vez, um tutorial curto explica o jogo e você escolhe o seu explorador.
+3. Ande até uma **lagoinha** do campus. As pererecas ficam escondidas nos **matinhos com "?"** em volta dela.
+4. Chegou a 20 m? **Chacoalhe o celular** para elas saírem do matinho.
+5. A até **10 m**, toque na perereca. Na captura, **vire o celular** (giroscópio) para achá-la entre as vitórias-régias e **toque rápido** nela até encher o pote.
+6. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
+7. Complete o **Pererecário** (15 espécies) e veja suas repetidas no **Meu Brejo**. Cada dia em que você joga é uma **caçada** e vira uma página do seu **Diário de campo**, no Perfil.
 
 Para instalar como app: no Android, menu ⋮ → "Instalar app"/"Adicionar à tela inicial"; no iPhone, Compartilhar → "Adicionar à Tela de Início".
 
@@ -26,7 +28,7 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 11 testes de sincronização, idempotência, conflitos e falhas
+npm test             # 12 testes de sincronização, idempotência, conflitos e falhas
 ```
 
 Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
@@ -49,7 +51,7 @@ Os brejos são áreas circulares (centro + raio) guardadas no servidor. Duas for
 - **No local, pelo celular:** Perfil → Painel de demonstração → informe a chave de administrador → "Criar brejo onde estou".
 - **Pelo computador:** abra `/admin`, cole as coordenadas copiadas do Google Maps ("-23.1093, -50.3591"), dê um nome e um raio (25–60 m funciona bem).
 
-Cada brejo tem de 3 a 7 pererecas (depende do raio), que mudam a cada **15 minutos**.
+Cada brejo vira uma lagoinha no mapa, com 3 a 7 pererecas em volta (depende do raio), que mudam a cada **15 minutos**. Um raio de 30 a 40 m funciona bem.
 
 ## Estrutura
 

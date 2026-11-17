@@ -5,7 +5,9 @@ import { sync } from '../sync.js';
 import { api } from '../api.js';
 import * as db from '../db.js';
 import { icons } from './icons.js';
-import { $, esc, openSheet, closeSheet, toast, fmtDist, fmtDuration, fmtDateTime, fmtTime, ago } from './common.js';
+import { headHtml, lookOf } from './sprites.js';
+import { dayFromExpeditionId, dayOf } from '../shared/game.js';
+import { $, esc, openSheet, closeSheet, toast, fmtDist, ago } from './common.js';
 import { sfx } from '../audio.js';
 
 let ctx = null;
@@ -16,16 +18,17 @@ export function mountProfile(el, context) {
   el.innerHTML = `<div class="screen-head head-profile"><div class="hero-slot"></div></div>
     <div class="screen-body">
       <div class="stats"></div>
-      <div class="section-title">Expedição atual</div>
+      <div class="section-title">Caçada de hoje</div>
       <div class="exp-slot"></div>
       <div class="section-title">Ranking do campus <small class="rk-note"></small></div>
       <div class="list rank"></div>
-      <div class="section-title">Histórico de expedições</div>
+      <div class="section-title">Diário de campo <small>suas caçadas</small></div>
       <div class="list history"></div>
       <div class="section-title">Sincronização</div>
       <div class="card sync-card" style="padding:14px"></div>
       <div class="section-title">Opções</div>
       <div class="list settings-list">
+        <div class="card list-item" data-act="howto">${icons.sparkle}<div class="grow"><div class="t">Como jogar</div><div class="s">Rever o tutorial e trocar o seu explorador</div></div></div>
         <div class="card list-item" data-act="demo">${icons.bug}<div class="grow"><div class="t">Painel de demonstração</div><div class="s">Testes de conexão, GPS simulado, conflitos</div></div></div>
         <div class="card list-item" data-act="logout">${icons.logout}<div class="grow"><div class="t">Sair da conta</div><div class="s">Seu progresso continua salvo no servidor</div></div></div>
       </div>
@@ -36,7 +39,7 @@ export function mountProfile(el, context) {
     sfx.tap();
     if (act === 'demo') ctx.openDemo();
     if (act === 'logout') confirmLogout();
-    if (act === 'end-exp') endExpedition();
+    if (act === 'howto') ctx.openTutorial();
     if (act === 'sync-now') { sync.kick(0); toast('Sincronizando…', '', 'sync', 1500); }
   });
 }
@@ -70,7 +73,7 @@ export function renderProfile(el) {
   const cat = getCatalog();
   const lv = v.level;
   $('.hero-slot', el).innerHTML = `<div class="profile-hero">
-      <div class="avatar-wrap"><div class="avatar">${frogImg(v.player.avatar || 'frog_leaf', 64)}</div><span class="lvl">${lv.level}</span></div>
+      <div class="avatar-wrap"><div class="avatar">${headHtml(lookOf(v.player), 4)}</div><span class="lvl">${lv.level}</span></div>
       <div><h2>${esc(v.player.displayName)}</h2><p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p></div>
     </div>
     <div class="xpline">Nível ${lv.level} · ${lv.into}/${lv.need} XP para o próximo<div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div></div>`;
@@ -80,21 +83,22 @@ export function renderProfile(el) {
     ['book', '#4cb944', `${v.discovered.size}/${cat.species.length}`, 'espécies'],
     ['pond', '#3bb5cf', v.captures.length, 'capturas'],
     ['route', '#ff7a5c', fmtDist(v.totalMeters), 'caminhados'],
-    ['flag', '#9b67e0', v.expeditions.length, 'expedições'],
+    ['flag', '#9b67e0', v.expeditions.length, v.expeditions.length === 1 ? 'dia de caçada' : 'dias de caçada'],
   ].map(([ic, c, b, s]) => `<div class="card stat"><div class="ico" style="background:${c}">${icons[ic]}</div><div><b>${b}</b><span>${s}</span></div></div>`).join('');
 
   const cur = store.currentExpedition();
-  $('.exp-slot', el).innerHTML = cur ? `<div class="card exp-now">
-      <div style="display:flex;justify-content:space-between;align-items:center"><b>Expedição em andamento</b><span class="s" style="font-size:13px;color:var(--ink-soft)">desde ${fmtTime(cur.startedAt)}</span></div>
-      <div class="row"><div><b>${cur.captures.length}</b><span>pererecas</span></div><div><b>${cur.xp}</b><span>XP</span></div><div><b>${fmtDist(cur.meters)}</b><span>caminhados</span></div><div><b>${fmtDuration(store.now() - cur.startedAt)}</b><span>duração</span></div></div>
-      <button class="btn small coral block" data-act="end-exp">${icons.flag} Encerrar expedição</button>
-    </div>` : '<div class="card list-item"><div class="s">Ande pelo mapa para começar uma expedição.</div></div>';
+  $('.exp-slot', el).innerHTML = `<div class="card exp-now">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b>${fmtDay(dayOf(store.now()))}</b><span class="s" style="font-size:13px;color:var(--ink-soft)">salva sozinha, mesmo offline</span></div>
+      <div class="row"><div><b>${cur?.captures.length || 0}</b><span>pererecas</span></div><div><b>${cur?.xp || 0}</b><span>XP</span></div><div><b>${fmtDist(cur?.meters || 0)}</b><span>caminhados</span></div></div>
+      <div class="frogs-row">${(cur?.captures || []).slice(0, 12).map((c) => frogImg(c.speciesId, 30)).join('') || '<span class="s" style="font-size:13px;color:var(--ink-soft)">Nenhuma perereca hoje ainda. Bora caçar!</span>'}</div>
+    </div>`;
 
-  $('.history', el).innerHTML = finished.length ? finished.slice(0, 15).map((e) => `<div class="card list-item">
-      <div class="grow"><div class="t">${fmtDateTime(e.startedAt)}</div>
-      <div class="s">${fmtDuration((e.endedAt || e.updatedAt) - e.startedAt)} · ${fmtDist(e.meters)} · ${e.captures.length} perereca${e.captures.length === 1 ? '' : 's'}${e.pending ? ' · ☁️ pendente' : ''}</div>
-      <div class="frogs">${e.captures.slice(0, 8).map((c) => frogImg(c.speciesId, 22)).join('')}</div></div>
-      <span class="pill-xp">+${e.xp} XP</span></div>`).join('') : '<div class="card list-item"><div class="s">Suas expedições encerradas aparecem aqui.</div></div>';
+  const past = v.expeditions.filter((e) => e.id !== cur?.id).sort((a, b) => b.startedAt - a.startedAt);
+  $('.history', el).innerHTML = past.length ? past.slice(0, 20).map((e) => `<div class="card list-item diary">
+      <div class="grow"><div class="t">${fmtDay(dayFromExpeditionId(e.id) || dayOf(e.startedAt))}</div>
+      <div class="s">${e.captures.length} perereca${e.captures.length === 1 ? '' : 's'} · ${fmtDist(e.meters)}${e.pending ? ' · ☁️ pendente' : ''}</div>
+      <div class="frogs">${e.captures.slice(0, 10).map((c) => frogImg(c.speciesId, 24)).join('')}</div></div>
+      <span class="pill-xp">+${e.xp} XP</span></div>`).join('') : '<div class="card list-item"><div class="s">Cada dia em que você caça vira uma página do seu diário.</div></div>';
 
   renderSyncCard(el);
   if (ranking) renderRanking(el);
@@ -111,20 +115,13 @@ export function renderSyncCard(el) {
     </div>`;
 }
 
-async function endExpedition() {
-  const sum = await store.endExpedition();
-  if (!sum) return;
-  sfx.win();
-  const sheet = openSheet(`
-    <h3>🏁 Expedição encerrada!</h3>
-    <p class="lead">Começou ${fmtDateTime(sum.startedAt)}</p>
-    <div class="kv">
-      <div><span>Pererecas</span><b>${sum.captures.length}</b></div><div><span>XP ganho</span><b>+${sum.xp}</b></div>
-      <div><span>Distância</span><b>${fmtDist(sum.meters)}</b></div><div><span>Duração</span><b>${fmtDuration(sum.endedAt - sum.startedAt)}</b></div>
-    </div>
-    <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:16px">${sum.captures.map((c) => frogImg(c.speciesId, 40)).join('')}</div>
-    <button class="btn block" data-act="ok">Começar nova expedição</button>`);
-  $('[data-act=ok]', sheet).addEventListener('click', async () => { closeSheet(); await store.ensureExpedition(); ctx.refresh(); });
+function fmtDay(day) {
+  if (!Number.isFinite(day)) return '';
+  const today = dayOf(store.now());
+  if (day === today) return 'Hoje';
+  if (day === today - 1) return 'Ontem';
+  const d = new Date(day * 86400000 + 12 * 3600000);
+  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 }
 
 function confirmLogout() {

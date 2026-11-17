@@ -169,8 +169,19 @@ async function openPostgres(url) {
   };
 }
 
+// Colunas adicionadas depois da primeira versão (bancos já existentes recebem via ALTER TABLE)
+const MIGRATIONS = [
+  "ALTER TABLE players ADD COLUMN look TEXT NOT NULL DEFAULT 'froghood-clara'",
+  'ALTER TABLE players ADD COLUMN look_ts BIGINT NOT NULL DEFAULT 0',
+];
+
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {
   const db = url ? await openPostgres(url) : await openSqlite(file);
   for (const stmt of SCHEMA) await db.run(stmt);
+  for (const stmt of MIGRATIONS) {
+    try { await db.run(stmt); } catch (e) {
+      if (!/duplicate column|already exists/i.test(e.message)) throw e;
+    }
+  }
   return db;
 }

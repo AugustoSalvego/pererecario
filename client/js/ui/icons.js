@@ -32,24 +32,3 @@ export const icons = {
   sparkle: s('<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>'),
   sound: s('<path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'),
 };
-
-// Bonequinho explorador do jogador (arte original do jogo)
-export const explorerSvg = `
-<svg viewBox="0 0 64 80" class="explorer" aria-hidden="true">
-  <ellipse cx="32" cy="76" rx="15" ry="4" fill="rgba(0,0,0,.22)"/>
-  <path d="M22 62h8v12h-9a3 3 0 0 1 1-12Z" fill="#6b4a2e"/>
-  <path d="M34 62h8a3 3 0 0 1 1 12h-9V62Z" fill="#6b4a2e"/>
-  <rect x="17" y="38" width="30" height="27" rx="11" fill="#3f9d55"/>
-  <rect x="12" y="40" width="10" height="20" rx="5" fill="#e0a36b"/>
-  <rect x="42" y="40" width="10" height="20" rx="5" fill="#e0a36b"/>
-  <path d="M26 40h12l-6 9Z" fill="#fff6dc"/>
-  <rect x="21" y="52" width="22" height="5" rx="2.5" fill="#8a5a33"/>
-  <circle cx="32" cy="27" r="13" fill="#f1bf8c"/>
-  <circle cx="27" cy="28" r="2.1" fill="#2a1f17"/><circle cx="37" cy="28" r="2.1" fill="#2a1f17"/>
-  <path d="M28.5 33.5c2 1.6 5 1.6 7 0" stroke="#2a1f17" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-  <circle cx="24" cy="32" r="2" fill="#f59a8a" opacity=".6"/><circle cx="40" cy="32" r="2" fill="#f59a8a" opacity=".6"/>
-  <ellipse cx="32" cy="18" rx="22" ry="5.5" fill="#d6b277"/>
-  <path d="M20 18c0-8 5.5-12 12-12s12 4 12 12Z" fill="#e8c88f"/>
-  <path d="M20.5 15.5h23" stroke="#7a5a2e" stroke-width="3"/>
-  <circle cx="32" cy="18" r="22" fill="none"/>
-</svg>`;

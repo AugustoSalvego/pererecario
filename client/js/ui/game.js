@@ -6,8 +6,10 @@ import { mountPond, renderPond } from './pond.js';
 import { mountFriends, renderFriends } from './friends.js';
 import { mountProfile, renderProfile, loadRanking, renderSyncCard } from './profile.js';
 import { openDemo } from './demo.js';
-import { icons, explorerSvg } from './icons.js';
-import { $, $$, h, esc, toast, openSheet, closeSheet, fmtDist, fmtDuration } from './common.js';
+import { openTutorial } from './tutorial.js';
+import { icons } from './icons.js';
+import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
+import { $, $$, esc, toast, openSheet, closeSheet, fmtDist } from './common.js';
 import { getCatalog, frogImg, species } from '../catalog.js';
 import { store } from '../store.js';
 import { sync } from '../sync.js';
@@ -16,13 +18,11 @@ import { sensors } from '../sensors.js';
 import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
-  spawnsFor, windowOf, windowEnd, distanceM, offsetLatLng, hash32,
-  CAPTURE_RANGE_M, REVEAL_RANGE_M,
+  spawnsFor, windowOf, windowEnd, distanceM, offsetLatLng, hash32, captureRange, REVEAL_RANGE_M,
 } from '../shared/game.js';
 
-const BUSH = `<svg viewBox="0 0 62 46"><ellipse cx="31" cy="42" rx="26" ry="4" fill="rgba(0,0,0,.18)"/><circle cx="18" cy="28" r="14" fill="#3e9b45"/><circle cx="44" cy="28" r="14" fill="#3e9b45"/><circle cx="31" cy="20" r="16" fill="#52b553"/><circle cx="24" cy="16" r="5" fill="#7fd36d" opacity=".7"/></svg>`;
-
-let map, current = 'map', ctx, lastWin = null, walkingTimer = null, installEvt = null;
+let map, current = 'map', ctx, lastWin = null, walkingTimer = null;
+let playerDir = 'down', walking = false, lastPos = null, justRevealed = new Set();
 const screens = {};
 
 export function startGame({ firstTime = false } = {}) {
@@ -37,7 +37,7 @@ export function startGame({ firstTime = false } = {}) {
     <div class="hint-bubble hidden"></div>
     <button class="hud-expedition" data-nav="profile"></button>
     <div class="hud-right">
-      <button class="icon-btn shake-btn hidden" aria-label="Coaxar">${icons.sound}</button>
+      <button class="icon-btn shake-btn hidden" aria-label="Chacoalhar">${icons.shake}</button>
       <button class="icon-btn recenter hidden" aria-label="Centralizar">${icons.locate}</button>
     </div>
     <section class="screen" data-screen="album"></section>
@@ -45,17 +45,18 @@ export function startGame({ firstTime = false } = {}) {
     <section class="screen" data-screen="friends"></section>
     <section class="screen" data-screen="profile"></section>
     <nav class="navbar">
-      <button data-nav="album">${icons.book}<span>Pererecário</span></button>
-      <button data-nav="pond">${icons.pond}<span>Meu Brejo</span><b class="badge hidden"></b></button>
+      <button data-nav="album">${img('icon-book.png', 30, 'px-icon')}<span>Pererecário</span></button>
+      <button data-nav="pond">${img('pond-small.png', 38, 'px-icon')}<span>Meu Brejo</span><b class="badge hidden"></b></button>
       <button data-nav="map" class="nav-map on"><span class="orb">${icons.map}</span><span>Mapa</span></button>
-      <button data-nav="friends">${icons.friends}<span>Amigos</span></button>
-      <button data-nav="profile">${icons.user}<span>Perfil</span></button>
+      <button data-nav="friends">${img('icon-heart.png', 27, 'px-icon')}<span>Amigos</span></button>
+      <button data-nav="profile"><span class="nav-head"></span><span>Perfil</span></button>
     </nav>`;
 
   ctx = {
     refresh: () => { refreshObjects(); renderAll(); },
     capture: (spawn) => startCapture(spawn),
     openDemo: () => openDemo(ctx),
+    openTutorial: () => openTutorial({ first: false, onDone: () => { refreshObjects(); renderAll(); } }),
     showMap: (follow) => { openScreen('map'); if (follow) recenter(); },
   };
 
@@ -86,12 +87,14 @@ export function startGame({ firstTime = false } = {}) {
 
   // eventos do jogo
   let lastLevel = store.view.level.level;
+  let lastLook = lookOf(store.view.player);
   store.addEventListener('change', () => {
     refreshObjects();
     renderAll();
     const lv = store.view.level.level;
     if (lv > lastLevel) { setTimeout(() => { sfx.win(); toast(`⭐ Você subiu para o nível ${lv}!`, 'ok', null, 3500); }, 1200); }
     lastLevel = lv;
+    if (lookOf(store.view.player) !== lastLook) { lastLook = lookOf(store.view.player); drawPlayer(true); }
   });
   store.addEventListener('brejos', () => { refreshObjects(); prefetchTiles(); });
   store.addEventListener('revealed', () => refreshObjects());
@@ -110,14 +113,14 @@ export function startGame({ firstTime = false } = {}) {
   geo.addEventListener('error', () => renderHint());
   geo.addEventListener('mode', () => { renderGpsChip(); renderHint(); });
   sensors.addEventListener('shake', () => doShake());
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; });
 
   setInterval(tick, 1000);
   refreshObjects();
   renderAll();
 
-  if (!store.settings.onboarded) onboarding(firstTime);
-  else {
+  if (!store.settings.tutorialDone) {
+    openTutorial({ first: true, firstTime, onDone: () => { geo.start(); refreshObjects(); renderAll(); } });
+  } else {
     geo.start();
     if (!sensors.needsPermission()) sensors.request();
   }
@@ -145,7 +148,11 @@ function renderAll() {
 function renderHud() {
   const v = store.view;
   if (!v.player) return;
-  $('.player-chip .avatar').innerHTML = frogImg(v.player.avatar || 'frog_leaf', 34);
+  const look = lookOf(v.player);
+  const av = $('.player-chip .avatar');
+  if (av.dataset.look !== look) { av.innerHTML = headHtml(look, 2); av.dataset.look = look; }
+  const nh = $('.navbar .nav-head');
+  if (nh.dataset.look !== look) { nh.innerHTML = headHtml(look, 1.7); nh.dataset.look = look; }
   $('.player-chip .lvl').textContent = v.level.level;
   $('.player-chip .name').textContent = v.player.displayName;
   $('.player-chip .xpbar i').style.width = `${(v.level.into / v.level.need) * 100}%`;
@@ -187,30 +194,39 @@ function renderGpsChip() {
 function renderExpedition() {
   const el = $('.hud-expedition');
   const cur = store.currentExpedition();
-  if (!cur) { el.classList.add('hidden'); return; }
-  el.classList.remove('hidden');
-  el.innerHTML = `<div><b>🐸 ${cur.captures.length}</b>pererecas</div><div class="sep"></div><div><b>${fmtDist(cur.meters)}</b>andados</div><div class="sep"></div><div><b>${fmtDuration(store.now() - cur.startedAt)}</b>expedição</div>`;
+  el.innerHTML = `<div><b>🐸 ${cur?.captures.length || 0}</b>hoje</div><div class="sep"></div><div><b>${fmtDist(cur?.meters || 0)}</b>andados</div>`;
+}
+
+function hiddenNearby() {
+  const pos = geo.pos;
+  if (!pos) return [];
+  return visibleSpawns().filter((s) => isHidden(s) && distanceM(pos, s) <= REVEAL_RANGE_M);
 }
 
 function renderHint() {
   const el = $('.hint-bubble');
   if (!el) return;
   let msg = '';
+  let shake = false;
   const pos = geo.pos;
-  if (geo.mode === 'real' && geo.error === 'denied') msg = '📍 Localização bloqueada. Permita o acesso à localização no navegador para encontrar os brejos.';
+  if (geo.mode === 'real' && geo.error === 'denied') msg = '📍 Localização bloqueada. Permita o acesso à localização no navegador para encontrar as lagoinhas.';
   else if (geo.mode === 'real' && geo.error === 'unsupported') msg = 'Este aparelho não informa a localização.';
   else if (!pos) msg = '📡 Procurando sinal de GPS…';
-  else if (!store.brejos.length) msg = 'Nenhum brejo cadastrado ainda. Peça ao organizador para criar os brejos do campus.';
+  else if (!store.brejos.length) msg = 'Nenhuma lagoinha cadastrada ainda. Peça ao organizador para criar as lagoinhas do campus.';
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
+  else if (hiddenNearby().length) { msg = '📳 Tem perereca escondida aqui! <b>Chacoalhe o celular</b>'; shake = true; }
   else {
     const nearest = store.brejos.map((b) => ({ b, d: distanceM(pos, b) - b.radius })).sort((a, b) => a.d - b.d)[0];
-    if (nearest && nearest.d > 150) msg = `🧭 O brejo mais próximo, <b>${esc(nearest.b.name)}</b>, está a ${fmtDist(nearest.d)}. Vá até lá!`;
+    if (nearest && nearest.d > 60) msg = `🧭 Lagoinha mais próxima: <b>${esc(nearest.b.name)}</b>, a ${fmtDist(nearest.d)}`;
   }
   el.innerHTML = msg;
+  el.classList.toggle('shake', shake);
   el.classList.toggle('hidden', !msg || current !== 'map');
 }
 
-// ---------- mapa: brejos, pererecas e jogador ----------
+// ---------- mapa: lagoinhas, matinhos, pererecas e jogador ----------
+const isHidden = (s) => s.kind === 'wild' && !store.revealed[s.id];
+
 function visibleSpawns() {
   const catalog = getCatalog();
   const w = windowOf(store.now());
@@ -227,49 +243,71 @@ function refreshObjects() {
   if (!map) return;
   const pos = geo.pos;
   const spawns = visibleSpawns();
-  const brejoIds = new Set(store.brejos.map((b) => `brejo:${b.id}`));
-  for (const k of [...map.features.keys()]) if (k.startsWith('brejo:') && !brejoIds.has(k)) map.removeFeature(k);
   const keep = new Set();
   for (const b of store.brejos) {
-    map.setFeature(`brejo:${b.id}`, { lat: b.lat, lng: b.lng, radiusM: b.radius, className: 'brejo-water' });
     const left = spawns.filter((s) => s.brejoId === b.id).length;
-    const lp = offsetLatLng(b.lat, b.lng, b.radius + 8, 0);
-    map.setObject(`label:${b.id}`, { lat: lp.lat, lng: lp.lng, className: 'mlabel', html: `<span>📍 ${esc(b.name)} <em>${left} 🐸</em></span>`, data: b });
-    keep.add(`label:${b.id}`);
+    map.setObject(`pond:${b.id}`, {
+      lat: b.lat, lng: b.lng, ground: true, className: 'mpond', data: b,
+      html: img(hash32(b.id) % 2 ? 'pond-big.png' : 'pond-small.png', hash32(b.id) % 2 ? 132 : 100),
+    });
+    const lp = offsetLatLng(b.lat, b.lng, -13, 0); // nome logo abaixo da lagoinha
+    map.setObject(`label:${b.id}`, { lat: lp.lat, lng: lp.lng, className: 'mlabel', html: `<span>${esc(b.name)} <em>${left} 🐸</em></span>`, data: b });
+    keep.add(`pond:${b.id}`); keep.add(`label:${b.id}`);
   }
+  const range = captureRange(pos);
   for (const s of spawns) {
-    const hidden = s.hidden && !store.revealed[s.id];
+    const hidden = isHidden(s);
     const d = pos ? distanceM(pos, s) : Infinity;
-    const near = d <= CAPTURE_RANGE_M;
-    const delay = -((hash32(s.id) % 2400) / 1000);
     const key = `frog:${s.id}`;
     keep.add(key);
-    const html = hidden
-      ? `<div class="body"><div class="bush">${BUSH}<b>?</b></div></div>`
-      : `<div class="body" style="--d:${delay}s">${frogImg(s.speciesId, 58)}<div class="shadow"></div></div>`;
-    map.setObject(key, { lat: s.lat, lng: s.lng, html, className: `mfrog ${near ? 'near' : 'far'}`, data: s });
+    let html, cls;
+    if (hidden) {
+      const peek = d <= REVEAL_RANGE_M;
+      cls = `mbush ${peek ? 'peek' : 'far'}`;
+      html = `<div class="body">${img(peek ? 'bush-peek.png' : 'bush.png', 50, 'bush')}${img('bubble-q.png', 24, 'bubble')}</div>`;
+    } else {
+      const fresh = justRevealed.has(s.id);
+      const delay = -((hash32(s.id) % 2400) / 1000);
+      cls = `mfrog ${d <= range ? 'near' : 'far'}`;
+      html = `<div class="body" style="--d:${delay}s">${fresh ? img('bubble-ex.png', 24, 'ex') + sparkleHtml(5) : ''}${frogImg(s.speciesId, 50)}<div class="shadow"></div></div>`;
+    }
+    map.setObject(key, { lat: s.lat, lng: s.lng, html, className: cls, data: s });
   }
-  for (const k of map.objectKeys()) if ((k.startsWith('frog:') || k.startsWith('label:')) && !keep.has(k)) map.removeObject(k);
+  for (const k of map.objectKeys()) if ((k.startsWith('frog:') || k.startsWith('label:') || k.startsWith('pond:')) && !keep.has(k)) map.removeObject(k);
 
   if (pos) {
-    map.setObject('player', { lat: pos.lat, lng: pos.lng, className: 'mplayer', html: explorerSvg, depthScale: false });
-    map.setFeature('range', { lat: pos.lat, lng: pos.lng, radiusM: CAPTURE_RANGE_M, className: 'range-ring' });
-    if (!pos.simulated && pos.accuracy > CAPTURE_RANGE_M) map.setFeature('acc', { lat: pos.lat, lng: pos.lng, radiusM: pos.accuracy, className: 'acc-ring' });
+    drawPlayer();
+    map.setFeature('range', { lat: pos.lat, lng: pos.lng, radiusM: range, className: 'range-ring' });
+    if (!pos.simulated && pos.accuracy > 25) map.setFeature('acc', { lat: pos.lat, lng: pos.lng, radiusM: pos.accuracy, className: 'acc-ring' });
     else map.removeFeature('acc');
   }
 }
 
+function drawPlayer(force = false) {
+  const pos = geo.pos;
+  if (!pos || !map) return;
+  const look = lookOf(store.view.player);
+  const sig = `${look}|${playerDir}|${walking}`;
+  const o = map.objects.get('player');
+  map.setObject('player', {
+    lat: pos.lat, lng: pos.lng, className: 'mplayer', depthScale: false,
+    html: (!o || o.sig !== sig || force) ? `<div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}` : null,
+  });
+  map.objects.get('player').sig = sig;
+}
+
 function onGeo() {
   const pos = geo.pos;
+  if (lastPos && distanceM(lastPos, pos) > 1.2) {
+    playerDir = dirFromBearing(bearing(lastPos, pos));
+    walking = true;
+    clearTimeout(walkingTimer);
+    walkingTimer = setTimeout(() => { walking = false; drawPlayer(); }, 800);
+  }
+  lastPos = { lat: pos.lat, lng: pos.lng };
   if (map.follow) {
     const jump = distanceM(map.center, pos) > 40;
     map.setCenter(pos.lat, pos.lng, jump);
-  }
-  const p = map.objects.get('player');
-  if (p) {
-    p.el.classList.add('walking');
-    clearTimeout(walkingTimer);
-    walkingTimer = setTimeout(() => p.el.classList.remove('walking'), 700);
   }
   refreshObjects();
   renderHint();
@@ -286,30 +324,30 @@ function recenter() {
 function tick() {
   const w = windowOf(store.now());
   if (w !== lastWin) {
-    if (lastWin != null) toast('🐸 Novas pererecas chegaram aos brejos!', 'ok', null, 2500);
+    if (lastWin != null) toast('🐸 Novas pererecas chegaram às lagoinhas!', 'ok', null, 2500);
     lastWin = w;
     refreshObjects();
   }
-  renderExpedition();
 }
 
 // ---------- interações ----------
 function onTapObject(key, data) {
   unlockAudio();
-  if (key.startsWith('label:')) return brejoSheet(data);
+  if (key.startsWith('label:') || key.startsWith('pond:')) return brejoSheet(data);
   if (!key.startsWith('frog:')) return;
   const s = data;
   const pos = geo.pos;
-  const hidden = s.hidden && !store.revealed[s.id];
   const d = pos ? distanceM(pos, s) : Infinity;
-  if (hidden) {
+  if (isHidden(s)) {
     sfx.tap();
+    if (d > REVEAL_RANGE_M) return toast(`Algo se mexe no matinho… Chegue mais perto (faltam ${fmtDist(Math.ceil(d - REVEAL_RANGE_M))}).`, '', 'walk');
     if (sensors.needsPermission() && !sensors.granted) return sensorPermissionSheet();
-    return toast('Algo se mexe na moita… <b>Chacoalhe o celular</b> perto dela para ouvir quem está escondida!', '', 'shake', 4000);
+    return toast('<b>Chacoalhe o celular</b> para a perereca sair do matinho!', '', 'shake', 3500);
   }
-  if (d > CAPTURE_RANGE_M) {
+  const range = captureRange(pos);
+  if (d > range) {
     sfx.error();
-    return toast(`Chegue mais perto! Faltam ${fmtDist(Math.ceil(d - CAPTURE_RANGE_M))}.`, 'warn', 'walk');
+    return toast(`Chegue mais perto! Faltam ${fmtDist(Math.ceil(d - range))}.`, 'warn', 'walk');
   }
   sfx.tap();
   startCapture(s);
@@ -323,7 +361,7 @@ function startCapture(spawn) {
 }
 
 function doShake() {
-  if (document.querySelector('.capture, .scanner') || current !== 'map') return;
+  if (document.querySelector('.capture, .scanner, .tutorial') || current !== 'map') return;
   const pos = geo.pos;
   sfx.croak();
   setTimeout(() => sfx.croak(), 380);
@@ -331,13 +369,13 @@ function doShake() {
   if (!pos) return toast('Sem posição ainda: espere o GPS.', 'warn');
   map.setFeature('wave', { lat: pos.lat, lng: pos.lng, radiusM: REVEAL_RANGE_M, className: 'shake-wave' });
   setTimeout(() => map.removeFeature('wave'), 1400);
-  const all = visibleSpawns().filter((s) => s.hidden && !store.revealed[s.id]);
-  const close = all.filter((s) => distanceM(pos, s) <= REVEAL_RANGE_M);
+  const close = hiddenNearby();
   if (close.length) {
+    for (const s of close) justRevealed.add(s.id);
+    setTimeout(() => { for (const s of close) justRevealed.delete(s.id); refreshObjects(); }, 2600);
     store.reveal(close.map((s) => s.id));
-    setTimeout(() => close.forEach((s) => map.objects.get(`frog:${s.id}`)?.el.classList.add('revealing')), 30);
-    toast(`Coaxos! ${close.length} perereca${close.length > 1 ? 's saíram' : ' saiu'} da moita!`, 'ok', 'sound');
-  } else if (all.length) toast('Silêncio… Chegue mais perto das moitas e chacoalhe de novo.', '', 'sound');
+    toast(`Coaxos! ${close.length} perereca${close.length > 1 ? 's saíram' : ' saiu'} do matinho!`, 'ok', 'sound');
+  } else if (visibleSpawns().some(isHidden)) toast('Silêncio… Chegue mais perto dos matinhos e chacoalhe de novo.', '', 'sound');
   else toast('Nenhuma perereca escondida por aqui.', '', 'sound');
 }
 
@@ -346,13 +384,13 @@ function brejoSheet(b) {
   const left = Math.max(0, windowEnd(windowOf(store.now())) - store.now());
   const d = geo.pos ? distanceM(geo.pos, b) : null;
   const sheet = openSheet(`
-    <h3>📍 ${esc(b.name)}</h3>
+    <h3>${esc(b.name)}</h3>
     <p class="lead">${d != null ? `A ${fmtDist(Math.max(0, d - b.radius))} de você · ` : ''}novas pererecas em ${Math.ceil(left / 60000)} min</p>
     <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:6px 0 16px">
       ${spawns.length ? spawns.map((s) => {
-        const hidden = s.hidden && !store.revealed[s.id];
+        const hidden = isHidden(s);
         const known = store.view.discovered.has(s.speciesId);
-        return `<div class="card" style="padding:8px;width:84px;text-align:center">${hidden ? `<div style="height:56px;display:grid;place-items:center;font-size:28px">🌿</div><small>escondida</small>` : `<div style="height:56px;display:grid;place-items:center;${known ? '' : 'filter:brightness(0) opacity(.25)'}">${frogImg(s.speciesId, 52)}</div><small>${known ? esc(species(s.speciesId).name) : '???'}</small>`}</div>`;
+        return `<div class="card" style="padding:8px;width:84px;text-align:center">${hidden ? `<div style="height:56px;display:grid;place-items:center">${img('bush.png', 48)}</div><small>escondida</small>` : `<div style="height:56px;display:grid;place-items:center;${known ? '' : 'filter:brightness(0) opacity(.25)'}">${frogImg(s.speciesId, 52)}</div><small>${known ? esc(species(s.speciesId).name) : '???'}</small>`}</div>`;
       }).join('') : '<p class="lead">Você já pegou todas daqui. Volte em alguns minutos!</p>'}
     </div>
     <button class="btn block" data-act="ok">Bora caçar!</button>`);
@@ -381,57 +419,28 @@ function statusSheet() {
 function sensorPermissionSheet() {
   const sheet = openSheet(`
     <h3>📳 Ativar sensores de movimento</h3>
-    <p class="lead">O Pererecário usa o acelerômetro (chacoalhar para ouvir pererecas escondidas) e o giroscópio (virar o celular para procurá-las na captura).</p>
+    <p class="lead">O Pererecário usa o acelerômetro (chacoalhar para tirar as pererecas do matinho) e o giroscópio (virar o celular para procurá-las na captura).</p>
     <button class="btn block" data-act="ok">Ativar sensores</button>`);
   $('[data-act=ok]', sheet).addEventListener('click', async () => {
     const ok = await sensors.request();
     closeSheet();
-    toast(ok ? 'Sensores ativados! Chacoalhe perto das moitas.' : 'Sem permissão para os sensores.', ok ? 'ok' : 'warn');
+    toast(ok ? 'Sensores ativados! Chacoalhe perto dos matinhos.' : 'Sem permissão para os sensores.', ok ? 'ok' : 'warn');
     renderGpsChip();
   });
 }
 
-function onboarding(firstTime) {
-  const name = esc(store.view.player?.displayName || '');
-  const sheet = openSheet(`
-    <div class="stage-lg" style="height:150px">${frogImg('frog_leaf', 120)}</div>
-    <h3>${firstTime ? `Bem-vindo, ${name}!` : `Oi de novo, ${name}!`}</h3>
-    <p class="lead">As pererecas estão esperando nos <b>brejos do campus</b>. Ande até elas, toque para capturar e complete o seu Pererecário!</p>
-    <div class="list" style="margin-bottom:16px">
-      <div class="card list-item">${icons.locate}<div class="grow"><div class="t">Localização</div><div class="s">Para saber quando você chega perto de um brejo</div></div></div>
-      <div class="card list-item">${icons.shake}<div class="grow"><div class="t">Sensores de movimento</div><div class="s">Chacoalhe para ouvir pererecas escondidas</div></div></div>
-      <div class="card list-item">${icons.cloudOff}<div class="grow"><div class="t">Funciona sem internet</div><div class="s">Seu progresso é salvo no celular e sincronizado depois</div></div></div>
-    </div>
-    <button class="btn block" data-act="go">Ativar e começar</button>`, { onClose: () => finish() });
-  let done = false;
-  async function finish() {
-    if (done) return;
-    done = true;
-    await store.saveSettings({ onboarded: true });
-    geo.start();
-  }
-  $('[data-act=go]', sheet).addEventListener('click', async () => {
-    unlockAudio();
-    await sensors.request();
-    closeSheet();
-    finish();
-  });
-}
-
-// baixa antecipadamente os tiles ao redor dos brejos (ficam em cache para uso offline)
-let prefetched = new Set();
+// baixa antecipadamente os tiles ao redor das lagoinhas (ficam em cache para uso offline)
+const prefetched = new Set();
 async function prefetchTiles() {
   if (api.isOffline() || !('caches' in window)) return;
   const urls = [];
   for (const b of store.brejos) {
     if (prefetched.has(b.id)) continue;
     prefetched.add(b.id);
-    for (const z of [17, 18]) urls.push(...tilesAround(b.lat, b.lng, b.radius + 300, z));
+    urls.push(...tilesAround(b.lat, b.lng, b.radius + 300, 18), ...tilesAround(b.lat, b.lng, b.radius + 120, 19));
   }
   for (const u of urls) {
     try { await fetch(u, { mode: 'no-cors' }); } catch { return; }
     await new Promise((r) => setTimeout(r, 40));
   }
 }
-
-export function getInstallEvent() { return installEvt; }

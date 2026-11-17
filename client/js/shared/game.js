@@ -4,9 +4,9 @@
 
 export const WINDOW_MS = 15 * 60 * 1000;       // as pererecas de um brejo mudam a cada 15 min
 export const GRACE_MS = 10 * 60 * 1000;        // tolerância para capturas feitas no fim da janela
-export const CAPTURE_RANGE_M = 30;             // distância máxima para tocar numa perereca
-export const REVEAL_RANGE_M = 70;              // alcance do "coaxo" ao chacoalhar o celular
-export const EXPEDITION_IDLE_MS = 45 * 60 * 1000; // expedição encerra após 45 min parada
+export const CAPTURE_RANGE_M = 10;             // distância para capturar uma perereca
+export const GPS_SLACK_M = 10;                 // folga extra quando o próprio GPS informa imprecisão
+export const REVEAL_RANGE_M = 20;              // alcance do chacoalhar: revela os matinhos por perto
 export const NEW_SPECIES_BONUS = 50;
 export const BR_OFFSET_MS = -3 * 60 * 60 * 1000;  // horário de Brasília (sem horário de verão)
 
@@ -98,9 +98,11 @@ export function spawnsFor(brejo, win, catalog) {
   for (let i = 0; i < n; i++) {
     const sp = pickSpecies(next, catalog);
     const ang = next() * Math.PI * 2;
-    const dist = Math.sqrt(next()) * brejo.radius * 0.8;
+    // os matinhos ficam em volta da lagoinha (que ocupa o centro do brejo)
+    const dist = brejo.radius * (0.3 + 0.55 * next());
     const pos = offsetLatLng(brejo.lat, brejo.lng, dist * Math.cos(ang), dist * Math.sin(ang));
-    const hidden = next() < 0.3;
+    next(); // mantém a sequência pseudoaleatória estável
+    const hidden = true; // toda perereca começa escondida num matinho
     out.push({
       id: `${brejo.id}:${win}:${i}`,
       kind: 'wild',
@@ -177,6 +179,22 @@ export function xpBreakdown(captures, catalog) {
   }
   return { total, perCapture, species: seen };
 }
+
+// alcance efetivo de captura: 10 m + folga quando o GPS do aparelho está impreciso
+export function captureRange(pos) {
+  if (!pos || pos.simulated) return CAPTURE_RANGE_M;
+  return CAPTURE_RANGE_M + Math.max(0, Math.min(GPS_SLACK_M, (pos.accuracy || 0) - CAPTURE_RANGE_M));
+}
+
+// A "partida" é a caçada do dia: id fixo por jogador e por dia (horário de Brasília).
+// Dois aparelhos no mesmo dia escrevem na MESMA partida, mesmo offline.
+export const dayExpeditionId = (playerId, day) => `dia:${playerId}:${day}`;
+export const dayFromExpeditionId = (id) => Number(String(id).split(':')[2]);
+
+export const LOOK_MODELS = ['froghood', 'explorer'];
+export const LOOK_SKINS = ['clara', 'media', 'escura'];
+export const DEFAULT_LOOK = 'froghood-clara';
+export const validLook = (look) => /^(froghood|explorer)-(clara|media|escura)$/.test(String(look));
 
 export function levelFor(xp) {
   let level = 1, need = 120, rest = xp;

@@ -133,6 +133,16 @@ test('favorito usa "última escrita vence"', async () => {
   assert.equal(r2.body.state.captures[0].favorite, false);
 });
 
+test('boneco escolhido sincroniza com "última escrita vence"', async () => {
+  const p = await newPlayer('leo');
+  const look = (v, ts) => ({ opId: crypto.randomUUID(), type: 'profile.look', ts, payload: { look: v, ts } });
+  await sync(p, 'A', [look('explorer-escura', clock + 20)]);
+  const r = await sync(p, 'B', [look('froghood-media', clock + 10)]);
+  assert.equal(r.body.state.player.look, 'explorer-escura');
+  const bad = await sync(p, 'B', [look('dragao-azul', clock + 30)]);
+  assert.equal(bad.body.results[0].status, 'rejected');
+});
+
 test('distância da expedição é um G-Counter por aparelho', async () => {
   const p = await newPlayer('fer');
   const id = crypto.randomUUID();

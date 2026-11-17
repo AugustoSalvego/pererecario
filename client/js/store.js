@@ -7,7 +7,7 @@
 import * as db from './db.js';
 import { api } from './api.js';
 import { getCatalog } from './catalog.js';
-import { xpBreakdown, levelFor, EXPEDITION_IDLE_MS, windowOf } from './shared/game.js';
+import { xpBreakdown, levelFor, windowOf, dayOf, dayExpeditionId } from './shared/game.js';
 
 export const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
   : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
@@ -202,6 +202,9 @@ class Store extends EventTarget {
         case 'friend.add':
           if (!friends.has(p.friendId)) friends.set(p.friendId, { id: p.friendId, displayName: p.displayName, avatar: p.avatar, since: p.at, pending: true });
           break;
+        case 'profile.look':
+          if (player && p.ts > (player.lookTs || 0)) { player.look = p.look; player.lookTs = p.ts; }
+          break;
         case 'profile.avatar':
           if (player && p.ts > (player.avatarTs || 0)) { player.avatar = p.speciesId; player.avatarTs = p.ts; }
           break;
@@ -250,10 +253,10 @@ class Store extends EventTarget {
     this.emit('change', this.view);
   }
 
-  // ---------- expedições (as "partidas") ----------
-  lastActivityOf(e) { return Math.max(e.updatedAt || 0, e.startedAt || 0, this.activity[e.id] || 0); }
+  // ---------- caçada do dia (a "partida") ----------
+  todayId() { return this.view?.player ? dayExpeditionId(this.view.player.id, dayOf(this.now())) : null; }
 
-  currentExpedition() { return this.view.expeditions.find((e) => e.id === this.currentExpeditionId) || null; }
+  currentExpedition() { return this.view.expeditions.find((e) => e.id === this.todayId()) || null; }
 
   ensureExpedition() {
     if (!this._ensuring) this._ensuring = this._ensureExpedition().finally(() => { this._ensuring = null; });
@@ -261,34 +264,15 @@ class Store extends EventTarget {
   }
 
   async _ensureExpedition() {
-    const t = this.now();
+    const id = this.todayId();
+    if (!id) return null;
+    this.currentExpeditionId = id;
     const cur = this.currentExpedition();
-    if (cur && cur.status === 'active' && t - this.lastActivityOf(cur) < EXPEDITION_IDLE_MS) return cur;
-    const active = this.view.expeditions.filter((e) => e.status === 'active').sort((a, b) => this.lastActivityOf(b) - this.lastActivityOf(a));
-    let keep = null;
-    for (const e of active) {
-      if (!keep && t - this.lastActivityOf(e) < EXPEDITION_IDLE_MS) keep = e;
-      else await this.addOp('expedition.end', { id: e.id, endedAt: this.lastActivityOf(e), meters: this.myMeters[e.id] || 0 });
-    }
-    if (keep) {
-      this.currentExpeditionId = keep.id;
-      if (keep.distance?.[this.deviceId] == null) await this.log('info', 'Continuando a expedição iniciada em outro aparelho');
-      return keep;
-    }
-    const id = uuid();
+    if (cur) return cur;
+    const t = this.now();
     this.activity[id] = t;
     await this.addOp('expedition.start', { id, startedAt: t }, { kv: { activity: this.activity } });
-    this.currentExpeditionId = id;
     return this.currentExpedition();
-  }
-
-  async endExpedition() {
-    const cur = this.currentExpedition();
-    if (!cur) return null;
-    const summary = { ...cur };
-    await this.addOp('expedition.end', { id: cur.id, endedAt: this.now(), meters: this.myMeters[cur.id] || 0 });
-    this.currentExpeditionId = null;
-    return { ...summary, endedAt: this.now(), status: 'finished' };
   }
 
   async addDistance(meters) {
@@ -304,7 +288,7 @@ class Store extends EventTarget {
 
   async flushProgress() {
     const exp = this.currentExpedition();
-    if (!exp || exp.status !== 'active') return;
+    if (!exp) return;
     this.lastProgressAt = Date.now();
     await this.addOp('expedition.progress', { id: exp.id, meters: Math.round(this.myMeters[exp.id] || 0), at: this.now() }, {
       kv: { myMeters: this.myMeters, activity: this.activity },
@@ -331,6 +315,10 @@ class Store extends EventTarget {
 
   async toggleFavorite(c) {
     await this.addOp('favorite', { spawnId: c.spawnId, favorite: !c.favorite, ts: this.now() });
+  }
+
+  async setLook(look) {
+    await this.addOp('profile.look', { look, ts: this.now() });
   }
 
   async setAvatar(speciesId) {

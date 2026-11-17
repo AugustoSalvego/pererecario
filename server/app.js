@@ -91,7 +91,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
 
   async function playerPublic(id) {
     const p = await db.one('SELECT * FROM players WHERE id=$1', [id]);
-    return p && { id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar, friendCode: p.friend_code, createdAt: p.created_at };
+    return p && { id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar, look: p.look, friendCode: p.friend_code, createdAt: p.created_at };
   }
 
   const routes = {

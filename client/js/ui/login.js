@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { store } from '../store.js';
 import { frogImg } from '../catalog.js';
 import { icons } from './icons.js';
+import { img } from './sprites.js';
 import { $, h } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
@@ -36,10 +37,10 @@ export function renderLogin(onDone) {
       <span class="tagline">🐸 Ande pelo campus e capture todas!</span>
     </div>
     <div class="login-stage">
-      <div class="pond"></div>
-      <div class="lily-frog" style="left:13%;bottom:22%">${frogImg('frog_drop', 58)}<div class="pad"></div></div>
-      <div class="lily-frog" style="left:50%;bottom:10%;transform:translateX(-50%)">${frogImg('frog_pitanga', 86)}<div class="pad"></div></div>
-      <div class="lily-frog" style="right:12%;bottom:26%">${frogImg('frog_honey', 56)}<div class="pad"></div></div>
+      ${img('pond-big.png', 380, 'pond-img')}
+      <div class="lily-frog" style="left:20%;bottom:24%">${frogImg('frog_drop', 54)}${img('lilypad.png', 60, 'pad-img')}</div>
+      <div class="lily-frog" style="left:50%;bottom:9%;transform:translateX(-50%)">${frogImg('frog_pitanga', 80)}${img('lilypad.png', 88, 'pad-img')}</div>
+      <div class="lily-frog" style="right:22%;bottom:30%">${frogImg('frog_honey', 46)}${img('lilypad.png', 52, 'pad-img')}</div>
     </div>
     <form class="login-card" novalidate>
       <div class="segmented"><button type="button" data-mode="login" class="on">Entrar</button><button type="button" data-mode="register">Criar conta</button></div>

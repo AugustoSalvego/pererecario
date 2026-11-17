@@ -68,7 +68,7 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
       <div class="cap-sky"></div>
       ${treeline(WORLD, Math.round(H * 0.18))}
       <div class="cap-water"></div>
-      ${pads.map((p) => `<div class="cap-pad" style="left:${p.x}px;top:${p.y}px"></div>`).join('')}
+      ${pads.map((p) => `<img class="px cap-lily" src="assets/sprites/lilypad.png" style="left:${p.x}px;top:${p.y}px" alt="">`).join('')}
       ${reeds(rand(0, W * 0.4), 140)}${reeds(WORLD * 0.45, 160)}${reeds(WORLD - 170, 150)}
       <div class="cap-frog"><div class="hitbox"></div>${frogImg(sp.id, Math.min(150, W * 0.36))}</div>
     </div>

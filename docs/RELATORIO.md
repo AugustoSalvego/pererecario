@@ -4,16 +4,16 @@ Trabalho prático de Sistemas Distribuídos: jogo para computação móvel com f
 
 ## 1. Descrição do jogo
 
-O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são áreas reais do campus (centro + raio), cadastradas no servidor. Dentro de cada brejo vivem de 3 a 7 pererecas, que mudam a cada 15 minutos. O jogador caminha com o celular até o brejo (GPS), toca numa perereca que esteja a até 30 m e entra no minijogo de captura: a perereca pula entre vitórias-régias, o jogador **vira o celular** (giroscópio) para encontrá-la e **toca rápido** nela até encher o pote (2 a 5 toques, conforme a raridade).
+O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são lugares reais do campus (centro + raio), cadastrados no servidor e desenhados no mapa como **lagoinhas**. Em volta de cada lagoinha vivem de 3 a 7 pererecas, que mudam a cada 15 minutos. Toda perereca começa **escondida num matinho com "?"**: o jogador caminha até lá (GPS) e, a até 20 m, **chacoalha o celular** para ela sair. Depois, a até **10 m**, toca nela e entra no minijogo de captura: a perereca pula entre vitórias-régias, o jogador **vira o celular** (giroscópio) para encontrá-la e **toca rápido** nela até encher o pote (2 a 5 toques, conforme a raridade).
 
-Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Algumas pererecas ficam **escondidas em moitas** e só aparecem quando o jogador **chacoalha o celular** perto delas. Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
+Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu explorador (2 modelos × 3 tons de pele), que anda no mapa nas 4 direções. Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
 | Requisito do enunciado | No jogo |
 |---|---|
 | Identificação do jogador | Conta com usuário e senha; token assinado guardado no aparelho |
-| Estado e progresso das partidas | **Expedição** = a partida: começa quando o jogador sai para caçar, acumula capturas, XP e distância, e termina manualmente ou após 45 min parada |
+| Estado e progresso das partidas | **Caçada do dia** = a partida: criada automaticamente no primeiro movimento ou captura do dia; acumula capturas, XP e distância. O identificador é fixo por jogador e por dia (`dia:<jogador>:<dia>`), então dois aparelhos no mesmo dia jogam **a mesma partida** |
 | Pontuações e resultados | XP por captura (10/25/60/150 + 50 por espécie nova), nível, ranking do campus |
-| Histórico das partidas | Lista de expedições encerradas no Perfil (data, duração, distância, pererecas, XP) |
+| Histórico das partidas | **Diário de campo** no Perfil: uma página por dia, com as pererecas capturadas, XP e distância |
 
 | Tela | |
 |---|---|
@@ -84,7 +84,7 @@ Rotas principais:
 
 O IndexedDB tem três "tabelas" (`client/js/db.js`):
 
-- **`kv`**: sessão (token e jogador), `snapshot` (último estado confirmado pelo servidor), brejos e versão, diferença de relógio com o servidor, configurações, pererecas reveladas, distância percorrida e atividade da expedição atual, e o identificador do aparelho (`deviceId`).
+- **`kv`**: sessão (token e jogador), `snapshot` (último estado confirmado pelo servidor), brejos e versão, diferença de relógio com o servidor, configurações, pererecas reveladas, distância percorrida na caçada do dia, e o identificador do aparelho (`deviceId`).
 - **`outbox`**: a **fila de operações** ainda não confirmadas, em ordem (chave autoincremental). Cada operação tem `opId` (UUID gerado no aparelho), tipo, dados, horário e número de tentativas.
 - **`log`**: os últimos 150 eventos de sincronização, exibidos no painel de demonstração.
 
@@ -94,7 +94,7 @@ O IndexedDB tem três "tabelas" (`client/js/db.js`):
 - quando o servidor confirma, a operação sai da fila e o snapshot novo já contém a captura, sem "piscar" nem duplicar;
 - se o servidor decidir diferente (conflito), o snapshot canônico prevalece automaticamente.
 
-**Atomicidade local:** a captura é gravada com uma única transação do IndexedDB que escreve a operação na fila e atualiza a atividade da expedição (`db.enqueue`). Se o app fechar no meio, ou tudo foi salvo ou nada foi. Quando o servidor responde, remover as operações confirmadas e salvar o novo snapshot também acontece numa única transação (`db.outboxRemove`).
+**Atomicidade local:** a captura é gravada com uma única transação do IndexedDB que escreve a operação na fila e atualiza a atividade da caçada do dia (`db.enqueue`). Se o app fechar no meio, ou tudo foi salvo ou nada foi. Quando o servidor responde, remover as operações confirmadas e salvar o novo snapshot também acontece numa única transação (`db.outboxRemove`).
 
 **Persistência entre aberturas:** fechar e abrir o app offline recupera o progresso: o Service Worker serve o app do cache e o IndexedDB devolve sessão, snapshot e fila. O login também fica salvo, então o jogo abre direto mesmo sem internet.
 
@@ -126,7 +126,7 @@ sequenceDiagram
   end
 ```
 
-**Tipos de operação:** `capture`, `favorite`, `expedition.start`, `expedition.progress`, `expedition.end`, `friend.add`, `profile.avatar`.
+**Tipos de operação:** `capture`, `favorite`, `expedition.start`, `expedition.progress`, `expedition.end`, `friend.add`, `profile.avatar`, `profile.look` (as operações `expedition.*` atualizam a caçada do dia).
 
 **Quando sincroniza (automático, sem reiniciar a partida):**
 - logo após cada nova operação;
@@ -144,19 +144,18 @@ sequenceDiagram
 
 **Hora do jogo:** o cliente calcula a diferença entre o próprio relógio e o do servidor a cada resposta (`serverTime` comparado com o meio da requisição) e usa essa correção para decidir a janela de 15 min das pererecas. Assim cliente e servidor concordam sobre quais pererecas existem, mesmo com o relógio do celular um pouco errado.
 
-**Coalescência:** a distância percorrida gera no máximo uma operação de progresso por minuto. Se a última operação da fila já é um progresso da mesma expedição, ela é substituída em vez de acumular (a fila não cresce enquanto o jogador anda offline).
+**Coalescência:** a distância percorrida gera no máximo uma operação de progresso por minuto. Se a última operação da fila já é um progresso da mesma caçada, ela é substituída em vez de acumular (a fila não cresce enquanto o jogador anda offline).
 
 ## 6. Política de resolução de conflitos
 
-O caso típico do enunciado: o mesmo jogador, em dois aparelhos offline, mexe na mesma partida. A política foi escolhida **por tipo de dado**, sempre com regras **determinísticas e independentes da ordem de chegada**, para que todos os aparelhos converjam para o mesmo estado:
+O caso típico do enunciado: o mesmo jogador, em dois aparelhos offline, mexe na mesma partida. Como a partida é a caçada do dia, com identificador fixo, isso acontece naturalmente sempre que alguém joga em dois aparelhos no mesmo dia. A política foi escolhida **por tipo de dado**, sempre com regras **determinísticas e independentes da ordem de chegada**, para que todos os aparelhos converjam para o mesmo estado:
 
 | Dado | Situação de conflito | Política | Por quê |
 |---|---|---|---|
 | **Captura** | A mesma perereca capturada nos dois aparelhos | **A primeira captura vence** (menor `caughtAt`; empate: menor `deviceId`). A outra é descartada e registrada na tabela `conflicts`. O aparelho que perdeu recebe o aviso "essa perereca já tinha sido capturada antes no aparelho X". | Uma perereca é um encontro único: contar duas vezes inflaria XP e coleção. Vencer a mais antiga é justo (quem pegou primeiro) e, por não depender da ordem de sincronização, o resultado é o mesmo se o aparelho A ou o B voltar primeiro (testado). |
-| **Capturas diferentes** na mesma expedição | Cada aparelho pegou pererecas diferentes | **União** (nada se perde) | Capturas distintas não competem entre si; é um conjunto que só cresce (G-Set). |
-| **Distância da expedição** | Os dois aparelhos andaram | **G-Counter:** cada aparelho só aumenta a própria parcela; o servidor guarda o máximo de cada parcela e o total é a soma | Somar valores reenviados contaria duas vezes; sobrescrever perderia a distância do outro aparelho. O G-Counter resolve os dois problemas. |
-| **Estado da expedição** | Um aparelho encerrou, o outro continuou | **"Encerrada" vence "ativa"**, e o fim considerado é o mais tardio reportado. Capturas feitas depois continuam contando. | Estado monotônico (só avança), e nenhuma captura é perdida. |
-| **Favorito, avatar** | Alterados nos dois aparelhos | **Last-Writer-Wins** pelo horário corrigido da alteração | Preferências simples, sem valor de jogo; vale a decisão mais recente do jogador. |
+| **Capturas diferentes** na mesma caçada do dia | Cada aparelho pegou pererecas diferentes | **União** (nada se perde) | Capturas distintas não competem entre si; é um conjunto que só cresce (G-Set). |
+| **Distância da caçada** | Os dois aparelhos andaram | **G-Counter:** cada aparelho só aumenta a própria parcela; o servidor guarda o máximo de cada parcela e o total é a soma | Somar valores reenviados contaria duas vezes; sobrescrever perderia a distância do outro aparelho. O G-Counter resolve os dois problemas. |
+| **Favorito, avatar, boneco** | Alterados nos dois aparelhos | **Last-Writer-Wins** pelo horário corrigido da alteração | Preferências simples, sem valor de jogo; vale a decisão mais recente do jogador. |
 | **Amizade** | Adicionada nos dois aparelhos | Idempotente (chave única do par, mútua) | Adicionar duas vezes é o mesmo que adicionar uma. |
 | **Presente do QR** | Escaneado de novo no mesmo dia / em outro aparelho | O id do encontro inclui o dia (`gift:jogador:amigo:dia`), então vale a regra da captura: só o primeiro conta | Limita a um presente por amigo por dia mesmo offline. |
 
@@ -186,8 +185,8 @@ O jogo muda conforme o ambiente físico do jogador:
 
 | Recurso | Sensor / contexto | Efeito no jogo |
 |---|---|---|
-| **Localização geográfica** | GPS (`watchPosition`, alta precisão) | Os brejos são lugares reais do campus. Só dá para capturar a até 30 m da perereca. A distância caminhada vira estatística da expedição. Sinal ruim (precisão > 60 m) gera aviso. Leituras com precisão ruim não contam distância. |
-| **Movimento: chacoalhar** | Acelerômetro (`devicemotion`) | Pererecas escondidas em moitas só aparecem quando o jogador **chacoalha o celular** a até 70 m delas (coaxos + vibração). |
+| **Localização geográfica** | GPS (`watchPosition`, alta precisão) | As lagoinhas são lugares reais do campus, sobre o mapa real (OpenStreetMap). Captura a até **10 m** da perereca, com até 10 m de folga automática quando o próprio GPS informa imprecisão. O boneco anda na direção do movimento. A distância caminhada entra na caçada do dia. Sinal ruim (precisão > 60 m) gera aviso, e leituras imprecisas não contam distância. |
+| **Movimento: chacoalhar** | Acelerômetro (`devicemotion`) | Toda perereca começa escondida num matinho com "?". A 20 m, o matinho "espia" (aparecem olhinhos) e o jogo pede para **chacoalhar o celular**; os coaxos e a vibração fazem as pererecas saírem. |
 | **Orientação: virar o celular** | Giroscópio/bússola (`deviceorientation`) | Na captura, a lagoa é um panorama mais largo que a tela: o jogador **gira o corpo com o celular** para encontrar a perereca, que fica "presa no mundo". Sem giroscópio, dá para arrastar com o dedo. |
 | **Proximidade entre jogadores** | Câmera + QR code | Cada jogador tem um QR no perfil. Escanear o de outra pessoa exige estar perto dela: cria a amizade e libera uma perereca-presente. O QR carrega os dados necessários, então funciona até offline. |
 | **Contexto temporal** | Relógio corrigido pelo servidor | As pererecas de cada brejo mudam a cada 15 min; os presentes são diários. |
@@ -205,15 +204,15 @@ O jogo muda conforme o ambiente físico do jogador:
 
 ## 10. Testes automatizados
 
-`npm test` roda 11 testes (`test/sync.test.js`) com o servidor real e banco em memória:
+`npm test` roda 12 testes (`test/sync.test.js`) com o servidor real e banco em memória:
 
 1. cadastro, login e acesso sem token;
 2. servidor e cliente calculam as mesmas pererecas;
 3. reenvio da mesma operação não duplica (inclusive dentro do mesmo lote);
 4. capturas inválidas são rejeitadas (espécie errada, fora do horário, longe demais);
 5. **conflito entre dois aparelhos resolvido igual em qualquer ordem de chegada**;
-6. favorito com last-writer-wins;
-7. distância como G-Counter e expedição encerrada com o fim mais tardio;
+6. favorito e boneco escolhido com last-writer-wins;
+7. distância da caçada como G-Counter por aparelho;
 8. QR: amizade mútua, presente único por dia, não pode adicionar a si mesmo;
 9. servidor indisponível (503) e recuperação;
 10. lote parcialmente aplicado reenviado inteiro com segurança;
@@ -224,6 +223,7 @@ Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reab
 ## 11. Limitações conhecidas
 
 - O conjunto de brejos precisa ser cadastrado pelos organizadores (no local, pelo celular, ou pelo `/admin`).
+- As artes atuais do boneco, das lagoinhas e dos matinhos são provisórias (ver `docs/ARTES.md`).
 - O mapa offline mostra apenas a região já vista ou baixada antecipadamente ao redor dos brejos; fora disso aparece o gramado do jogo.
 - No iPhone, os sensores de movimento só podem ser liberados após um toque do usuário (o app pede na primeira abertura).
 - O relógio do aparelho é corrigido a cada sincronização; se o celular nunca ficou online depois de ter o relógio muito alterado, uma captura pode cair fora da janela e ser rejeitada.

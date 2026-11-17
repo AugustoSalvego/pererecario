@@ -12,8 +12,8 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 ## Teste 1: partida online com registro no servidor
 
-1. No celular A (online, pílula verde **Online**), mostre a expedição no canto inferior esquerdo.
-2. Ande até uma perereca, capture.
+1. No celular A (online, pílula verde **Online**), mostre o contador "hoje" no canto inferior esquerdo (a caçada do dia é a partida).
+2. Ande até a lagoinha, chacoalhe o celular perto de um matinho, chegue a 10 m da perereca e capture.
 3. No projetor (`/admin`): a captura aparece em **Capturas recebidas** e em **Log de operações** (`capture` → `applied`) com o aparelho de origem.
 
 ## Teste 2: perder a conexão durante a partida e continuar jogando
@@ -36,7 +36,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 ## Teste 5: recuperar o progresso em outro aparelho
 
 1. No celular B (ou num navegador anônimo), entre com a mesma conta.
-2. O Pererecário, o Meu Brejo, o nível e o histórico de expedições aparecem iguais aos do celular A.
+2. O Pererecário, o Meu Brejo, o nível e o Diário de campo aparecem iguais aos do celular A.
 
 ## Teste 6: servidor indisponível, reenvio e conflito
 
@@ -60,6 +60,6 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 ## Extras de computação ubíqua (para mostrar)
 
-- **Chacoalhar** o celular perto de uma moita com "?" revela as pererecas escondidas.
+- **Chacoalhar** o celular perto de um matinho com "?" faz as pererecas saírem.
 - Na captura, **girar o corpo com o celular** para encontrar a perereca.
 - **QR code**: dois colegas abrem a aba Amigos e um escaneia o QR do outro: a perereca-presente aparece.

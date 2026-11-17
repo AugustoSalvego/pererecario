@@ -12,7 +12,7 @@
 import crypto from 'node:crypto';
 import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
-  distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor,
+  distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook,
 } from '../client/js/shared/game.js';
 
 const GPS_TOLERANCE_M = 45;
@@ -203,6 +203,14 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       return { status: 'applied' };
     },
 
+    async 'profile.look'(q, playerId, deviceId, p) {
+      const ts = num(p.ts);
+      if (!validLook(p.look) || ts === null) return { status: 'rejected', error: 'Boneco inválido' };
+      // Last-Writer-Wins, como o avatar
+      await q.run('UPDATE players SET look=$1, look_ts=$2 WHERE id=$3 AND look_ts < $2', [p.look, ts, playerId]);
+      return { status: 'applied' };
+    },
+
     async 'profile.avatar'(q, playerId, deviceId, p) {
       const ts = num(p.ts);
       if (!speciesIds.has(p.speciesId) || ts === null) return { status: 'rejected', error: 'Avatar inválido' };
@@ -262,7 +270,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
     return {
       player: {
         id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar,
-        avatarTs: p.avatar_ts, friendCode: p.friend_code, createdAt: p.created_at,
+        avatarTs: p.avatar_ts, look: p.look, lookTs: p.look_ts, friendCode: p.friend_code, createdAt: p.created_at,
       },
       captures: caps.map((c) => ({
         id: c.id, spawnId: c.spawn_id, speciesId: c.species_id, sizeCm: c.size_cm, kind: c.kind,

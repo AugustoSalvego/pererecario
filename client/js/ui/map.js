@@ -1,9 +1,11 @@
-// Mapa do jogo, desenhado à mão: tiles do OpenStreetMap (estilo CARTO) num plano
-// inclinado em perspectiva, como nos jogos de mapa. Brejos ficam "no chão" (plano
-// inclinado); pererecas, rótulos e o jogador ficam em pé (camada sem inclinação).
+// Mapa do jogo, desenhado à mão: o mapa real (OpenStreetMap, estilo CARTO Voyager,
+// com nomes de rua) visto de cima. Elementos "no chão" (anel de alcance) ficam na
+// camada do plano; lagoinhas, matinhos, pererecas e o boneco ficam na camada de objetos.
+// O plano aceita inclinação em perspectiva (tilt), mas o jogo usa o mapa reto.
 const TILE = 256;
-const TILT = 40;
-const TILE_TEMPLATE = globalThis.PERERECARIO_TILES || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png';
+const RETINA = (globalThis.devicePixelRatio || 1) > 1.4 ? '@2x' : '';
+const TILE_TEMPLATE = globalThis.PERERECARIO_TILES || `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${RETINA}.png`;
+export const BASE_ZOOM = 19.2;
 const TILE_URL = (z, x, y) => TILE_TEMPLATE.replace('{s}', 'abcd'[(x + y) % 4]).replace('{z}', z).replace('{x}', x).replace('{y}', y);
 const rad = (d) => (d * Math.PI) / 180;
 
@@ -31,16 +33,18 @@ export function tilesAround(lat, lng, radiusM, z) {
 }
 
 export class GameMap {
-  constructor(el, { onTapGround, onTapObject, onUserMove } = {}) {
+  constructor(el, { onTapGround, onTapObject, onUserMove, tilt = 0 } = {}) {
     this.el = el;
     this.cb = { onTapGround, onTapObject, onUserMove };
+    this.tilt = tilt;
     this.center = { lat: -23.1, lng: -50.36 };
-    this.zoom = 18.2;
+    this.zoom = BASE_ZOOM;
     this.follow = true;
     this.tiles = new Map();
     this.features = new Map();
     this.objects = new Map();
     el.classList.add('map');
+    if (!tilt) el.classList.add('flat');
     el.innerHTML = `<div class="map-sky"><div class="cloud" style="left:10%"></div><div class="cloud" style="left:60%;animation-delay:-30s;width:60px"></div></div>
       <div class="map-plane"><div class="map-ground"></div><div class="map-tiles"></div><div class="map-features"></div></div>
       <div class="map-objects"></div><div class="map-fog"></div><div class="map-attrib">© OpenStreetMap · © CARTO</div>`;
@@ -48,8 +52,8 @@ export class GameMap {
     this.tileLayer = el.querySelector('.map-tiles');
     this.featLayer = el.querySelector('.map-features');
     this.objLayer = el.querySelector('.map-objects');
-    this.sinT = Math.sin(rad(TILT));
-    this.cosT = Math.cos(rad(TILT));
+    this.sinT = Math.sin(rad(tilt));
+    this.cosT = Math.cos(rad(tilt));
     this.measure();
     new ResizeObserver(() => { this.measure(); this.invalidate(); }).observe(el);
     this.bindGestures();
@@ -58,10 +62,10 @@ export class GameMap {
   measure() {
     this.W = this.el.clientWidth || 360;
     this.H = this.el.clientHeight || 720;
-    this.O = { x: this.W / 2, y: this.H * 0.64 };
+    this.O = { x: this.W / 2, y: this.H * (this.tilt ? 0.64 : 0.56) };
     this.P = Math.max(560, this.H * 1.0);
     this.plane.style.transformOrigin = `${this.O.x}px ${this.O.y}px`;
-    this.plane.style.transform = `perspective(${this.P}px) rotateX(${TILT}deg)`;
+    this.plane.style.transform = this.tilt ? `perspective(${this.P}px) rotateX(${this.tilt}deg)` : 'none';
   }
 
   // ----- projeções -----
@@ -126,7 +130,7 @@ export class GameMap {
   removeFeature(key) { const f = this.features.get(key); if (f) { f.el.remove(); this.features.delete(key); } }
 
   // objeto = elemento em pé (perereca, rótulo, jogador)
-  setObject(key, { lat, lng, html, className = '', depthScale = true, data }) {
+  setObject(key, { lat, lng, html, className = '', depthScale = true, ground = false, data }) {
     let o = this.objects.get(key);
     if (!o) {
       const el = document.createElement('div');
@@ -135,7 +139,7 @@ export class GameMap {
       o = { el };
       this.objects.set(key, o);
     }
-    Object.assign(o, { lat, lng, depthScale, data });
+    Object.assign(o, { lat, lng, depthScale, ground, data });
     const cls = `mobj ${className}`;
     if (o.cls !== cls) { o.el.className = cls; o.cls = cls; }
     if (html != null && o.html !== html) { o.el.innerHTML = html; o.html = html; }
@@ -151,7 +155,7 @@ export class GameMap {
     const scale = 2 ** (this.zoom - L);
     const c = worldPx(this.center.lat, this.center.lng, L);
     // região do plano visível (inversa da perspectiva nos cantos da tela)
-    const corners = [[0, H * 0.08], [W, H * 0.08], [0, H], [W, H]].map(([x, y]) => this.screenToPlane(x, y));
+    const corners = [[0, this.tilt ? H * 0.08 : 0], [W, this.tilt ? H * 0.08 : 0], [0, H], [W, H]].map(([x, y]) => this.screenToPlane(x, y));
     const minX = Math.min(...corners.map((p) => p.x)), maxX = Math.max(...corners.map((p) => p.x));
     const minY = Math.max(-2400, Math.min(...corners.map((p) => p.y))), maxY = Math.max(...corners.map((p) => p.y));
     const n = 2 ** L;
@@ -194,9 +198,10 @@ export class GameMap {
       const off = s.y < -60 || s.y > H + 120 || s.x < -120 || s.x > W + 120 || p.y < minY;
       if (off) { if (!o.off) { o.el.style.display = 'none'; o.off = true; } continue; }
       if (o.off) { o.el.style.display = ''; o.off = false; }
-      const k = o.depthScale ? Math.max(0.45, Math.min(1.25, s.s)) * Math.min(1.15, 2 ** ((this.zoom - 18.2) * 0.5)) : 1;
+      const zk = Math.max(0.55, Math.min(1.35, 2 ** ((this.zoom - BASE_ZOOM) * 0.7)));
+      const k = o.depthScale ? Math.max(0.45, Math.min(1.25, s.s)) * zk : 1;
       o.el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${k})`;
-      o.el.style.zIndex = String(Math.round(s.y));
+      o.el.style.zIndex = String(o.ground ? 1 : 1000 + Math.round(s.y));
     }
   }
 
@@ -256,7 +261,7 @@ export class GameMap {
   }
 
   setZoom(z) {
-    this.zoom = Math.max(16.4, Math.min(19.6, z));
+    this.zoom = Math.max(17.4, Math.min(20.2, z));
     this.invalidate();
   }
 }
