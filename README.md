@@ -1,91 +1,78 @@
 # Pererecário 🐸
 
-An offline-first mobile frog collection game with original pixel-art creatures. The **visual experience v0.4** includes 15 approved pixel-art species, their album personalities, a responsive collection UI, simulated camera flow, repeated specimens (Meu Brejo), and a field guide.
+Jogo para celular no estilo "anda e captura": as pererecas ficam esperando nos **brejos do campus**, você caminha até elas com o GPS e **toca rápido** para capturá-las. O jogo funciona **online e offline**: tudo fica salvo no aparelho e é sincronizado com o servidor quando a conexão volta.
 
-> **Development status:** The new `jogar.html` is a playable browser simulator with local progress saving and real encounter rarity logic. `preview_v04.html` and the Flutter app remain visual prototypes. Android camera/GPS, Google sign-in, backend synchronization and trading are not implemented yet.
+Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 
-## Play the game simulator before the Android APK
+![Telas do jogo](docs/img/telas.jpg)
 
-Open **`jogar.html`** in Chrome or Edge from this repository's folder. No Flutter or installation required.
+- **Documentação completa do trabalho:** [`docs/RELATORIO.md`](docs/RELATORIO.md) (armazenamento local, sincronização, conflitos, falhas, computação ubíqua)
+- **Roteiro da apresentação (testes obrigatórios):** [`docs/ROTEIRO_APRESENTACAO.md`](docs/ROTEIRO_APRESENTACAO.md)
 
-- Start with an empty album. Go to **Explorar → Procurar perereca → Fotografar**.
-- The first encounter is Folhinha; later encounters use rarity weights (60/28/10/2) and anti-frustration guarantees.
-- Capture with unlimited attempts; after two misses, the game assists you. One specimen is awarded per encounter.
-- Browse your discoveries in **Álbum** and repeated specimens in **Meu Brejo**.
-- Your progress and pending encounter are saved locally to browser storage when available. To start over, use **Guia → Reiniciar**.
-- This is a **simulator**, not a real phone camera or GPS application. Browser storage is not synced across devices.
+## Como jogar
 
-The separate `preview_v04.html` is retained unchanged as the approved visual reference.
+1. Abra o link do jogo no celular (Chrome no Android ou Safari no iPhone), crie a conta e permita **localização** e **sensores de movimento**.
+2. Ande até um brejo do campus. As pererecas aparecem pulando dentro dele.
+3. Chegou perto (até 30 m)? Toque na perereca. Na captura, **vire o celular** (giroscópio) para achá-la entre as vitórias-régias e **toque rápido** nela até encher o pote.
+4. Viu uma **moita com "?"**? Tem perereca escondida: **chacoalhe o celular** perto dela para ouvir os coaxos e fazê-la aparecer.
+5. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
+6. Complete o **Pererecário** (15 espécies) e veja suas repetidas no **Meu Brejo**. Cada saída para caçar é uma **expedição**, com pontuação, distância e histórico.
 
-## Included in this baseline
+Para instalar como app: no Android, menu ⋮ → "Instalar app"/"Adicionar à tela inicial"; no iPhone, Compartilhar → "Adicionar à Tela de Início".
 
-- `assets/frogs_atlas.png` — approved pixel-art atlas for all 15 species.
-- `assets/species.json` — persistent species IDs, rarities, image rectangles, and album personalities.
-- `lib/frog_sprite.dart` — reusable Flutter painter for pixel-perfect animation, silhouettes and reduced-motion support.
-- `lib/main.dart` — Flutter visual catalog demonstration.
-- `preview.html` — self-contained browser preview; open locally, no server needed.
-- `docs/INTERACOES.md` — original gameplay and interaction decisions (Portuguese).
-- `docs/ROADMAP.md` — proposed implementation order and persistence/sync architecture.
-- `scripts/validate_catalog.py` — basic catalog/atlas integrity validation.
+## Rodar localmente
 
-## Visual experience preview (desktop or mobile)
-
-Open `preview.html` (which redirects to `preview_v04.html`) in a modern browser directly from the repository folder. The visual demo uses:
-
-- `visual/app.css` — responsive design, rarity palettes, album cards, simulated camera and dialog styling.
-- `visual/app.js` — album, discovery/duplicate demo states, viewfinder, guide and animations.
-- `preview_v04.html` embeds species metadata and references the original atlas file locally. Run `python scripts/build_visual_preview.py` after editing `assets/species.json`.
-
-The demo deliberately keeps **all** state in memory; reload resets sample discoveries and duplicate inventory. It does not access your device camera, GPS, account, or network. For styling and feature boundaries see `docs/VISUAL_SPEC.md`.
-
-## Run the Flutter demo (Android)
-
-Install the Flutter SDK and Android SDK first. From the repository directory:
+Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar com SQLite).
 
 ```bash
-flutter doctor
-flutter create --platforms=android .
-flutter pub get
-flutter run
+npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
+npm test             # 11 testes de sincronização, idempotência, conflitos e falhas
 ```
 
-`flutter create` fills in the missing Android project scaffolding without replacing the existing app source files. If asked to overwrite existing files, stop and review the proposed changes. Android-generated files can be committed to this repository after verification.
+Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
 
-## Validate
+> No celular, GPS, câmera e sensores só funcionam com **HTTPS**. Para testar no aparelho use o deploy abaixo (ou um túnel HTTPS para o seu computador).
 
-```bash
-python3 scripts/validate_catalog.py
-python3 scripts/validate_visual.py
-flutter analyze
-flutter test
+## Colocar no ar (Render, grátis)
+
+1. Crie uma conta em [render.com](https://render.com) (pode entrar com o GitHub).
+2. **New → Blueprint** e escolha este repositório. O arquivo [`render.yaml`](render.yaml) cria o servidor Node e um banco **PostgreSQL gratuito**.
+3. Quando pedir `ADMIN_KEY`, invente uma senha (é a do painel `/admin`).
+4. Aguarde o deploy e abra a URL `https://pererecario-xxxx.onrender.com`. Esse é o link para os jogadores (gere um QR code dele para o público).
+
+Observações do plano gratuito do Render: o servidor "dorme" após 15 min sem acesso e leva ~1 min para acordar (o jogo continua funcionando offline nesse meio-tempo e sincroniza depois); o Postgres gratuito expira 30 dias após criado. Por isso o banco é Postgres e não SQLite: no plano grátis, arquivos locais são apagados quando o servidor dorme.
+
+## Cadastrar os brejos do campus
+
+Os brejos são áreas circulares (centro + raio) guardadas no servidor. Duas formas:
+
+- **No local, pelo celular:** Perfil → Painel de demonstração → informe a chave de administrador → "Criar brejo onde estou".
+- **Pelo computador:** abra `/admin`, cole as coordenadas copiadas do Google Maps ("-23.1093, -50.3591"), dê um nome e um raio (25–60 m funciona bem).
+
+Cada brejo tem de 3 a 7 pererecas (depende do raio), que mudam a cada **15 minutos**.
+
+## Estrutura
+
+```
+client/                 PWA (HTML/CSS/JS sem build)
+  index.html, sw.js     app shell + Service Worker (offline)
+  js/shared/game.js     regras determinísticas compartilhadas com o servidor
+  js/db.js              IndexedDB (armazenamento local persistente)
+  js/store.js           estado = último estado do servidor + fila de operações
+  js/sync.js            módulo de sincronização (conectividade, reenvio, backoff)
+  js/geo.js, sensors.js GPS (real ou simulado), acelerômetro e giroscópio
+  js/ui/                telas: login, mapa, captura, álbum, Meu Brejo, amigos, perfil, demonstração
+  admin.html            painel do servidor (dados, conflitos, simulação de queda)
+  assets/               atlas com as 15 pererecas + catálogo das espécies
+server/                 Node.js (http nativo) + SQLite/PostgreSQL
+  app.js                rotas REST
+  sync.js               aplicação idempotente das operações e resolução de conflitos
+  db.js                 camada de banco (mesmo SQL nos dois motores)
+test/sync.test.js       testes automatizados
 ```
 
-Flutter/Android compilation requires a Flutter toolchain; it has not been confirmed in the environment that prepared this repository. The project includes a CI workflow to run validation and basic Flutter checks on pushes.
+## Autor
 
-## GitHub workflow
+**Danilo Augusto Salvego dos Santos** · GitHub: [AugustoSalvego](https://github.com/AugustoSalvego)
 
-Clone once; then use `git pull` to receive changes and `git add` / `git commit` / `git push` to publish your own. See `docs/GIT_WORKFLOW.md` for the initial publication steps.
-
-## Roadmap
-
-1. Local SQLite persistence for encounters, unique captures and inventory.
-2. Real camera overlay and GPS-gated encounters, using fair capture mechanics.
-3. Google login and backend API with PostgreSQL + idempotent synchronization.
-4. Trading, encounter balancing, Android device validation, and release polish.
-
-The established gameplay rules take precedence over any roadmap suggestion. In particular: no impossible catches; assistance after two missed attempts; no loss of a captured frog because connectivity fails; and special album animations only for each discovered species in the main album.
-
-## Author
-
-**Danilo Augusto Salvego dos Santos**  
-GitHub: [AugustoSalvego](https://github.com/AugustoSalvego)
-
-## Atualização v0.3 — movimentos
-
-- Pitanga, Musgo e Brasa não utilizam mais distorção por faixas do atlas.
-- Peculiaridades iniciam logo após abrir a ficha e se repetem em ciclos curtos
-  (3,2–4,0 s), com pausa entre apresentações.
-- HTML e Flutter usam a mesma lógica de comportamento e a arte original.
-- O efeito de inchar é sutil enquanto não houver quadros específicos desenhados.
-
-Abra `preview.html` no navegador para experimentar sem Flutter.
+Mapa: © colaboradores do OpenStreetMap, © CARTO. Bibliotecas incluídas: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT) e [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0).

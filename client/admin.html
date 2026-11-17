@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pererecário · Painel do servidor</title>
+<link rel="icon" href="assets/icons/icon-64.png">
+<style>
+  :root { --ink:#17352a; --soft:#5b7768; --line:#e1e9dc; --leaf:#4cb944; --bg:#f4f8ef; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 'Fredoka', ui-rounded, system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+  header { background: linear-gradient(135deg,#46b64a,#2a8f45); color: #fff; padding: 18px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 24px; flex: 1; }
+  header img { width: 44px; height: 44px; border-radius: 12px; }
+  input, button, select { font: inherit; }
+  input { height: 40px; border-radius: 10px; border: 2px solid var(--line); padding: 0 10px; }
+  button { height: 40px; border-radius: 10px; border: 0; padding: 0 14px; background: var(--leaf); color: #fff; font-weight: 600; cursor: pointer; }
+  button.alt { background: #ff7a5c; } button.ghost { background: #fff; color: var(--ink); border: 2px solid var(--line); }
+  main { padding: 20px 24px 60px; max-width: 1300px; margin: auto; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .card { background: #fff; border-radius: 16px; padding: 14px 16px; box-shadow: 0 3px 0 var(--line); }
+  .card b { font-size: 30px; display: block; line-height: 1.1; }
+  .card span { color: var(--soft); font-size: 13px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  section { background: #fff; border-radius: 16px; padding: 14px 16px; box-shadow: 0 3px 0 var(--line); overflow: auto; }
+  section h2 { font-size: 17px; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--soft); font-weight: 600; border-bottom: 2px solid var(--line); padding: 6px 6px; white-space: nowrap; }
+  td { border-bottom: 1px solid var(--line); padding: 6px; white-space: nowrap; }
+  .tag { border-radius: 99px; padding: 1px 8px; font-weight: 600; font-size: 12px; }
+  .applied { background: #e2f6d9; color: #2a7a22; } .conflict { background: #efe5ff; color: #6a3fc0; } .rejected { background: #ffe4dd; color: #b5452c; }
+  .late { color: #b36b00; font-weight: 600; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #msg { font-weight: 600; }
+  .muted { color: var(--soft); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="assets/icons/icon-192.png" alt="">
+  <h1>Pererecário · Painel do servidor</h1>
+  <div class="row"><input id="key" type="password" placeholder="Chave de administrador"><button id="go">Entrar</button></div>
+</header>
+<main>
+  <p id="msg" class="muted">Informe a chave de administrador (variável ADMIN_KEY do servidor).</p>
+  <div id="content" hidden>
+    <div class="cards" id="cards"></div>
+    <section style="margin-bottom:16px">
+      <h2>Simulação de falhas</h2>
+      <div class="row">
+        <button class="alt" data-out="60">Derrubar servidor por 60 s</button>
+        <button class="alt" data-out="180">Derrubar por 3 min</button>
+        <button class="ghost" data-out="0">Religar agora</button>
+        <span id="outage" class="muted"></span>
+      </div>
+    </section>
+    <div class="grid">
+      <section><h2>Jogadores (ranking)</h2><table id="players"></table></section>
+      <section><h2>Capturas recebidas</h2><p class="muted">"Atraso" = tempo entre a captura no celular e a chegada ao servidor (capturas feitas offline).</p><table id="captures"></table></section>
+      <section><h2>Log de operações (idempotência)</h2><table id="ops"></table></section>
+      <section><h2>Conflitos resolvidos</h2><p class="muted">Mesma perereca capturada em dois aparelhos: fica a captura mais antiga.</p><table id="conflicts"></table></section>
+      <section style="grid-column:1/-1"><h2>Brejos</h2>
+        <div class="row" style="margin-bottom:10px">
+          <input id="bname" placeholder="Nome do brejo" style="flex:1;min-width:160px">
+          <input id="bcoords" placeholder="lat, lng (copie do Google Maps)" style="flex:1;min-width:220px">
+          <input id="bradius" type="number" value="35" min="10" max="200" style="width:90px" title="raio em metros">
+          <button id="badd">Criar brejo</button>
+        </div>
+        <table id="brejos"></table>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const t = (ms) => ms ? new Date(ms).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-';
+const dur = (ms) => ms < 2000 ? '' : ms < 60000 ? `${Math.round(ms / 1000)} s` : ms < 3600000 ? `${Math.round(ms / 60000)} min` : `${(ms / 3600000).toFixed(1)} h`;
+let key = localStorage.getItem('adminKey') || '';
+$('#key').value = key;
+async function call(method, path, body) {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || r.status);
+  return d;
+}
+function table(el, cols, rows) {
+  el.innerHTML = `<tr>${cols.map((c) => `<th>${c[0]}</th>`).join('')}</tr>` + (rows.length ? rows.map((r) => `<tr>${cols.map((c) => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length}" class="muted">Nada ainda</td></tr>`);
+}
+async function load() {
+  try {
+    const d = await call('GET', '/api/admin/overview');
+    $('#msg').textContent = `Banco: ${d.db} · atualizado ${t(d.serverTime)}`;
+    $('#content').hidden = false;
+    const c = d.counts;
+    $('#cards').innerHTML = [['Jogadores', c.players], ['Ativos nas últimas 24 h', c.activeToday], ['Capturas', c.captures], ['Operações recebidas', c.operations], ['Reenvios ignorados', c.resends], ['Conflitos resolvidos', c.conflicts], ['Operações rejeitadas', c.rejected]]
+      .map(([k, v]) => `<div class="card"><b>${v}</b><span>${k}</span></div>`).join('');
+    $('#outage').textContent = d.outageUntil > d.serverTime ? `Servidor "fora do ar" por mais ${Math.round((d.outageUntil - d.serverTime) / 1000)} s` : 'Servidor no ar';
+    table($('#players'), [['#', (r) => r.i], ['Usuário', (r) => esc(r.username)], ['Nome', (r) => esc(r.display_name)], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
+      [...d.players].sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, i: i + 1 })));
+    table($('#captures'), [['Jogador', (r) => esc(r.username)], ['Espécie', (r) => esc(r.species_id.replace('frog_', ''))], ['Tipo', (r) => r.kind], ['Aparelho', (r) => esc(r.device_id)], ['Capturada', (r) => t(r.caught_at)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.caught_at)}</span>`]], d.captures);
+    table($('#ops'), [['Recebida', (r) => t(r.received_at)], ['Jogador', (r) => esc(r.username)], ['Tipo', (r) => r.type], ['Resultado', (r) => `<span class="tag ${r.status}">${r.status}</span>`], ['Aparelho', (r) => esc(r.device_id)], ['op_id', (r) => r.op_id.slice(0, 8)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.client_ts)}</span>`]], d.operations);
+    table($('#conflicts'), [['Quando', (r) => t(r.resolved_at)], ['Jogador', (r) => esc(r.username)], ['Perereca', (r) => esc(r.spawn_id)], ['Mantida', (r) => `${esc(r.kept_device)} @ ${t(r.kept_at)}`], ['Descartada', (r) => `${esc(r.discarded_device)} @ ${t(r.discarded_at)}`]], d.conflicts);
+    table($('#brejos'), [['Nome', (r) => esc(r.name)], ['Posição', (r) => `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`], ['Raio', (r) => `${r.radius} m`], ['', (r) => `<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target="_blank">ver no mapa</a> · <a href="#" data-del="${r.id}">remover</a>`]], d.brejos);
+  } catch (e) {
+    $('#msg').textContent = `Erro: ${e.message}`;
+  }
+}
+$('#go').onclick = () => { key = $('#key').value.trim(); localStorage.setItem('adminKey', key); load(); };
+document.addEventListener('click', async (e) => {
+  const out = e.target.dataset.out;
+  if (out != null) { await call('POST', '/api/admin/outage', { seconds: Number(out) }).catch((x) => alert(x.message)); load(); }
+  const del = e.target.dataset.del;
+  if (del) { e.preventDefault(); if (confirm('Remover este brejo?')) { await call('POST', '/api/admin/brejos/remove', { id: del }); load(); } }
+});
+$('#badd').onclick = async () => {
+  const [lat, lng] = $('#bcoords').value.split(',').map((s) => Number(s.trim()));
+  try {
+    await call('POST', '/api/admin/brejos', { name: $('#bname').value, lat, lng, radius: Number($('#bradius').value) });
+    $('#bname').value = ''; $('#bcoords').value = '';
+    load();
+  } catch (e) { alert(e.message); }
+};
+if (key) load();
+setInterval(() => { if (key && !$('#content').hidden) load(); }, 3000);
+</script>
+</body>
+</html>
