@@ -600,8 +600,8 @@ svg { display: block; }
 /* matinho: o "?" aparece e some; ao tocar, espia por 1 s antes da perereca sair */
 .mbush .bubble { animation: qBlink 3.6s steps(1) infinite; animation-delay: var(--qd, 0s); }
 @keyframes qBlink { 0%, 45% { opacity: 0; transform: translateY(4px) scale(.6); } 50% { opacity: 1; transform: translateY(0) scale(1.08); } 55%, 90% { opacity: 1; transform: none; } 95%, 100% { opacity: 0; transform: translateY(4px) scale(.6); } }
-.mbush.peek .bush { animation: peekShake .25s ease-in-out infinite; }
-@keyframes peekShake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.mbush.peek .bush { animation: peekShake 1s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes peekShake { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-2deg); } 70% { transform: rotate(2deg); } }
 /* pererecas à vista: menores e com pulinhos mais espaçados */
 .mfrog .frog { animation: mapHop 5.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
 .mfrog .shadow { width: 34px; height: 9px; margin-top: -4px; animation: mapHopShadow 5.2s ease-in-out infinite; animation-delay: var(--d, 0s); }

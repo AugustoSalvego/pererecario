@@ -1,6 +1,6 @@
 # Artes do jogo: o que trocar e em que formato
 
-Todas as artes ficam em **`client/assets/sprites/`**. As atuais são provisórias, geradas por `scripts/gerar_sprites.py`. Para trocar, salve o seu PNG **com o mesmo nome por cima do arquivo antigo**: o jogo carrega sozinho, sem mexer em código.
+Todas as artes ficam em **`client/assets/sprites/`**. Os bonecos são gerados por `scripts/gerar_bonecos.py` (versão 2, aprovada); lagoinhas, vitória-régia, ícones e efeitos por `scripts/gerar_sprites.py`; o matinho e o balão "?" são arte desenhada à parte. Para trocar, salve o seu PNG **com o mesmo nome por cima do arquivo antigo**: o jogo carrega sozinho, sem mexer em código.
 
 Regras gerais (o matinho e o balão "?" já são arte definitiva em alta resolução e são reduzidos suavemente; o resto é pixel art pequena):
 - **PNG com fundo transparente**.
@@ -13,7 +13,7 @@ Regras gerais (o matinho e o balão "?" já são arte definitiva em alta resolu�
 |---|---|---|
 | `froghood` (capuz de sapinho), `explorer` (explorador de chapéu) | `masculino`, `feminino` | `clara`, `media`, `escura` |
 
-Exemplo: `char-froghood-feminino-media.png`. Hoje os arquivos `feminino` são **cópias provisórias** dos `masculino`: é só desenhar por cima.
+Exemplo: `char-froghood-feminino-media.png`.
 
 Cada arquivo é uma **folha de 3 colunas × 4 linhas**, todos os quadros do mesmo tamanho:
 
@@ -25,10 +25,10 @@ linha 2     parado        passo 1       passo 2      ← virado para a direita
 linha 3     parado        passo 1       passo 2      ← de costas (andando para cima)
 ```
 
-- Hoje cada quadro tem **20 × 27 pixels** (folha de 60 × 108).
+- Hoje cada quadro tem **24 × 32 pixels** (folha de 72 × 128).
 - **Quer outro tamanho** (por exemplo 32 × 32)? Mude uma linha em `client/js/ui/sprites.js`:
   ```js
-  export const CHAR = { fw: 20, fh: 27, head: 15 };
+  export const CHAR = { fw: 24, fh: 32, head: 19 };
   ```
   `fw`/`fh` são a largura e a altura de **um quadro**, e `head` é quantas linhas de pixel, de cima para baixo, formam a "cabeça" usada no avatar do topo, na barra de navegação e no perfil.
 - O pé do boneco deve encostar na **borda de baixo** do quadro: é esse ponto que fica sobre a posição do GPS.

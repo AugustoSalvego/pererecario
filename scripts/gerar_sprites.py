@@ -462,12 +462,7 @@ def save(im, name):
 
 
 def main():
-    for model in ('explorer', 'froghood'):
-        for skin in SKINS:
-            sheet = character_sheet(model, skin)
-            save(sheet, f'char-{model}-masculino-{skin}.png')
-            # provisório: a versão "feminino" usa a mesma arte até a definitiva ser desenhada
-            save(sheet, f'char-{model}-feminino-{skin}.png')
+    # os bonecos agora vêm de scripts/gerar_bonecos.py
     save(pond(60, 34, 7), 'pond-big.png')
     save(pond(40, 24, 3, rocks=False), 'pond-small.png')
     # bush.png, bush-peek.png e bubble-q.png já são a arte definitiva: não sobrescrever

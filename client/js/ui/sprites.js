@@ -7,7 +7,7 @@ export const DIR_ROW = { down: 0, left: 1, right: 2, up: 3 };
 
 // Tamanho de UM quadro do boneco, em pixels do PNG (folha = 3 colunas x 4 linhas).
 // Trocou a arte por outra de tamanho diferente? Ajuste só aqui. Ver docs/ARTES.md.
-export const CHAR = { fw: 20, fh: 27, head: 15 };
+export const CHAR = { fw: 24, fh: 32, head: 19 };
 const charVars = `--fw:${CHAR.fw};--fh:${CHAR.fh};--hh:${CHAR.head}`;
 
 export const lookOf = (player) => normalizeLook(player?.look);
