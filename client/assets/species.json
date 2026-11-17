@@ -10,7 +10,7 @@
    "label": "Comum",
    "weight": 55,
    "xp": 10,
-   "taps": 2,
+   "taps": 3,
    "hopMs": 1500,
    "color": "#7cc35b",
    "sizeCm": [
@@ -22,7 +22,7 @@
    "label": "Incomum",
    "weight": 28,
    "xp": 25,
-   "taps": 3,
+   "taps": 4,
    "hopMs": 1250,
    "color": "#3fb4d8",
    "sizeCm": [
@@ -34,7 +34,7 @@
    "label": "Rara",
    "weight": 13,
    "xp": 60,
-   "taps": 4,
+   "taps": 5,
    "hopMs": 1050,
    "color": "#a46be0",
    "sizeCm": [
@@ -46,7 +46,7 @@
    "label": "Especial",
    "weight": 4,
    "xp": 150,
-   "taps": 5,
+   "taps": 6,
    "hopMs": 900,
    "color": "#f2b632",
    "sizeCm": [

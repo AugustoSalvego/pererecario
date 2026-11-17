@@ -28,7 +28,7 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 12 testes de sincronização, idempotência, conflitos e falhas
+npm test             # 14 testes de sincronização, idempotência, conflitos e falhas
 ```
 
 Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
@@ -51,7 +51,7 @@ Os brejos são áreas circulares (centro + raio) guardadas no servidor. Duas for
 - **No local, pelo celular:** Perfil → Painel de demonstração → informe a chave de administrador → "Criar brejo onde estou".
 - **Pelo computador:** abra `/admin`, cole as coordenadas copiadas do Google Maps ("-23.1093, -50.3591"), dê um nome e um raio (25–60 m funciona bem).
 
-Cada brejo vira uma lagoinha no mapa, com 3 a 7 pererecas em volta (depende do raio), que mudam a cada **15 minutos**. Um raio de 30 a 40 m funciona bem.
+Cada brejo vira uma lagoinha no mapa, com 3 a 7 pererecas em volta (depende do raio), que mudam a cada **15 minutos**. Um raio de 30 a 40 m funciona bem. Dois brejos não podem ficar em cima nem colados um no outro (o servidor recusa).
 
 ## Estrutura
 

@@ -297,7 +297,7 @@ function drawPlayer(force = false) {
   const o = map.objects.get('player');
   map.setObject('player', {
     lat: pos.lat, lng: pos.lng, className: 'mplayer', depthScale: false,
-    html: (!o || o.sig !== sig || force) ? `<div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}` : null,
+    html: (!o || o.sig !== sig || force) ? `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}</div>` : null,
   });
   map.objects.get('player').sig = sig;
 }
@@ -347,7 +347,7 @@ function onTapObject(key, data) {
   if (isHidden(s)) {
     if (revealing.has(s.id)) return;
     if (d > REVEAL_RANGE_M) { sfx.tap(); return toast(`Algo se mexe no matinho… Chegue mais perto (faltam ${fmtDist(Math.ceil(d - REVEAL_RANGE_M))}).`, '', 'walk'); }
-    sfx.croak();
+    sfx.rustle();
     vibrate(40);
     return revealFrom([s]);
   }
@@ -356,7 +356,7 @@ function onTapObject(key, data) {
     sfx.error();
     return toast(`Chegue mais perto! Faltam ${fmtDist(Math.ceil(d - range))}.`, 'warn', 'walk');
   }
-  sfx.tap();
+  sfx.pop();
   startCapture(s);
 }
 
@@ -370,8 +370,8 @@ function startCapture(spawn) {
 function doShake() {
   if (document.querySelector('.capture, .scanner, .tutorial') || current !== 'map') return;
   const pos = geo.pos;
-  sfx.croak();
-  setTimeout(() => sfx.croak(), 380);
+  sfx.rustle();
+  setTimeout(() => sfx.ribbit(), 250);
   vibrate([60, 40, 60]);
   if (!pos) return toast('Sem posição ainda: espere o GPS.', 'warn');
   map.setFeature('wave', { lat: pos.lat, lng: pos.lng, radiusM: REVEAL_RANGE_M, className: 'shake-wave' });
@@ -389,6 +389,7 @@ function revealFrom(list) {
   for (const s of list) revealing.add(s.id);
   refreshObjects();
   setTimeout(async () => {
+    sfx.pop();
     for (const s of list) { revealing.delete(s.id); justRevealed.add(s.id); }
     await store.reveal(list.map((s) => s.id));
     setTimeout(() => { for (const s of list) justRevealed.delete(s.id); refreshObjects(); }, 2400);

@@ -64,6 +64,24 @@ test('cadastro, login e senha errada', async () => {
   assert.equal(noauth.status, 401);
 });
 
+test('brejo novo não pode nascer em cima nem do lado de outro', async () => {
+  await ensureBrejo();
+  const r = await call('POST', '/api/admin/brejos', { name: 'Colado', lat: -23.1003, lng: -50.36, radius: 30 }, { 'X-Admin-Key': ADMIN });
+  assert.equal(r.status, 409);
+  const ok = await call('POST', '/api/admin/brejos', { name: 'Longe', lat: -23.1020, lng: -50.36, radius: 30 }, { 'X-Admin-Key': ADMIN });
+  assert.equal(ok.status, 200);
+});
+
+test('pererecas de um brejo nascem afastadas entre si e da lagoinha', async () => {
+  const b = await ensureBrejo();
+  const { distanceM: dm, POND_CLEAR_M } = await import('../client/js/shared/game.js');
+  for (let w = 0; w < 40; w++) {
+    const sp = spawnsFor(b, windowOf(clock) + w, app.catalog);
+    for (const s of sp) assert.ok(dm(s, b) >= POND_CLEAR_M - 0.5, 'em cima da lagoinha');
+    for (let i = 0; i < sp.length; i++) for (let j = i + 1; j < sp.length; j++) assert.ok(dm(sp[i], sp[j]) >= 8, 'pererecas coladas');
+  }
+});
+
 test('o servidor recalcula as mesmas pererecas que o cliente', async () => {
   const b = await ensureBrejo();
   const win = windowOf(clock);

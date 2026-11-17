@@ -49,7 +49,7 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
   const t = tier(spawn.speciesId);
   const known = store.view.discovered.has(sp.id);
   const W = app.clientWidth, H = app.clientHeight;
-  const need = t.taps;
+  const need = t.taps + (Math.random() < 0.5 ? 0 : 1); // o jogador não sabe quantos toques faltam
 
   // vitórias-régias espalhadas pela lagoa, todas dentro da tela
   const pads = [[0.24, 0.6], [0.76, 0.6], [0.5, 0.72], [0.22, 0.86], [0.78, 0.86]]
@@ -70,15 +70,13 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
     <div class="cap-hud">
       <button class="icon-btn" data-act="close" aria-label="Voltar">${icons.close}</button>
       <div class="cap-title">${spawn.kind === 'gift' ? '<small>🎁 Presente</small>' : ''}<b>${known ? esc(sp.name) : '???'}</b>${rarityBadge(sp.id)}</div>
-      <div class="jar"><div class="glass"><i style="height:0%"></i></div><span class="jar-n">0/${need}</span></div>
+      <span style="width:48px"></span>
     </div>
-    <div class="cap-help">${icons.sparkle}<span><b>Toque rápido</b> na perereca ${need} vezes para pegar!</span></div>
+    <div class="cap-help">${icons.sparkle}<span><b>Toque rápido</b> na perereca até pegar!</span></div>
   </div>`);
   app.appendChild(el);
 
   const frogEl = $('.cap-frog', el);
-  const jarFill = $('.jar .glass i', el);
-  const jarN = $('.jar-n', el);
   const help = $('.cap-help', el);
 
   let hits = 0, misses = 0, assist = false, done = false;
@@ -138,8 +136,6 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
     frogEl.classList.remove('flash');
     void frogEl.offsetWidth;
     frogEl.classList.add('flash');
-    jarFill.style.height = `${(hits / need) * 100}%`;
-    jarN.textContent = `${hits}/${need}`;
     floatText(hits >= need ? 'Peguei!' : ['Boa!', 'Isso!', 'Quase!', 'Vai!'][hits % 4], frog.x - view, frog.y - 120);
     if (hits >= need) return success();
     hop();
@@ -168,7 +164,6 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
     frogEl.style.transform = `translate(${frog.x}px, ${frog.y}px) scale(.2)`;
     frogEl.style.opacity = '0';
     sfx.win();
-    setTimeout(() => sfx.croak(), 250);
     vibrate([40, 60, 40]);
     let result;
     try {

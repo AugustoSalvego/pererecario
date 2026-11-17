@@ -97,7 +97,7 @@ export async function handleFriend(friend) {
   if (friend.id === v.player.id) { toast('Esse é o seu próprio QR! 😄', 'warn'); return; }
   const isNew = await store.addFriend(friend);
   vibrate(30);
-  sfx.croak();
+  sfx.pop();
   if (isNew) toast(`Você e ${esc(friend.displayName)} agora são parceiros de brejo!`, 'ok', 'friends');
   const gift = giftFor(v.player.id, friend.id, dayOf(store.now()), friend.mask >>> 0, getCatalog());
   if (store.view.capturedSpawns.has(gift.id)) {

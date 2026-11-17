@@ -91,18 +91,33 @@ export function spawnCount(brejo) {
   return Math.max(3, Math.min(7, Math.round(brejo.radius / 9)));
 }
 
+export const POND_CLEAR_M = 17;   // ninguém nasce em cima da lagoinha (centro do brejo)
+export const MIN_SPAWN_GAP_M = 12; // distância mínima entre duas pererecas do mesmo brejo
+export const MIN_BREJO_GAP_M = 15; // folga mínima entre as bordas de dois brejos
+
 export function spawnsFor(brejo, win, catalog) {
-  const next = rng(hash32(`${brejo.id}|${win}`));
+  const next = rng(hash32(`${brejo.id}|${win}`));          // espécie e tamanho
+  const pos = rng(hash32(`${brejo.id}|${win}|pos`));       // posição
   const n = spawnCount(brejo);
+  const rMin = Math.max(POND_CLEAR_M, brejo.radius * 0.3);
+  const rMax = Math.max(rMin + 10, brejo.radius * 0.9);
+  const placed = [];
   const out = [];
   for (let i = 0; i < n; i++) {
     const sp = pickSpecies(next, catalog);
-    const ang = next() * Math.PI * 2;
-    // os matinhos ficam em volta da lagoinha (que ocupa o centro do brejo)
-    const dist = brejo.radius * (0.3 + 0.55 * next());
-    const pos = offsetLatLng(brejo.lat, brejo.lng, dist * Math.cos(ang), dist * Math.sin(ang));
-    next(); // mantém a sequência pseudoaleatória estável
-    const hidden = sp.tier !== 'common'; // comuns ficam à vista; as demais se escondem num matinho
+    // tenta algumas posições e fica com a mais afastada das outras pererecas
+    let best = null, bestGap = -1;
+    for (let t = 0; t < 24; t++) {
+      const ang = pos() * Math.PI * 2;
+      const dist = rMin + (rMax - rMin) * Math.sqrt(pos());
+      const c = { n: dist * Math.cos(ang), e: dist * Math.sin(ang) };
+      let gap = Infinity;
+      for (const q of placed) gap = Math.min(gap, Math.hypot(q.n - c.n, q.e - c.e));
+      if (gap > bestGap) { best = c; bestGap = gap; }
+      if (gap >= MIN_SPAWN_GAP_M) break;
+    }
+    placed.push(best);
+    const ll = offsetLatLng(brejo.lat, brejo.lng, best.n, best.e);
     out.push({
       id: `${brejo.id}:${win}:${i}`,
       kind: 'wild',
@@ -110,9 +125,9 @@ export function spawnsFor(brejo, win, catalog) {
       win,
       speciesId: sp.id,
       sizeCm: sizeFor(next, sp),
-      hidden,
-      lat: pos.lat,
-      lng: pos.lng,
+      hidden: sp.tier !== 'common', // comuns ficam à vista; as demais se escondem num matinho
+      lat: ll.lat,
+      lng: ll.lng,
     });
   }
   return out;

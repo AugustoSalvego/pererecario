@@ -543,8 +543,9 @@ svg { display: block; }
 @keyframes exPop { from { transform: scale(0); } }
 .mfrog .sparkle, .mbush .sparkle { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); }
 .mfrog.near .body::before { width: 64px; height: 20px; border-color: #b6f58f; box-shadow: 0 0 12px #8be36a; }
-.mplayer .char { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); }
-.mplayer .pshadow { position: absolute; left: -20px; top: -8px; width: 40px; height: 12px; border-radius: 50%; background: rgba(0,0,0,.22); }
+.mplayer .pwrap { position: absolute; left: 0; top: 0; transform: translate(-50%, -58%); }
+.mplayer .char { position: relative; display: block; }
+.mplayer .pshadow { position: absolute; left: 50%; bottom: -5px; width: 40px; height: 12px; margin-left: -20px; border-radius: 50%; background: rgba(0,0,0,.22); }
 .mlabel span { font-size: 12.5px; bottom: auto; top: 0; }
 
 /* navegação com ícones em pixel */

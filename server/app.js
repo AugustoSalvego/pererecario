@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, makeTokens, friendCode } from './auth.js';
 import { makeSync } from './sync.js';
-import { hash32, maskFromSpecies, xpBreakdown, levelFor } from '../client/js/shared/game.js';
+import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLIENT_DIR = path.join(ROOT, 'client');
@@ -211,6 +211,11 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
       const lat = Number(body.lat), lng = Number(body.lng), radius = Number(body.radius);
       if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || !(radius >= 10 && radius <= 200)) {
         throw new HttpError(400, 'Informe nome, posição e raio entre 10 e 200 m');
+      }
+      for (const b of (await brejos()).brejos) {
+        const d = distanceM({ lat, lng }, b);
+        const need = radius + b.radius + MIN_BREJO_GAP_M;
+        if (d < need) throw new HttpError(409, `Muito perto do brejo "${b.name}" (${Math.round(d)} m). Afaste pelo menos ${Math.ceil(need - d)} m ou diminua o raio.`);
       }
       const id = 'b' + crypto.randomBytes(4).toString('hex');
       await db.tx((q) => q.run('INSERT INTO brejos (id, name, lat, lng, radius, active, created_at) VALUES ($1,$2,$3,$4,$5,1,$6)',

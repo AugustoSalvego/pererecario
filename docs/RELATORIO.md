@@ -4,7 +4,7 @@ Trabalho prático de Sistemas Distribuídos: jogo para computação móvel com f
 
 ## 1. Descrição do jogo
 
-O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são lugares reais do campus (centro + raio), cadastrados no servidor e desenhados no mapa como **lagoinhas**. Em volta de cada lagoinha vivem de 3 a 7 pererecas, que mudam a cada 15 minutos. As **comuns** ficam à vista no mapa, dando pulinhos; as **incomuns, raras e a especial** se escondem num **matinho** (que mostra um "?" de tempos em tempos): o jogador caminha até lá (GPS) e, a até 20 m, **toca no matinho** ou **chacoalha o celular**; o matinho espia por 1 s e a perereca sai. Depois, a até **10 m**, toca nela no mapa para escolhê-la e entra no minijogo de captura: a perereca pula entre as vitórias-régias da tela e o jogador **toca rápido** nela até encher o pote (2 a 5 toques, conforme a raridade).
+O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são lugares reais do campus (centro + raio), cadastrados no servidor e desenhados no mapa como **lagoinhas**. Em volta de cada lagoinha vivem de 3 a 7 pererecas, que mudam a cada 15 minutos. As **comuns** ficam à vista no mapa, dando pulinhos; as **incomuns, raras e a especial** se escondem num **matinho** (que mostra um "?" de tempos em tempos): o jogador caminha até lá (GPS) e, a até 20 m, **toca no matinho** ou **chacoalha o celular**; o matinho espia por 1 s e a perereca sai. Depois, a até **10 m**, toca nela no mapa para escolhê-la e entra no minijogo de captura: a perereca pula entre as vitórias-régias da tela e o jogador **toca rápido** nela até pegar: no mínimo 3 toques, mais nas raras, sem mostrar quantos faltam.
 
 Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu explorador (2 modelos × 3 tons de pele), que anda no mapa nas 4 direções. Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
@@ -189,7 +189,7 @@ O jogo muda conforme o ambiente físico do jogador:
 | **Movimento: chacoalhar** | Acelerômetro (`devicemotion`) | As pererecas mais raras (incomuns, raras e especial) se escondem num matinho. Chacoalhar o celular a até 20 m revela de uma vez todos os matinhos por perto (tocar num matinho revela só aquele). A 20 m, o matinho "espia" (aparecem olhinhos) e o jogo pede para **chacoalhar o celular**; os coaxos e a vibração fazem as pererecas saírem. |
 | **Proximidade entre jogadores** | Câmera + QR code | Cada jogador tem um QR no perfil. Escanear o de outra pessoa exige estar perto dela: cria a amizade e libera uma perereca-presente. O QR carrega os dados necessários, então funciona até offline. |
 | **Contexto temporal** | Relógio corrigido pelo servidor | As pererecas de cada brejo mudam a cada 15 min; os presentes são diários. |
-| **Retorno físico** | Vibração e som (Web Audio) | Vibra a cada toque certeiro, ao capturar e ao chacoalhar. |
+| **Retorno físico** | Vibração e som (Web Audio) | Vibra a cada toque certeiro, ao capturar e ao chacoalhar; sons sintetizados na hora (bolhas, folhas, respingos), sem arquivos de áudio. |
 
 **Por que não Bluetooth:** navegadores não permitem que um celular procure outros aparelhos por perto (a Web Bluetooth só conecta a um dispositivo escolhido pelo usuário e não existe no iPhone). O QR code cumpre o mesmo papel de "prova de proximidade" e funciona em qualquer celular com câmera.
 
@@ -203,7 +203,7 @@ O jogo muda conforme o ambiente físico do jogador:
 
 ## 10. Testes automatizados
 
-`npm test` roda 12 testes (`test/sync.test.js`) com o servidor real e banco em memória:
+`npm test` roda 14 testes (`test/sync.test.js`) com o servidor real e banco em memória:
 
 1. cadastro, login e acesso sem token;
 2. servidor e cliente calculam as mesmas pererecas;
@@ -215,13 +215,15 @@ O jogo muda conforme o ambiente físico do jogador:
 8. QR: amizade mútua, presente único por dia, não pode adicionar a si mesmo;
 9. servidor indisponível (503) e recuperação;
 10. lote parcialmente aplicado reenviado inteiro com segurança;
-11. ranking e progresso recuperado em outro aparelho.
+11. ranking e progresso recuperado em outro aparelho;
+12. brejo novo recusado quando fica em cima ou colado em outro;
+13. pererecas nascem afastadas entre si e fora da lagoinha.
 
 Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor) também foram exercitados num navegador Chrome automatizado.
 
 ## 11. Limitações conhecidas
 
-- O conjunto de brejos precisa ser cadastrado pelos organizadores (no local, pelo celular, ou pelo `/admin`).
+- O conjunto de brejos precisa ser cadastrado pelos organizadores (no local, pelo celular, ou pelo `/admin`). O servidor recusa um brejo em cima ou colado em outro (folga mínima de 15 m entre as bordas), e as pererecas de um brejo nascem afastadas entre si e da lagoinha.
 - As artes atuais do boneco, das lagoinhas e dos matinhos são provisórias (ver `docs/ARTES.md`).
 - O mapa offline mostra apenas a região já vista ou baixada antecipadamente ao redor dos brejos; fora disso aparece o gramado do jogo.
 - No iPhone, o sensor de movimento só pode ser liberado após um toque do usuário (o app pede na primeira abertura).
