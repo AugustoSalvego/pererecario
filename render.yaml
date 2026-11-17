@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: pererecario
+    runtime: python
+    plan: starter
+    rootDir: .
+    buildCommand: "python -m compileall -q server"
+    startCommand: "python -m server.server"
+    healthCheckPath: /api/v1/health
+    disk:
+      name: pererecario-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: PYTHON_VERSION
+        value: 3.12.9
