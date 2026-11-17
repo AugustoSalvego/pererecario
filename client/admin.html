@@ -61,7 +61,16 @@
       <section><h2>Log de operações (idempotência)</h2><table id="ops"></table></section>
       <section><h2>Partidas (caçada do dia)</h2><p class="muted">Uma partida por jogador por dia. "Aparelhos" = quantos celulares jogaram a mesma partida.</p><table id="partidas"></table></section>
       <section><h2>Conflitos resolvidos</h2><p class="muted">Mesma perereca capturada em dois aparelhos: fica a captura mais antiga.</p><table id="conflicts"></table></section>
-      <section style="grid-column:1/-1"><h2>Brejos</h2>
+      <section style="grid-column:1/-1"><h2>Área do campus (lagoinhas automáticas)</h2>
+        <p class="muted">Dentro desta área o jogo espalha lagoinhas sozinho, uma a cada ~130 m. Comece com raio de 400 a 600 m. Os brejos cadastrados à mão (abaixo) continuam valendo.</p>
+        <div class="row" style="margin-bottom:8px">
+          <input id="ccoords" placeholder="centro do campus: lat, lng (copie do Google Maps)" style="flex:1;min-width:260px">
+          <input id="cradius" type="number" value="500" min="100" max="3000" style="width:100px" title="raio em metros">
+          <button id="cset">Definir área</button><button class="ghost" id="cclear">Remover área</button>
+        </div>
+        <div id="cinfo" class="muted"></div>
+      </section>
+      <section style="grid-column:1/-1"><h2>Brejos cadastrados à mão</h2>
         <div class="row" style="margin-bottom:10px">
           <input id="bname" placeholder="Nome do brejo" style="flex:1;min-width:160px">
           <input id="bcoords" placeholder="coordenadas do Google Maps: -23.1068, -50.3602" style="flex:1;min-width:220px">
@@ -104,6 +113,7 @@ async function load() {
     table($('#ops'), [['Recebida', (r) => t(r.received_at)], ['Jogador', (r) => esc(r.username)], ['Tipo', (r) => r.type], ['Resultado', (r) => `<span class="tag ${r.status}">${r.status}</span>`], ['Aparelho', (r) => esc(r.device_id)], ['op_id', (r) => r.op_id.slice(0, 8)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.client_ts)}</span>`]], d.operations);
     table($('#partidas'), [['Jogador', (r) => esc(r.username)], ['Início', (r) => t(r.started_at)], ['Última atividade', (r) => t(r.updated_at)], ['Pererecas', (r) => r.captures], ['Distância', (r) => `${Math.round(r.meters)} m`], ['Aparelhos', (r) => r.devices]], d.partidas || []);
     table($('#conflicts'), [['Quando', (r) => t(r.resolved_at)], ['Jogador', (r) => esc(r.username)], ['Perereca', (r) => esc(r.spawn_id)], ['Mantida', (r) => `${esc(r.kept_device)} @ ${t(r.kept_at)}`], ['Descartada', (r) => `${esc(r.discarded_device)} @ ${t(r.discarded_at)}`]], d.conflicts);
+    $('#cinfo').innerHTML = d.campus ? `Área definida: centro ${d.campus.lat.toFixed(6)}, ${d.campus.lng.toFixed(6)} · raio ${d.campus.radius} m · <a href="https://www.google.com/maps?q=${d.campus.lat},${d.campus.lng}" target="_blank">ver no mapa</a>` : 'Nenhuma área definida: só aparecem os brejos cadastrados à mão.';
     const shown = []; const hav = (a, b) => { const R = 6371008.8, t = (x) => x * Math.PI / 180; const s2 = Math.sin(t(b.lat - a.lat) / 2) ** 2 + Math.cos(t(a.lat)) * Math.cos(t(b.lat)) * Math.sin(t(b.lng - a.lng) / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(s2)); };
     for (const b of d.brejos) { const over = shown.find((k) => hav(b, k) < b.radius + k.radius); b.over = over ? over.name : null; if (!over) shown.push(b); }
     table($('#brejos'), [['Nome', (r) => esc(r.name) + (r.over ? ` <span class="tag rejected">sobreposto a "${esc(r.over)}": oculto no jogo</span>` : '')], ['Posição', (r) => `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`], ['Raio', (r) => `${r.radius} m`], ['', (r) => `<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target="_blank">ver no mapa</a> · <a href="#" data-del="${r.id}">remover</a>`]], d.brejos);
@@ -136,6 +146,12 @@ function parseCoords(text) {
   if (!nums || nums.length < 2) return null;
   return { lat: Number(nums[0]), lng: Number(nums[1]) };
 }
+$('#cset').onclick = async () => {
+  const c = parseCoords($('#ccoords').value);
+  if (!c) { alert('Não entendi as coordenadas.'); return; }
+  try { await call('POST', '/api/admin/campus', { lat: c.lat, lng: c.lng, radius: Number($('#cradius').value) }); $('#ccoords').value = ''; load(); } catch (e) { alert(e.message); }
+};
+$('#cclear').onclick = async () => { if (confirm('Remover a área do campus? As lagoinhas automáticas somem.')) { await call('POST', '/api/admin/campus', { clear: true }); load(); } };
 $('#badd').onclick = async () => {
   const c = parseCoords($('#bcoords').value);
   if (!c || Math.abs(c.lat) > 90 || Math.abs(c.lng) > 180) { alert('Não entendi as coordenadas. Use -23.106806, -50.360250 ou 23°06\'24.5"S 50°21\'36.9"W'); return; }

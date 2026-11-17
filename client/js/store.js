@@ -21,6 +21,7 @@ class Store extends EventTarget {
   snapshot = EMPTY;
   outbox = [];
   brejos = [];
+  campus = null;
   brejosVersion = null;
   clockOffset = 0;
   settings = {};
@@ -42,6 +43,7 @@ class Store extends EventTarget {
     this.outbox = await db.outboxAll();
     this.brejos = (await db.kvGet('brejos')) || [];
     this.brejosVersion = await db.kvGet('brejosVersion');
+    this.campus = await db.kvGet('campus');
     this.clockOffset = (await db.kvGet('clockOffset')) || 0;
     this.settings = (await db.kvGet('settings')) || {};
     this.revealed = (await db.kvGet('revealed')) || {};
@@ -83,7 +85,7 @@ class Store extends EventTarget {
   async logout() {
     await db.wipe({ keep: ['deviceId', 'settings'] });
     this.session = null; api.token = null;
-    this.snapshot = EMPTY; this.outbox = []; this.brejos = []; this.brejosVersion = null;
+    this.snapshot = EMPTY; this.outbox = []; this.brejos = []; this.campus = null; this.brejosVersion = null;
     this.activity = {}; this.myMeters = {}; this.revealed = {}; this.currentExpeditionId = null;
     this.recompute();
   }
@@ -128,8 +130,10 @@ class Store extends EventTarget {
     const kv = { snapshot: this.snapshot, clockOffset: this.clockOffset };
     if (resp.brejos) {
       this.brejos = resp.brejos;
+      this.campus = resp.campus || null;
       this.brejosVersion = resp.brejosVersion;
       kv.brejos = this.brejos;
+      kv.campus = this.campus;
       kv.brejosVersion = this.brejosVersion;
     }
     if (this.session && resp.state?.player) {
@@ -144,10 +148,12 @@ class Store extends EventTarget {
     return events;
   }
 
-  async setBrejos(brejos, version) {
+  async setBrejos(brejos, version, campus = this.campus) {
     this.brejos = brejos;
+    this.campus = campus || null;
     this.brejosVersion = version;
     await db.kvSet('brejos', brejos);
+    await db.kvSet('campus', this.campus);
     await db.kvSet('brejosVersion', version);
     this.emit('brejos', brejos);
   }

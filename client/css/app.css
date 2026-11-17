@@ -613,3 +613,12 @@ svg { display: block; }
 
 /* mapa padrão do OpenStreetMap: cores mais suaves, no estilo de mapa claro */
 .map.tiles-osm .map-tiles img { filter: saturate(.55) brightness(1.08) contrast(.92); }
+
+/* seta para a lagoinha mais próxima */
+.compass { position: absolute; left: 50%; top: calc(var(--safe-top) + 74px); transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.95); border-radius: 99px; padding: 7px 14px 7px 8px; font-weight: 600; font-size: 13px; box-shadow: 0 4px 0 rgba(23,53,42,.15); white-space: nowrap; max-width: 80%; }
+.compass .arrow { width: 28px; height: 28px; border-radius: 50%; background: var(--leaf); color: #fff; display: grid; place-items: center; font-size: 14px; transition: transform .4s; }
+.compass .txt { overflow: hidden; text-overflow: ellipsis; }
+.hint-bubble:not(.hidden) ~ .compass { top: calc(var(--safe-top) + 138px); }
+/* pererecas e lagoinhas surgem suavemente ao entrar no raio de visão */
+.mobj.mfrog, .mobj.mbush, .mobj.mpond { animation: objIn .45s ease-out; }
+@keyframes objIn { from { opacity: 0; } }

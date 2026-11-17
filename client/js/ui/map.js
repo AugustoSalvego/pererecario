@@ -142,7 +142,7 @@ export class GameMap {
   removeFeature(key) { const f = this.features.get(key); if (f) { f.el.remove(); this.features.delete(key); } }
 
   // objeto = elemento em pé (perereca, rótulo, jogador)
-  setObject(key, { lat, lng, html, className = '', depthScale = true, ground = false, data }) {
+  setObject(key, { lat, lng, html, className = '', depthScale = true, ground = false, top = false, data }) {
     let o = this.objects.get(key);
     if (!o) {
       const el = document.createElement('div');
@@ -151,7 +151,7 @@ export class GameMap {
       o = { el };
       this.objects.set(key, o);
     }
-    Object.assign(o, { lat, lng, depthScale, ground, data });
+    Object.assign(o, { lat, lng, depthScale, ground, top, data });
     const cls = `mobj ${className}`;
     if (o.cls !== cls) { o.el.className = cls; o.cls = cls; }
     if (html != null && o.html !== html) { o.el.innerHTML = html; o.html = html; }
@@ -213,7 +213,7 @@ export class GameMap {
       const zk = Math.max(0.55, Math.min(1.35, 2 ** ((this.zoom - BASE_ZOOM) * 0.7)));
       const k = o.depthScale ? Math.max(0.45, Math.min(1.25, s.s)) * zk : 1;
       o.el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${k})`;
-      o.el.style.zIndex = String(o.ground ? 1 : 1000 + Math.round(s.y));
+      o.el.style.zIndex = String(o.ground ? 1 : o.top ? 100000 : 1000 + Math.round(s.y));
     }
   }
 

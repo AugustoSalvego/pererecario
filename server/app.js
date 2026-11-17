@@ -39,7 +39,11 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     }
   }
   const tokens = makeTokens(tokenSecret);
-  const sync = makeSync({ db, catalog, now, log });
+  async function getCampus(q = db) {
+    const row = await q.one('SELECT value FROM settings WHERE key=$1', ['campus']);
+    try { return row ? JSON.parse(row.value) : null; } catch { return null; }
+  }
+  const sync = makeSync({ db, catalog, now, log, getCampus });
 
   // brejos iniciais (só se a tabela estiver vazia)
   const count = await db.one('SELECT COUNT(*) AS n FROM brejos');
@@ -62,8 +66,9 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
 
   async function brejos() {
     const rows = await db.query('SELECT id, name, lat, lng, radius FROM brejos WHERE active=1 ORDER BY created_at, id');
-    const version = String(hash32(JSON.stringify(rows)));
-    return { brejos: rows, version };
+    const campus = await getCampus();
+    const version = String(hash32(JSON.stringify({ rows, campus })));
+    return { brejos: rows, campus, version };
   }
 
   // atrás do proxy do Render todo mundo chega com o mesmo IP: usa o X-Forwarded-For
@@ -148,7 +153,9 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
       const b = await brejos();
       return {
         results, state, serverTime: now(),
-        brejosVersion: b.version, brejos: body.brejosVersion === b.version ? undefined : b.brejos,
+        brejosVersion: b.version,
+        brejos: body.brejosVersion === b.version ? undefined : b.brejos,
+        campus: body.brejosVersion === b.version ? undefined : b.campus,
       };
     },
 
@@ -205,6 +212,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
         conflicts: await db.query(
           `SELECT c.*, p.username FROM conflicts c JOIN players p ON p.id = c.player_id ORDER BY c.resolved_at DESC LIMIT 30`),
         brejos: (await brejos()).brejos,
+        campus: await getCampus(),
       };
     },
 
@@ -230,6 +238,27 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     'POST /api/admin/brejos/remove': async (req, body) => {
       requireAdmin(req);
       await db.tx((q) => q.run('UPDATE brejos SET active=0 WHERE id=$1', [String(body.id || '')]));
+      return brejos();
+    },
+
+    // área do campus: o jogo espalha lagoinhas automáticas dentro dela
+    'POST /api/admin/campus': async (req, body) => {
+      requireAdmin(req);
+      if (body.clear) {
+        await db.tx((q) => q.run('DELETE FROM settings WHERE key=$1', ['campus']));
+        log('área do campus removida');
+        return brejos();
+      }
+      const lat = Number(body.lat), lng = Number(body.lng), radius = Number(body.radius);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !(radius >= 100 && radius <= 3000)) {
+        throw new HttpError(400, 'Informe a posição e um raio entre 100 e 3000 m');
+      }
+      const value = JSON.stringify({ lat, lng, radius });
+      await db.tx(async (q) => {
+        await q.run('DELETE FROM settings WHERE key=$1', ['campus']);
+        await q.run('INSERT INTO settings (key, value) VALUES ($1,$2)', ['campus', value]);
+      });
+      log(`área do campus definida: raio ${radius} m`);
       return brejos();
     },
 

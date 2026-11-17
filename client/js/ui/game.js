@@ -18,10 +18,19 @@ import { sensors } from '../sensors.js';
 import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
-  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, visibleBrejos,
+  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, allBrejos,
+  FROG_VIEW_M, POND_VIEW_M,
 } from '../shared/game.js';
 
-const brejosShown = () => visibleBrejos(store.brejos);
+// lagoinhas cadastradas + automáticas da área do campus (recalculadas só quando mudam)
+let shownCache = { key: null, list: [] };
+function brejosShown() {
+  const key = `${store.brejosVersion}|${store.brejos.length}`;
+  if (shownCache.key !== key) shownCache = { key, list: allBrejos(store.brejos, store.campus) };
+  return shownCache.list;
+}
+// ponto de referência para o raio de visão: o jogador (ou o centro do mapa, sem GPS)
+const viewPoint = () => geo.pos || map?.center;
 
 let map, current = 'map', ctx, lastWin = null, walkingTimer = null;
 let playerDir = 'down', walking = false, lastPos = null, justRevealed = new Set();
@@ -38,6 +47,7 @@ export function startGame({ firstTime = false } = {}) {
       <div class="status-col"><button class="status-pill" aria-label="Estado da conexão"></button><div class="gps-chip"></div></div>
     </div>
     <div class="hint-bubble hidden"></div>
+    <button class="compass hidden" aria-label="Lagoinha mais próxima"><span class="arrow">➤</span><span class="txt"></span></button>
     <button class="hud-expedition" data-nav="profile"></button>
     <div class="hud-right">
       <button class="icon-btn shake-btn hidden" aria-label="Chacoalhar">${icons.shake}</button>
@@ -86,6 +96,10 @@ export function startGame({ firstTime = false } = {}) {
   });
   $('.recenter', root).addEventListener('click', recenter);
   $('.status-pill', root).addEventListener('click', statusSheet);
+  $('.compass', root).addEventListener('click', () => {
+    const b = brejosShown().find((x) => x.id === $('.compass', root).dataset.target);
+    if (b) { map.follow = false; $('.recenter', root).classList.remove('hidden'); map.setCenter(b.lat, b.lng, true); }
+  });
   $('.shake-btn', root).addEventListener('click', () => doShake());
 
   // eventos do jogo
@@ -215,14 +229,11 @@ function renderHint() {
   if (geo.mode === 'real' && geo.error === 'denied') msg = '📍 Localização bloqueada. Permita o acesso à localização no navegador para encontrar as lagoinhas.';
   else if (geo.mode === 'real' && geo.error === 'unsupported') msg = 'Este aparelho não informa a localização.';
   else if (!pos) msg = '📡 Procurando sinal de GPS…';
-  else if (!store.brejos.length) msg = 'Nenhuma lagoinha cadastrada ainda. Peça ao organizador para criar as lagoinhas do campus.';
+  else if (!brejosShown().length) msg = 'Nenhuma lagoinha ainda. O organizador precisa definir a área do campus no painel.';
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
   else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
-  else {
-    const nearest = brejosShown().map((b) => ({ b, d: distanceM(pos, b) - b.radius })).sort((a, b) => a.d - b.d)[0];
-    if (nearest && nearest.d > 60) msg = `🧭 Lagoinha mais próxima: <b>${esc(nearest.b.name)}</b>, a ${fmtDist(nearest.d)}`;
-  }
   el.innerHTML = msg;
+  renderCompass();
   el.classList.toggle('shake', shake);
   el.classList.toggle('hidden', !msg || current !== 'map');
 }
@@ -233,11 +244,15 @@ const isHidden = (s) => s.kind === 'wild' && s.hidden && !store.revealed[s.id];
 function visibleSpawns() {
   const catalog = getCatalog();
   const w = windowOf(store.now());
-  const pos = geo.pos;
+  const vp = viewPoint();
   const out = [];
+  if (!vp) return out;
   for (const b of brejosShown()) {
-    if (pos && distanceM(pos, b) > 2500) continue;
-    for (const s of spawnsFor(b, w, catalog)) if (!store.view.capturedSpawns.has(s.id)) out.push(s);
+    if (distanceM(vp, b) > FROG_VIEW_M + b.radius) continue;
+    for (const s of spawnsFor(b, w, catalog)) {
+      if (store.view.capturedSpawns.has(s.id)) continue;
+      if (distanceM(vp, s) <= FROG_VIEW_M) out.push(s); // longe demais: some do mapa
+    }
   }
   return out;
 }
@@ -247,7 +262,9 @@ function refreshObjects() {
   const pos = geo.pos;
   const spawns = visibleSpawns();
   const keep = new Set();
+  const vp = viewPoint();
   for (const b of brejosShown()) {
+    if (!vp || distanceM(vp, b) > POND_VIEW_M) continue;
     map.setObject(`pond:${b.id}`, {
       lat: b.lat, lng: b.lng, ground: true, className: 'mpond', data: b,
       html: img(hash32(b.id) % 2 ? 'pond-big.png' : 'pond-small.png', hash32(b.id) % 2 ? 132 : 100),
@@ -295,7 +312,7 @@ function drawPlayer(force = false) {
   const sig = `${look}|${playerDir}|${walking}`;
   const o = map.objects.get('player');
   map.setObject('player', {
-    lat: pos.lat, lng: pos.lng, className: 'mplayer', depthScale: false,
+    lat: pos.lat, lng: pos.lng, className: 'mplayer', depthScale: false, top: true,
     html: (!o || o.sig !== sig || force) ? `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}</div>` : null,
   });
   map.objects.get('player').sig = sig;
@@ -317,6 +334,20 @@ function onGeo() {
   refreshObjects();
   renderHint();
   renderExpedition();
+}
+
+// seta apontando para a lagoinha mais próxima (o mapa fica com o norte para cima)
+function renderCompass() {
+  const el = $('.compass');
+  if (!el) return;
+  const pos = geo.pos;
+  const nearest = pos ? brejosShown().map((b) => ({ b, d: distanceM(pos, b) })).sort((a, b) => a.d - b.d)[0] : null;
+  const show = nearest && nearest.d - nearest.b.radius > 25 && current === 'map';
+  el.classList.toggle('hidden', !show);
+  if (!show) return;
+  $('.arrow', el).style.transform = `rotate(${bearing(pos, nearest.b) - 90}deg)`;
+  $('.txt', el).textContent = `${nearest.b.name} · ${fmtDist(nearest.d)}`;
+  el.dataset.target = nearest.b.id;
 }
 
 function recenter() {

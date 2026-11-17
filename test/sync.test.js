@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { spawnsFor, windowOf, giftFor, dayOf, maskFromSpecies } from '../client/js/shared/game.js';
+import { spawnsFor, windowOf, giftFor, dayOf, maskFromSpecies, autoBrejos, allBrejos } from '../client/js/shared/game.js';
 
 let server, base, app, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
@@ -80,6 +80,25 @@ test('pererecas de um brejo nascem afastadas entre si e da lagoinha', async () =
     for (const s of sp) assert.ok(dm(s, b) >= POND_CLEAR_M - 0.5, 'em cima da lagoinha');
     for (let i = 0; i < sp.length; i++) for (let j = i + 1; j < sp.length; j++) assert.ok(dm(sp[i], sp[j]) >= 8, 'pererecas coladas');
   }
+});
+
+test('lagoinhas automáticas da área do campus: mesmas no cliente e no servidor', async () => {
+  const p = await newPlayer('nina');
+  const campus = { lat: -23.2, lng: -50.4, radius: 500 };
+  const r = await call('POST', '/api/admin/campus', campus, { 'X-Admin-Key': ADMIN });
+  assert.equal(r.status, 200);
+  const auto = autoBrejos(campus);
+  assert.ok(auto.length >= 20, `poucas lagoinhas: ${auto.length}`);
+  const shown = allBrejos(r.body.brejos, r.body.campus);
+  for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) {
+    const { distanceM: dm } = await import('../client/js/shared/game.js');
+    assert.ok(dm(shown[i], shown[j]) >= shown[i].radius + shown[j].radius, 'lagoinhas sobrepostas');
+  }
+  const b = auto[0];
+  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[0];
+  const res = await sync(p, 'c1', [captureOp(spawn, clock)]);
+  assert.equal(res.body.results[0].status, 'applied', JSON.stringify(res.body.results[0]));
+  await call('POST', '/api/admin/campus', { clear: true }, { 'X-Admin-Key': ADMIN });
 });
 
 test('o servidor recalcula as mesmas pererecas que o cliente', async () => {

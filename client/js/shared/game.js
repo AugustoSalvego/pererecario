@@ -2,11 +2,42 @@
 // Tudo aqui é determinístico: dado o mesmo brejo e a mesma janela de tempo,
 // cliente e servidor chegam exatamente às mesmas pererecas, sem conversar.
 
-export const WINDOW_MS = 15 * 60 * 1000;       // as pererecas de um brejo mudam a cada 15 min
+// =====================================================================================
+//  BALANCEAMENTO: todos os números que regulam onde e quanto as pererecas aparecem.
+//  Mudou algo? Reinicie o servidor (npm start) e recarregue o app duas vezes.
+//  Servidor e celular leem este mesmo arquivo, então sempre concordam entre si.
+//  (Raridade das espécies, XP e toques para capturar ficam em assets/species.json.)
+// =====================================================================================
+export const BALANCO = {
+  // --- lagoinhas automáticas (aparecem dentro da área do campus definida no painel) ---
+  lagoinhaACadaM: 130,       // distância média entre lagoinhas. Menor = mais lagoinhas.
+  chanceDeLagoinha: 0.75,    // 0 a 1: chance de cada ponto da grade ganhar lagoinha. 1 = todos.
+  raioDaLagoinhaM: 30,       // tamanho da área de cada lagoinha (onde as pererecas nascem).
+
+  // --- pererecas em cada lagoinha ---
+  metrosPorPerereca: 7,      // 1 perereca a cada 7 m de raio (lagoinha de 30 m = 4 pererecas)
+  minPererecas: 3,           // nunca menos que isso por lagoinha
+  maxPererecas: 7,           // nem mais que isso
+  trocaACadaMin: 15,         // a cada 15 min as pererecas de cada lagoinha mudam (novas nascem)
+
+  // --- distâncias do jogador ---
+  capturaAteM: 10,           // pode tocar na perereca para capturar a até 10 m
+  folgaDoGpsM: 10,           // folga extra quando o GPS do celular diz que está impreciso
+  revelaMatinhoAteM: 20,     // tocar no matinho / chacoalhar funciona a até 20 m
+  vePererecasAteM: 70,       // pererecas e matinhos só aparecem a até 70 m (mais longe somem)
+  veLagoinhasAteM: 400,      // lagoinhas aparecem a até 400 m
+
+  // --- espaço entre as coisas (para nada nascer embolado) ---
+  vaoDaLagoinhaM: 17,        // nenhuma perereca nasce em cima da lagoinha
+  vaoEntrePererecasM: 12,    // distância mínima entre duas pererecas
+  vaoEntreBrejosM: 15,       // folga mínima entre as bordas de dois brejos cadastrados à mão
+};
+
+export const WINDOW_MS = BALANCO.trocaACadaMin * 60 * 1000;  // as pererecas de um brejo mudam a cada janela
 export const GRACE_MS = 10 * 60 * 1000;        // tolerância para capturas feitas no fim da janela
-export const CAPTURE_RANGE_M = 10;             // distância para capturar uma perereca
-export const GPS_SLACK_M = 10;                 // folga extra quando o próprio GPS informa imprecisão
-export const REVEAL_RANGE_M = 20;              // alcance do chacoalhar: revela os matinhos por perto
+export const CAPTURE_RANGE_M = BALANCO.capturaAteM;
+export const GPS_SLACK_M = BALANCO.folgaDoGpsM;
+export const REVEAL_RANGE_M = BALANCO.revelaMatinhoAteM;
 export const NEW_SPECIES_BONUS = 50;
 export const BR_OFFSET_MS = -3 * 60 * 60 * 1000;  // horário de Brasília (sem horário de verão)
 
@@ -88,12 +119,48 @@ function sizeFor(next, sp) {
 
 // ---------- pererecas dos brejos ----------
 export function spawnCount(brejo) {
-  return Math.max(3, Math.min(7, Math.round(brejo.radius / 9)));
+  const n = Math.round(brejo.radius / BALANCO.metrosPorPerereca);
+  return Math.max(BALANCO.minPererecas, Math.min(BALANCO.maxPererecas, n));
 }
 
-export const POND_CLEAR_M = 17;   // ninguém nasce em cima da lagoinha (centro do brejo)
-export const MIN_SPAWN_GAP_M = 12; // distância mínima entre duas pererecas do mesmo brejo
-export const MIN_BREJO_GAP_M = 15; // folga mínima entre as bordas de dois brejos
+export const POND_CLEAR_M = BALANCO.vaoDaLagoinhaM;
+export const MIN_SPAWN_GAP_M = BALANCO.vaoEntrePererecasM;
+export const MIN_BREJO_GAP_M = BALANCO.vaoEntreBrejosM;
+
+// ---------- lagoinhas automáticas na área do campus ----------
+// O organizador define o campus (centro + raio). O jogo espalha lagoinhas numa grade
+// (BALANCO.lagoinhaACadaM), com sorteio determinístico: celular e servidor chegam às mesmas lagoinhas.
+export const AUTO = { cell: BALANCO.lagoinhaACadaM, radius: BALANCO.raioDaLagoinhaM, chance: BALANCO.chanceDeLagoinha };
+export const FROG_VIEW_M = BALANCO.vePererecasAteM;
+export const POND_VIEW_M = BALANCO.veLagoinhasAteM;
+const POND_NAMES = ['Lagoinha Serena', 'Poça do Girino', 'Brejinho da Taboa', 'Lagoa do Musgo', 'Poça Cristalina',
+  'Brejo do Ipê', 'Lagoinha da Garça', 'Brejo das Vitórias-Régias', 'Lagoinha do Sol', 'Poça do Orvalho',
+  'Brejinho Escondido', 'Lagoa da Libélula', 'Poça do Sabiá', 'Brejinho do Capim', 'Lagoinha da Chuva', 'Poça da Lua'];
+
+export function autoBrejos(campus) {
+  if (!campus || !(campus.radius > 0)) return [];
+  const out = [];
+  const n = Math.ceil(campus.radius / AUTO.cell);
+  const salt = `${Math.round(campus.lat * 1e5)}|${Math.round(campus.lng * 1e5)}`;
+  for (let i = -n; i <= n; i++) {
+    for (let j = -n; j <= n; j++) {
+      const next = rng(hash32(`auto|${i}|${j}|${salt}`));
+      if (next() > AUTO.chance) continue;
+      const north = i * AUTO.cell + (next() - 0.5) * AUTO.cell * 0.4;
+      const east = j * AUTO.cell + (next() - 0.5) * AUTO.cell * 0.4;
+      const name = POND_NAMES[Math.floor(next() * POND_NAMES.length)];
+      if (Math.hypot(north, east) > campus.radius) continue;
+      const p = offsetLatLng(campus.lat, campus.lng, north, east);
+      out.push({ id: `a${i + 100}x${j + 100}`, name, lat: p.lat, lng: p.lng, radius: AUTO.radius, auto: true });
+    }
+  }
+  return out;
+}
+
+// todas as lagoinhas do jogo: as cadastradas à mão primeiro, depois as automáticas
+export function allBrejos(manual, campus) {
+  return visibleBrejos([...(manual || []), ...autoBrejos(campus)]);
+}
 
 // Brejos criados antes da trava de distância podem estar sobrepostos: o jogo mostra
 // só o mais antigo de cada grupo sobreposto (a lista vem em ordem de criação).

@@ -44,14 +44,18 @@ Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-a
 
 Observações do plano gratuito do Render: o servidor "dorme" após 15 min sem acesso e leva ~1 min para acordar (o jogo continua funcionando offline nesse meio-tempo e sincroniza depois); o Postgres gratuito expira 30 dias após criado. Por isso o banco é Postgres e não SQLite: no plano grátis, arquivos locais são apagados quando o servidor dorme.
 
-## Cadastrar os brejos do campus
+## Lagoinhas do campus
 
-Os brejos são áreas circulares (centro + raio) guardadas no servidor. Duas formas:
+O jeito mais fácil é **definir a área do campus** (centro + raio): o jogo espalha sozinho umas 30 lagoinhas nessa área, uma a cada ~130 m, e cada uma tem 4 pererecas que mudam a cada **15 minutos**. Celular e servidor calculam as mesmas lagoinhas, sem precisar cadastrar uma por uma.
 
-- **No local, pelo celular:** Perfil → Painel de demonstração → informe a chave de administrador → "Criar brejo onde estou".
-- **Pelo computador:** abra `/admin`, cole as coordenadas copiadas do Google Maps ("-23.1093, -50.3591"), dê um nome e um raio (25–60 m funciona bem).
+- **No local, pelo celular:** Perfil → Painel de demonstração → chave de administrador → raio (ex.: 500) → **Definir campus aqui**.
+- **Pelo computador:** `/admin` → "Área do campus" → cole as coordenadas do centro copiadas do Google Maps e o raio.
 
-Cada brejo vira uma lagoinha no mapa, com 3 a 7 pererecas em volta (depende do raio), que mudam a cada **15 minutos**. Um raio de 30 a 40 m funciona bem. Dois brejos não podem ficar em cima nem colados um no outro (o servidor recusa).
+Também dá para criar **brejos à mão** em lugares específicos (Painel de demonstração → "Criar brejo onde estou", ou `/admin` → Brejos). Dois brejos não podem ficar em cima nem colados um no outro (o servidor recusa).
+
+No mapa, as pererecas e os matinhos só aparecem a até 70 m do jogador (mais longe, somem), e as lagoinhas a até 400 m. Quando não há nenhuma perereca por perto, uma setinha no topo aponta a lagoinha mais próxima.
+
+Para deixar o jogo com mais ou menos pererecas, veja [`docs/BALANCEAMENTO.md`](docs/BALANCEAMENTO.md): todos os números ficam num lugar só.
 
 ## Estrutura
 
