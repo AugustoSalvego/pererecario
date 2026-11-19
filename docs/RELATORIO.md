@@ -207,7 +207,7 @@ A posição dos outros jogadores segue uma regra diferente do resto do jogo. Cap
 | **Falha durante a sincronização** (a conexão cai depois de o servidor aplicar, antes da resposta chegar) | As operações continuam na fila porque não houve confirmação. Na próxima tentativa o servidor reconhece os `opId` e responde `duplicate` sem reaplicar. Cada operação roda numa transação no servidor: falha no meio do lote não deixa nada pela metade, e o lote inteiro pode ser reenviado com segurança. |
 | **Reenvio de informações já transmitidas** | Tratado pela idempotência (seção 5): resposta `duplicate`, nenhuma alteração. O painel de demonstração tem um botão que reenvia de propósito uma operação já confirmada. |
 | **Operação inválida** (perereca que não existe, horário fora da janela, longe demais) | O servidor recalcula o encontro e responde `rejected` com o motivo; a operação sai da fila e o jogador é avisado. |
-| **Sessão expirada** | Resposta 401: o app avisa e pede novo login. O botão "Sair" alerta se ainda houver operações não sincronizadas. |
+| **Sessão expirada** | Resposta 401: o app avisa e pede novo login **sem apagar a fila**; a tela de entrada mostra quantas ações daquela conta estão esperando, e entrando com a mesma conta elas sobem normalmente. O botão "Sair" alerta se ainda houver operações não sincronizadas. |
 | **Servidor "dormindo" (Render gratuito)** | Mesmo comportamento de servidor indisponível; o jogador nem precisa perceber. |
 
 Para a apresentação, o painel de demonstração (Perfil → Painel de demonstração) e o painel do servidor (`/admin`) permitem **simular** cada uma dessas falhas: modo avião simulado, derrubar o servidor por 60 s (o servidor responde 503 e volta sozinho), perder a resposta da próxima sincronização e reenviar uma operação confirmada. Há também o registro de eventos com cada etapa.
@@ -279,6 +279,8 @@ O jogo muda conforme o ambiente físico do jogador:
 25. redefinição de senha pelo administrador sem perder o progresso.
 
 Em `test/contas.test.js`, outros 10 testes cobrem as contas: cadastro e login por e-mail, conta nova pelo Google pedindo o apelido, tokens do Google falsificados, de outro aplicativo, de outro emissor, vencidos ou alterados depois de assinados (todos recusados), ligação pelo mesmo Gmail com a senha antiga desativada, e-mail que não é Gmail não ligando sozinho, a mesma conta Google não ligando em dois jogadores, troca de senha e limite de tentativas por conta. O Google é simulado com uma chave RSA de teste.
+
+Em `test/seguranca.test.js`, 4 testes cobrem o painel e as contas da organização: hospedado sem uma `ADMIN_KEY` forte o servidor sobe, mas o painel fica desligado (nem a chave padrão do código público abre), 20 chaves erradas bloqueiam o aparelho por 10 minutos, e uma conta marcada como organização some do ranking dos outros sem deixar de ser uma conta normal.
 
 Em `test/codigo.test.js`, 13 testes cobrem o código por e-mail, com o Brevo trocado por um carteiro de mentira: a conta só nasce com o código certo (e o banco não guarda o código nem a senha), código vencido, limite de 5 tentativas, reenvio só depois de 1 minuto (o código novo vale e o velho não), pedido novo invalidando o anterior, limites de e-mails por endereço e por aparelho, esqueci a senha do começo ao fim, falha no envio sem deixar nada pendurado, Google ligando a uma conta confirmada sem desativar a senha, o jogo sem o Brevo configurado, o e-mail de teste do painel e o formato da chamada à API do Brevo.
 

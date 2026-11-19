@@ -1,7 +1,7 @@
 # Hospedagem e segurança dos dados
 
 Este guia coloca o Pererecário no ar de graça e garante que os jogadores não percam o progresso.
-São três peças, cada uma num serviço diferente (mais o login com o Google no passo 4 e o código por e-mail no passo 6, os dois opcionais e grátis):
+São três peças, cada uma num serviço diferente (mais o login com o Google no passo 4 e o código por e-mail no passo 7, os dois opcionais e grátis):
 
 | Peça | Serviço | Para quê | Custo |
 |---|---|---|---|
@@ -34,10 +34,13 @@ O que pode fazer um jogador perder algo, e o que já protege:
 | O banco reiniciar ou dormir com o servidor ligado | O servidor reabre a conexão sozinho (testado no GitHub contra um Postgres de verdade) |
 | Alguém apagar dados por engano | Neon volta o banco para qualquer momento das últimas 6 horas; além disso, há os backups |
 | Jogador sem internet | O jogo continua; a fila sincroniza quando a conexão voltar |
-| Jogador esquecer a senha | Quem usa "Continuar com Google" não tem senha para esquecer. Para quem usa e-mail e senha, o próprio jogo resolve: "Esqueci a senha" → código no e-mail → senha nova (passo 6). Sem o Brevo, o organizador define uma senha nova no `/admin`. O progresso continua todo lá |
-| Alguém criar conta com o e-mail de outra pessoa | Com o passo 6 feito, a conta só nasce depois do código que chega no e-mail. E o dono de verdade sempre recupera a conta pelo "Esqueci a senha" |
+| Jogador esquecer a senha | Quem usa "Continuar com Google" não tem senha para esquecer. Para quem usa e-mail e senha, o próprio jogo resolve: "Esqueci a senha" → código no e-mail → senha nova (passo 7). Sem o Brevo, o organizador define uma senha nova no `/admin`. O progresso continua todo lá |
+| Alguém criar conta com o e-mail de outra pessoa | Com o passo 7 feito, a conta só nasce depois do código que chega no e-mail. E o dono de verdade sempre recupera a conta pelo "Esqueci a senha" |
 | Jogador trocar de celular ou perder o celular | É só entrar com e-mail e senha (ou com o Google) no outro aparelho |
 | Sair da conta com ações não enviadas | O jogo avisa quantas operações ainda não chegaram e pede para esperar sincronizar |
+| A sessão do jogador deixar de valer no servidor (por exemplo, se a `TOKEN_SECRET` do Render mudar) | O jogo pede para entrar de novo **sem apagar nada** do celular e mostra quantas ações estão esperando; entrando com a mesma conta, elas sobem (testado no navegador) |
+| Alguém de fora entrar no painel `/admin` | A chave é sorteada pelo Render (longa e aleatória) e só você a vê. Sem uma chave de 12 ou mais caracteres, o painel fica desligado. Errou a chave 20 vezes em 10 minutos, aquele aparelho fica bloqueado |
+| Acabar a cota grátis do Neon no mês | São 100 CU-horas por mês, umas 400 horas com o banco acordado; ele dorme depois de 5 minutos sem uso, e o servidor só acorda o banco quando alguém joga. Mesmo ligado o dia inteiro, do dia 20 ao fim de novembro dá menos de 300 horas. O uso aparece no painel do Neon (**Monitoring**) |
 | Limpar os dados do navegador antes de sincronizar | Esse é o único caso sem proteção: o que estava só na fila do celular se perde. Oriente os jogadores a não limpar o navegador durante o evento |
 
 ## Passo a passo
@@ -54,16 +57,19 @@ O que pode fazer um jogador perder algo, e o que já protege:
 2. **New → Blueprint** e escolha este repositório (branch `main`). O arquivo [`render.yaml`](../render.yaml) já descreve tudo.
 3. O Render vai pedir três valores:
    - `DATABASE_URL`: a connection string do Neon;
-   - `ADMIN_KEY`: invente uma senha forte (é a do painel `/admin` e a do backup). Guarde;
-   - `CARTO_KEY`: opcional; deixe vazio para usar o mapa do OpenStreetMap.
+   - `CARTO_KEY`: opcional; deixe vazio para usar o mapa do OpenStreetMap;
+   - `GOOGLE_CLIENT_ID`, `BREVO_API_KEY`, `EMAIL_FROM`: opcionais, deixe vazios por enquanto (passos 4 e 7).
+
+   O `ADMIN_KEY` (senha do painel `/admin` e do backup) e o `TOKEN_SECRET` (assina as sessões dos jogadores) o Render sorteia sozinho. **Nunca troque nem apague o `TOKEN_SECRET`**: todo mundo teria de entrar de novo (sem perder nada, mas é chato no meio do evento).
 4. Espere o deploy terminar e abra `https://pererecario-xxxx.onrender.com/healthz`: tem de aparecer `ok`. Nos *Logs* do Render deve aparecer `banco: postgres`.
-5. Abra a URL no celular, crie uma conta de teste e capture uma perereca. No `/admin` (com a `ADMIN_KEY`), a captura tem de aparecer.
+5. **Pegue a chave do painel:** no Render, abra o serviço → **Environment** → na linha `ADMIN_KEY`, clique no olho para ver e copie. Guarde junto com suas senhas. É com ela que você entra em `https://pererecario-xxxx.onrender.com/admin` (o navegador lembra depois da primeira vez).
+6. Abra a URL no celular, crie uma conta de teste e capture uma perereca. No `/admin`, a captura tem de aparecer.
 
 ### 3. Backup automático no GitHub (5 min)
 
 1. No GitHub, abra o repositório → **Settings → Secrets and variables → Actions → New repository secret** e crie três segredos:
    - `GAME_URL`: a URL do jogo, por exemplo `https://pererecario-xxxx.onrender.com`;
-   - `ADMIN_KEY`: a mesma do Render;
+   - `ADMIN_KEY`: a mesma do Render (a que você copiou no passo 2.5);
    - `BACKUP_PASSWORD`: uma senha **só para os backups**. Guarde num lugar seguro (gerenciador de senhas, por exemplo): sem ela, o backup não abre.
 2. Vá em **Actions → backup → Run workflow**. Em 1 ou 2 minutos aparece um ✅ e, dentro da execução, um arquivo `backup-...` em *Artifacts*. A partir daí ele roda sozinho a cada 6 horas.
 3. **Atenção, o repositório é público:** qualquer pessoa logada no GitHub consegue baixar os arquivos de backup. Por isso eles saem criptografados (têm nomes de usuário e as senhas, guardadas embaralhadas com scrypt), e o workflow se recusa a rodar sem `BACKUP_PASSWORD`. Use uma senha **longa** (por exemplo, quatro ou cinco palavras aleatórias) e não a reaproveite em nenhum outro lugar. Se puder deixar o repositório privado depois da avaliação, melhor ainda.
@@ -87,10 +93,24 @@ O botão "Continuar com Google" só aparece depois deste passo; até lá o jogo 
 
 Se um dia o endereço do jogo mudar (outro nome no Render ou um domínio próprio), adicione o endereço novo nas **Origens JavaScript autorizadas**; senão o botão do Google mostra um erro.
 
-### 5. Antes do evento (checklist)
+### 5. Conta de demonstração e conta de administrador
+
+São duas coisas diferentes:
+
+- **Administrador = o painel `/admin`.** Não é uma conta do jogo: é uma página protegida pela `ADMIN_KEY`, que só você tem. Por ela você vê todos os jogadores e capturas, baixa backup, define senha nova para quem esqueceu, testa o e-mail e simula a queda do servidor na apresentação. Os jogadores não têm como entrar sem a chave.
+- **Demonstração = uma conta normal do jogo, só sua.** No celular, **Criar conta** com o seu e-mail e uma senha que você não usa em nenhum outro lugar (com o passo 7 feito, chega o código no e-mail). Ninguém mais entra nela, porque só você sabe a senha. Depois, no `/admin` → "Conta de demonstração", escreva o e-mail dela e clique em **Marcar como organização**. Com isso:
+  - ela some do ranking dos outros jogadores (você continua se vendo no seu ranking, para mostrar na apresentação);
+  - ela não entra na contagem de **Jogadores externos** do painel, que é o número para o resultado de engajamento do dia 25/11;
+  - ela continua aparecendo no mapa para quem estiver perto (bom para mostrar "jogadores juntos").
+
+Para os testes da apresentação use **a mesma conta de demonstração** nos dois celulares (o roteiro explica por quê). Se quiser, marque também as contas de colegas que ajudarem nos testes.
+
+### 6. Antes do evento (checklist)
 
 - [ ] `/healthz` responde `ok` e os logs dizem `banco: postgres`.
-- [ ] Se fez o passo 6: no `/admin`, "Mandar e-mail de teste" chega; criar uma conta de teste com o código; testar o "Esqueci a senha".
+- [ ] O `/admin` abre com a `ADMIN_KEY` do Render (e **não** abre com `brejo-admin`).
+- [ ] A conta de demonstração foi criada e marcada como organização; ela entra nos dois celulares.
+- [ ] Se fez o passo 7: no `/admin`, "Mandar e-mail de teste" chega; criar uma conta de teste com o código; testar o "Esqueci a senha".
 - [ ] Uma conta de teste no celular: capturar, fechar o app, abrir de novo, conferir que continua lá.
 - [ ] Modo avião: capturar duas pererecas, voltar a internet, conferir que chegaram ao `/admin`.
 - [ ] Rodar o backup na mão (Actions → backup → Run workflow) e ver o ✅.
@@ -99,7 +119,7 @@ Se um dia o endereço do jogo mudar (outro nome no Render ou um domínio própri
 - [ ] Criar uma conta pelo **Continuar com Google** num Android e num iPhone, e outra com e-mail e senha.
 - [ ] Gerar o QR code da URL para o público.
 
-### 6. Código por e-mail com o Brevo (grátis, 15 min)
+### 7. Código por e-mail com o Brevo (grátis, 15 min)
 
 Com este passo, criar conta com e-mail e senha passa a pedir um **código de 6 números** que chega no e-mail (ninguém consegue criar conta com o e-mail de outra pessoa), e aparece o **"Esqueci a senha"** que funciona sozinho: código no e-mail → senha nova. Enquanto ele não estiver feito, o cadastro funciona como antes, sem código, e nada quebra.
 
@@ -155,8 +175,8 @@ O Brevo manda até **300 e-mails por dia** no plano gratuito, sem cartão. Cada 
 
 Para conferir um backup sem mexer no banco de verdade, rode o mesmo comando **sem** `DATABASE_URL`: ele restaura num arquivo local (`data/pererecario.db`).
 
-**Um jogador esqueceu a senha:** com o passo 6 feito, ele mesmo resolve no jogo: **Entrar → Esqueci a senha**. Se a conta é Gmail, também pode entrar com "Continuar com Google". Se nada disso der (o e-mail não chega, por exemplo), `/admin` → "Redefinir senha" → e-mail dele e uma senha nova (mínimo 8).
+**Um jogador esqueceu a senha:** com o passo 7 feito, ele mesmo resolve no jogo: **Entrar → Esqueci a senha**. Se a conta é Gmail, também pode entrar com "Continuar com Google". Se nada disso der (o e-mail não chega, por exemplo), `/admin` → "Redefinir senha" → e-mail dele e uma senha nova (mínimo 8).
 
-**O código não chega para ninguém:** no `/admin`, o topo mostra `E-mail (Brevo)` com as falhas e o último erro; use "Mandar e-mail de teste" e siga a tabela do passo 6. Enquanto isso, os jogadores podem criar conta pelo "Continuar com Google". Em último caso, apague `BREVO_API_KEY` no Render: o cadastro volta a funcionar sem código.
+**O código não chega para ninguém:** no `/admin`, o topo mostra `E-mail (Brevo)` com as falhas e o último erro; use "Mandar e-mail de teste" e siga a tabela do passo 7. Enquanto isso, os jogadores podem criar conta pelo "Continuar com Google". Em último caso, apague `BREVO_API_KEY` no Render: o cadastro volta a funcionar sem código.
 
 **Um jogador diz que perdeu capturas:** peça para ele abrir o jogo com internet e esperar a nuvem do topo ficar verde. Se ele tiver saído da conta ou limpado o navegador antes de sincronizar, o que estava só no celular não chegou ao servidor. No `/admin`, a tabela de operações mostra tudo o que chegou de cada aparelho.

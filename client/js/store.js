@@ -88,6 +88,14 @@ class Store extends EventTarget {
     this.recompute();
   }
 
+  // O servidor não aceitou mais a sessão (por exemplo, a chave das sessões do servidor mudou).
+  // Sai da conta SEM apagar nada: entrando de novo com a mesma conta, o que está na fila sobe normalmente.
+  async expireSession() {
+    this.session = null;
+    api.token = null;
+    await db.kvSet('session', null);
+  }
+
   async saveSettings(patch) {
     this.settings = { ...this.settings, ...patch };
     await db.kvSet('settings', this.settings);

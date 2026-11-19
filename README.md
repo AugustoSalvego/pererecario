@@ -33,10 +33,10 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 50 testes: sincronização, idempotência, conflitos, falhas, trabalhos, loja, vendas, backup, contas e código por e-mail
+npm test             # 54 testes: sincronização, idempotência, conflitos, falhas, trabalhos, loja, vendas, backup, contas, código por e-mail e painel protegido
 ```
 
-Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
+Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; hospedado, essa chave não vale: o Render sorteia a `ADMIN_KEY` e, sem uma chave de 12 ou mais caracteres, o painel fica desligado).
 
 > No celular, GPS, câmera e sensores só funcionam com **HTTPS**. Para testar no aparelho use o deploy abaixo (ou um túnel HTTPS para o seu computador).
 
@@ -45,7 +45,7 @@ Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-a
 Passo a passo completo em [`docs/HOSPEDAGEM.md`](docs/HOSPEDAGEM.md). Em resumo:
 
 1. **Banco no [Neon](https://neon.com)** (PostgreSQL grátis e sem prazo de validade): crie um projeto na região AWS US East 1 (N. Virginia) e copie a *connection string*.
-2. **Servidor no [Render](https://render.com)**: **New → Blueprint** com este repositório. O [`render.yaml`](render.yaml) cria o servidor e pede `DATABASE_URL` (a do Neon), `ADMIN_KEY` (senha do `/admin`) e `CARTO_KEY` (opcional).
+2. **Servidor no [Render](https://render.com)**: **New → Blueprint** com este repositório. O [`render.yaml`](render.yaml) cria o servidor, pede a `DATABASE_URL` (a do Neon) e sorteia a `ADMIN_KEY` (senha do `/admin`, que você vê em **Environment**).
 3. **Backup automático**: cadastre os segredos `GAME_URL`, `ADMIN_KEY` e `BACKUP_PASSWORD` no GitHub. O workflow [`backup`](.github/workflows/backup.yml) copia o banco inteiro a cada 6 horas, criptografado, e guarda por 90 dias. Para restaurar: `node scripts/restaurar_backup.js arquivo`.
 4. **Opcionais e grátis:** `GOOGLE_CLIENT_ID` (botão "Continuar com Google") e `BREVO_API_KEY` + `EMAIL_FROM` (código de 6 números por e-mail no cadastro e no "Esqueci a senha"). Sem eles, o jogo funciona só com e-mail e senha, sem código.
 

@@ -171,7 +171,11 @@ export function startGame({ firstTime = false } = {}) {
     if (op.type === 'frog.sell') return toast(`Venda desfeita: ${esc(result.error)}. A perereca voltou para o brejo.`, 'warn', 'cloudOff', 6000);
     toast(`O servidor recusou uma operação: ${esc(result.error)}`, 'warn', 'cloudOff', 5000);
   });
-  sync.addEventListener('auth-expired', async () => { toast('Sessão expirada. Entre novamente.', 'warn'); await store.logout(); setTimeout(() => location.reload(), 1500); });
+  sync.addEventListener('auth-expired', async () => {
+    toast('Sessão expirada. Entre de novo com a mesma conta: nada do que está no aparelho foi perdido.', 'warn', 'cloudOff', 4000);
+    await store.expireSession();
+    setTimeout(() => location.reload(), 3000);
+  });
   geo.addEventListener('change', onGeo);
   geo.addEventListener('error', () => renderHint());
   geo.addEventListener('mode', () => { renderGpsChip(); renderHint(); renderHud(); refreshObjects(); drawPlayer(true); });

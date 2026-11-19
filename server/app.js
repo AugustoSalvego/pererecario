@@ -44,7 +44,7 @@ const MAILS_PER_EMAIL_HOUR = 5;
 export async function createApp({
   db, adminKey = process.env.ADMIN_KEY || 'brejo-admin', tokenSecret = process.env.TOKEN_SECRET, now = () => Date.now(), quiet = false,
   googleClientId = process.env.GOOGLE_CLIENT_ID || null, googleKeys = undefined,
-  // Carteiro (Brevo). Sem ele, o cadastro é como antes: sem código (docs/HOSPEDAGEM.md, passo 6)
+  // Carteiro (Brevo). Sem ele, o cadastro é como antes: sem código (docs/HOSPEDAGEM.md, passo 7)
   mailer = mailerFromEnv(), mailDailyMax = Number(process.env.MAIL_DAILY_MAX) || 280,
 } = {}) {
   // "Continuar com Google" só aparece se o servidor tiver o Client ID (docs/HOSPEDAGEM.md)
@@ -120,8 +120,20 @@ export async function createApp({
     return pid;
   }
 
+  // Painel /admin: só com a chave (ADMIN_KEY). Hospedado sem uma chave forte, o painel fica desligado
+  // (server/index.js). Chave errada 20 vezes em 10 minutos bloqueia aquele aparelho por um tempo.
+  const digest = (s) => crypto.createHash('sha256').update(String(s)).digest();
   function requireAdmin(req) {
-    if (req.headers['x-admin-key'] !== adminKey) throw new HttpError(403, 'Chave de administrador incorreta');
+    if (!adminKey) throw new HttpError(403, 'Painel desligado: falta definir ADMIN_KEY no servidor, com 12 ou mais caracteres (docs/HOSPEDAGEM.md)');
+    const k = `admin-erro:${clientIp(req)}`;
+    const t = now();
+    const fails = (rate.get(k) || []).filter((x) => t - x < 10 * 60_000);
+    if (fails.length >= 20) throw new HttpError(429, 'Muitas tentativas com a chave errada. Espere 10 minutos.');
+    if (!crypto.timingSafeEqual(digest(req.headers['x-admin-key'] || ''), digest(adminKey))) {
+      fails.push(t);
+      rate.set(k, fails);
+      throw new HttpError(403, 'Chave de administrador incorreta');
+    }
   }
 
   async function playerPublic(id) {
@@ -475,7 +487,7 @@ export async function createApp({
       const rows = await sync.ranking();
       const boards = await sync.boards(playerId);
       // top/me: o ranking de XP (formato antigo); boards: XP, capturas e Brejais ganhos
-      return { top: boards.xp.top.slice(0, 20), me: boards.xp.me, players: rows.length, boards };
+      return { top: boards.xp.top.slice(0, 20), me: boards.xp.me, players: rows.filter((r) => !r.staff).length, boards };
     },
 
     'GET /api/players/code': async (req, body, url) => {
@@ -490,7 +502,7 @@ export async function createApp({
     // ----- administração / demonstração -----
     'GET /api/admin/overview': async (req) => {
       requireAdmin(req);
-      const players = await db.query('SELECT id, username, display_name, email, google_sub, created_at FROM players ORDER BY created_at DESC');
+      const players = await db.query('SELECT id, username, display_name, email, google_sub, staff, created_at FROM players ORDER BY created_at DESC');
       const ranking = await sync.ranking();
       const xpBy = new Map(ranking.map((r) => [r.id, r]));
       const t = now();
@@ -502,14 +514,17 @@ export async function createApp({
         mail: { enabled: !!mailer, sent: mailStats.sent, failed: mailStats.failed, today: mailStats.today, dailyMax: mailDailyMax, lastError: mailStats.lastError, lastErrorAt: mailStats.lastErrorAt },
         counts: {
           players: players.length,
+          external: players.filter((p) => !Number(p.staff)).length,
+          staff: players.filter((p) => Number(p.staff)).length,
           captures: Number((await db.one('SELECT COUNT(*) AS n FROM captures')).n),
           operations: Number((await db.one('SELECT COUNT(*) AS n FROM operations')).n),
           resends: sync.stats.duplicates,
           rejected: Number((await db.one("SELECT COUNT(*) AS n FROM operations WHERE status='rejected'")).n),
           conflicts: Number((await db.one('SELECT COUNT(*) AS n FROM conflicts')).n),
           activeToday: Number((await db.one('SELECT COUNT(DISTINCT player_id) AS n FROM operations WHERE received_at > $1', [t - 86400000])).n),
+          activeExternal: Number((await db.one('SELECT COUNT(DISTINCT o.player_id) AS n FROM operations o JOIN players p ON p.id = o.player_id WHERE o.received_at > $1 AND p.staff = 0', [t - 86400000])).n),
         },
-        players: players.map(({ google_sub, ...p }) => ({ ...p, google: !!google_sub, xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
+        players: players.map(({ google_sub, staff, ...p }) => ({ ...p, google: !!google_sub, staff: !!Number(staff), xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
         captures: await db.query(
           `SELECT c.id, c.spawn_id, c.species_id, c.kind, c.mode, c.caught_at, c.received_at, c.device_id, p.username
            FROM captures c JOIN players p ON p.id = c.player_id ORDER BY c.received_at DESC LIMIT 40`),
@@ -577,10 +592,24 @@ export async function createApp({
       return { ok: true, displayName: p.display_name };
     },
 
+    // Conta da organização (demonstração): continua uma conta normal, com senha só sua, mas não aparece
+    // no ranking dos outros jogadores e não conta como jogador externo no painel
+    'POST /api/admin/staff': async (req, body) => {
+      requireAdmin(req);
+      const user = String(body.user || '').trim().toLowerCase();
+      const p = user ? await db.one('SELECT id, display_name FROM players WHERE username=$1 OR email=$1', [user]) : null;
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse e-mail. Crie a conta no jogo primeiro.');
+      const staff = body.staff === false ? 0 : 1;
+      await db.tx((q) => q.run('UPDATE players SET staff=$1 WHERE id=$2', [staff, p.id]));
+      sync.refreshRanking();
+      log(`${p.display_name} ${staff ? 'virou' : 'deixou de ser'} conta da organização`);
+      return { ok: true, displayName: p.display_name, staff: !!staff };
+    },
+
     // Testar o Brevo: manda um e-mail de teste e, se falhar, mostra o motivo exato
     'POST /api/admin/test-email': async (req, body) => {
       requireAdmin(req);
-      if (!mailer) throw new HttpError(404, 'O e-mail está desligado: faltam BREVO_API_KEY e EMAIL_FROM no Render (docs/HOSPEDAGEM.md, passo 6)');
+      if (!mailer) throw new HttpError(404, 'O e-mail está desligado: faltam BREVO_API_KEY e EMAIL_FROM no Render (docs/HOSPEDAGEM.md, passo 7)');
       const to = String(body.to || '').trim().toLowerCase();
       if (!EMAIL_RE.test(to)) throw new HttpError(400, 'Esse e-mail não parece certo');
       try {

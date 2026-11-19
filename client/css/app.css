@@ -1015,3 +1015,6 @@ svg { display: block; }
 .code-card .field.pw { margin-top: 2px; }
 .code-help { margin: 12px 4px 2px; font-size: 13px; color: var(--ink-soft); text-align: center; line-height: 1.4; }
 .code-links { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+/* sessão expirada com ações na fila: entre com a mesma conta */
+.pending-note { display: flex; gap: 10px; align-items: flex-start; background: #fff1d6; color: #7a4b00; border: 2px solid #f3cf8a; border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.35; margin-bottom: 12px; overflow-wrap: anywhere; }
+.pending-note svg { width: 22px; height: 22px; flex: none; margin-top: 1px; }

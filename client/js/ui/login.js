@@ -62,6 +62,14 @@ async function googleClientId(config) {
   try { const c = await api.get('/api/config', { timeout: 60000 }); return c?.googleClientId || null; } catch { return null; }
 }
 
+// A sessão expirou com coisas ainda na fila: avisa para entrar com a mesma conta (assim nada se perde)
+function pendingNote() {
+  const n = store.outbox.length;
+  const who = store.snapshot?.player;
+  if (!n || !who) return '';
+  return `<div class="pending-note">${icons.cloudOff}<span>Este aparelho tem <b>${n} ${n === 1 ? 'ação' : 'ações'}</b> da conta <b>${esc(who.displayName || '')}</b>${who.email ? ` (${esc(who.email)})` : ''} esperando para subir. Entre com essa mesma conta para não perder nada.</span></div>`;
+}
+
 export function renderLogin(onDone, config = {}) {
   const root = $('#login');
   root.classList.remove('hidden');
@@ -87,6 +95,7 @@ export function renderLogin(onDone, config = {}) {
       <div class="lily-frog" style="right:22%;bottom:30%">${frogImg('frog_honey', 46)}${img('lilypad.png', 52, 'pad-img')}</div>
     </div>
     <form class="login-card" novalidate>
+      ${pendingNote()}
       <div class="offline-banner hidden">${icons.cloudOff}<span>Você está sem internet. Para entrar pela primeira vez é preciso estar online.</span></div>
       <div class="google-area hidden"><div class="g-slot"></div><div class="or"><span>ou com e-mail</span></div></div>
       <div class="segmented"><button type="button" data-mode="login" class="on">Entrar</button><button type="button" data-mode="register">Criar conta</button></div>

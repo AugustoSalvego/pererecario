@@ -1,7 +1,7 @@
 // Envio de e-mail pelo Brevo (plano gratuito: 300 e-mails por dia, sem cartão).
 // Usado só para mandar o código de 6 números (confirmar cadastro e "esqueci a senha").
 // Sem BREVO_API_KEY e EMAIL_FROM no servidor, não há carteiro e o cadastro funciona sem código.
-// Passo a passo: docs/HOSPEDAGEM.md (passo 6).
+// Passo a passo: docs/HOSPEDAGEM.md (passo 7).
 
 export class MailError extends Error {}
 

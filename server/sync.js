@@ -390,7 +390,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
   // tira ninguém do lugar). A lista principal (rows) continua ordenada por XP.
   async function ranking() {
     if (now() - rankCache.at < 15000) return rankCache.rows;
-    const players = await db.query('SELECT id, display_name, avatar, look FROM players');
+    const players = await db.query('SELECT id, display_name, avatar, look, staff FROM players');
     const caps = await db.query('SELECT id, player_id, species_id, caught_at FROM captures');
     const pays = await db.query('SELECT player_id, pay FROM jobs');
     const sold = await db.query('SELECT player_id, price FROM sales');
@@ -404,16 +404,17 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       return {
         id: p.id, displayName: p.display_name, avatar: p.avatar, look: p.look || null, xp: b.total,
         level: levelFor(b.total).level, species: b.species.size, captures: (byPlayer.get(p.id) || []).length,
-        gold: gold.get(p.id) || 0,
+        gold: gold.get(p.id) || 0, staff: !!Number(p.staff),
       };
     }).sort((a, b) => b.xp - a.xp || a.displayName.localeCompare(b.displayName));
     rankCache = { at: now(), rows };
     return rows;
   }
 
-  // os três quadros, cada um com o top e a posição do jogador
+  // os três quadros, cada um com o top e a posição do jogador.
+  // Contas da organização só aparecem no ranking delas mesmas.
   async function boards(playerId, size = 50) {
-    const rows = await ranking();
+    const rows = (await ranking()).filter((r) => !r.staff || r.id === playerId);
     const by = (key) => {
       const sorted = [...rows].sort((a, b) => b[key] - a[key] || b.xp - a.xp || a.displayName.localeCompare(b.displayName));
       const idx = sorted.findIndex((r) => r.id === playerId);
@@ -422,5 +423,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
     return { xp: by('xp'), captures: by('captures'), gold: by('gold') };
   }
 
-  return { applyOp, snapshot, ranking, boards, handlers, stats };
+  const refreshRanking = () => { rankCache = { at: 0, rows: [] }; };
+
+  return { applyOp, snapshot, ranking, boards, refreshRanking, handlers, stats };
 }

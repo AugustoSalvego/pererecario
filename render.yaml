@@ -19,12 +19,12 @@ services:
       - key: TOKEN_SECRET
         generateValue: true
       - key: ADMIN_KEY
-        sync: false # o Render pede o valor na criação: é a senha do painel /admin e do backup
+        generateValue: true # o Render sorteia uma chave forte: é a senha do painel /admin e do backup (veja em Environment)
       - key: GOOGLE_CLIENT_ID
         sync: false # opcional: o "Client ID" do Google para o botão "Continuar com Google" (docs/HOSPEDAGEM.md, passo 4); vazio = só e-mail e senha
       - key: BREVO_API_KEY
-        sync: false # opcional: chave do Brevo para mandar o código de 6 números por e-mail (docs/HOSPEDAGEM.md, passo 6); vazio = cadastro sem código
+        sync: false # opcional: chave do Brevo para mandar o código de 6 números por e-mail (docs/HOSPEDAGEM.md, passo 7); vazio = cadastro sem código
       - key: EMAIL_FROM
-        sync: false # opcional: o e-mail remetente verificado no Brevo (o mesmo do passo 6)
+        sync: false # opcional: o e-mail remetente verificado no Brevo (o mesmo do passo 7)
       - key: CARTO_KEY
         sync: false # opcional: chave gratuita do mapa CARTO (carto.com/basemaps/apikey); vazio = OpenStreetMap

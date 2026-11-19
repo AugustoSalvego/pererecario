@@ -68,6 +68,13 @@
         <button class="alt" id="tmgo">Mandar e-mail de teste</button>
         <span id="tmmsg" class="muted"></span>
       </div>
+      <p class="muted" style="margin-top:6px">Conta de demonstração (organização): crie a conta no jogo normalmente e marque aqui pelo e-mail. Ela continua sendo só sua (com a sua senha), mas não aparece no ranking dos outros jogadores e não conta como jogador externo nos números acima.</p>
+      <div class="row" style="margin-bottom:12px">
+        <input id="stuser" placeholder="e-mail da conta" autocomplete="off" style="min-width:200px">
+        <button class="alt" id="ston">Marcar como organização</button>
+        <button class="alt" id="stoff">Desmarcar</button>
+        <span id="stmsg" class="muted"></span>
+      </div>
       <p class="muted" style="margin-top:6px">Jogador esqueceu a senha e o "Esqueci a senha" do jogo não resolveu? Defina uma nova (o progresso dele continua todo lá) e passe para ele.</p>
       <div class="row">
         <input id="rpuser" placeholder="e-mail (ou usuário antigo)" autocomplete="off" style="min-width:200px">
@@ -105,7 +112,7 @@ $('#key').value = key;
 async function call(method, path, body) {
   const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: body ? JSON.stringify(body) : undefined });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || r.status);
+  if (!r.ok) { const e = new Error(d.error || r.status); e.status = r.status; throw e; }
   return d;
 }
 $('#bkdown').addEventListener('click', async () => {
@@ -130,6 +137,17 @@ $('#tmgo').addEventListener('click', async () => {
     $('#tmmsg').textContent = `Enviado (remetente: ${d.from}). Confira a caixa de entrada e o spam.`;
   } catch (e) { $('#tmmsg').textContent = `Erro: ${e.message}`; }
 });
+async function setStaff(staff) {
+  const user = $('#stuser').value.trim();
+  if (!user) { $('#stmsg').textContent = 'Informe o e-mail da conta.'; return; }
+  try {
+    const d = await call('POST', '/api/admin/staff', { user, staff });
+    $('#stmsg').textContent = d.staff ? `Pronto: ${d.displayName} agora é conta da organização.` : `Pronto: ${d.displayName} voltou a ser jogador comum.`;
+    load();
+  } catch (e) { $('#stmsg').textContent = `Erro: ${e.message}`; }
+}
+$('#ston').addEventListener('click', () => setStaff(true));
+$('#stoff').addEventListener('click', () => setStaff(false));
 $('#rpgo').addEventListener('click', async () => {
   const user = $('#rpuser').value.trim(), password = $('#rppass').value;
   if (!user || password.length < 8) { $('#rpmsg').textContent = 'Informe o e-mail e uma senha com pelo menos 8 caracteres.'; return; }
@@ -150,10 +168,10 @@ async function load() {
     $('#msg').textContent = `Banco: ${d.db} · ${mail} · atualizado ${t(d.serverTime)}`;
     $('#content').hidden = false;
     const c = d.counts;
-    $('#cards').innerHTML = [['Jogando agora', d.online ?? 0], ['Jogadores', c.players], ['Ativos nas últimas 24 h', c.activeToday], ['Capturas', c.captures], ['Operações recebidas', c.operations], ['Reenvios ignorados', c.resends], ['Conflitos resolvidos', c.conflicts], ['Operações rejeitadas', c.rejected]]
+    $('#cards').innerHTML = [['Jogando agora', d.online ?? 0], ['Jogadores externos', c.external ?? c.players], ['Externos ativos nas últimas 24 h', c.activeExternal ?? c.activeToday], ['Contas da organização', c.staff ?? 0], ['Capturas', c.captures], ['Operações recebidas', c.operations], ['Reenvios ignorados', c.resends], ['Conflitos resolvidos', c.conflicts], ['Operações rejeitadas', c.rejected]]
       .map(([k, v]) => `<div class="card"><b>${v}</b><span>${k}</span></div>`).join('');
     $('#outage').textContent = d.outageUntil > d.serverTime ? `Servidor "fora do ar" por mais ${Math.round((d.outageUntil - d.serverTime) / 1000)} s` : 'Servidor no ar';
-    table($('#players'), [['#', (r) => r.i], ['Apelido', (r) => esc(r.display_name)], ['E-mail', (r) => esc(r.email || `@${r.username}`) + (r.google ? ' <span class="tag applied">Google</span>' : '')], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
+    table($('#players'), [['#', (r) => r.i], ['Apelido', (r) => esc(r.display_name) + (r.staff ? ' <span class="tag duplicate">organização</span>' : '')], ['E-mail', (r) => esc(r.email || `@${r.username}`) + (r.google ? ' <span class="tag applied">Google</span>' : '')], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
       [...d.players].sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, i: i + 1 })));
     table($('#captures'), [['Jogador', (r) => esc(r.username)], ['Espécie', (r) => esc(r.species_id.replace('frog_', ''))], ['Tipo', (r) => r.kind], ['Modo', (r) => (r.mode === 'controle' ? '🎮 controle' : r.mode === 'presente' ? '🎁 presente' : '📍 GPS')], ['Aparelho', (r) => esc(r.device_id)], ['Capturada', (r) => t(r.caught_at)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.caught_at)}</span>`]], d.captures);
     table($('#ops'), [['Recebida', (r) => t(r.received_at)], ['Jogador', (r) => esc(r.username)], ['Tipo', (r) => r.type], ['Resultado', (r) => `<span class="tag ${r.status}">${r.status}</span>`], ['Aparelho', (r) => esc(r.device_id)], ['op_id', (r) => r.op_id.slice(0, 8)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.client_ts)}</span>`]], d.operations);
@@ -164,6 +182,7 @@ async function load() {
     table($('#brejos'), [['Nome', (r) => esc(r.name) + (r.over ? ` <span class="tag rejected">sobreposto a "${esc(r.over)}": oculto no jogo</span>` : '')], ['Posição', (r) => `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`], ['Raio', (r) => `${r.radius} m`], ['', (r) => `<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target="_blank">ver no mapa</a> · <a href="#" data-del="${r.id}">remover</a>`]], d.brejos);
   } catch (e) {
     $('#msg').textContent = `Erro: ${e.message}`;
+    if (e.status === 403 || e.status === 429) $('#content').hidden = true;   // chave errada: para de tentar sozinho
   }
 }
 $('#go').onclick = () => { key = $('#key').value.trim(); localStorage.setItem('adminKey', key); load(); };
