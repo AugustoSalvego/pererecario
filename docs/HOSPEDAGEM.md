@@ -95,8 +95,8 @@ O botão "Continuar com Google" só aparece depois deste passo; até lá o jogo 
    - `https://pererecario-xxxx.onrender.com` (o endereço exato do jogo, sem barra no fim);
    - `http://localhost:8080` (para testar no computador).
    Não precisa de "URIs de redirecionamento". Clique em **Criar** e copie o **ID do cliente** (termina em `.apps.googleusercontent.com`). Ele não é segredo: aparece na página do jogo. A "chave secreta do cliente" não é usada.
-4. Em **Público** (ou na própria Tela de permissão), clique em **Publicar app** e confirme. O jogo só pede nome, e-mail e foto do perfil, e para isso o Google não exige verificação. Sem publicar, qualquer pessoa ainda consegue entrar, mas o Google mostra um aviso de "app em teste".
-5. No Render, abra o serviço → **Environment** → **Add Environment Variable**: `GOOGLE_CLIENT_ID` = o ID copiado → **Save**. O servidor reinicia sozinho.
+4. Em **Público** (ou na própria Tela de permissão), clique em **Publicar app** e confirme. O jogo só pede nome, e-mail e foto do perfil, e para isso o Google não exige verificação. **Não pule este item:** enquanto o app está "em teste", só as contas cadastradas como usuários de teste conseguem entrar com o Google.
+5. No Render, abra o serviço → **Environment**. A linha `GOOGLE_CLIENT_ID` já existe, vazia (criada pelo Blueprint): clique em **Edit**, cole o ID e salve (**Save and deploy**). O servidor reinicia sozinho.
 6. Abra o jogo: o botão "Continuar com Google" aparece em cima de "ou com e-mail". Entre com uma conta Google de teste.
 
 Se um dia o endereço do jogo mudar (outro nome no Render ou um domínio próprio), adicione o endereço novo nas **Origens JavaScript autorizadas**; senão o botão do Google mostra um erro.
