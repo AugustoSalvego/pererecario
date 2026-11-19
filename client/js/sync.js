@@ -5,6 +5,7 @@ import { store } from './store.js';
 
 const BATCH = 50;
 const IDLE_MS = 25000;      // "batimento" quando está tudo em dia (também traz novidades de outros aparelhos)
+const TRADE_MS = 6000;      // com troca em andamento, confere mais vezes (a resposta do amigo chega logo)
 const OFFLINE_MS = 4000;    // checagem enquanto não há rede
 const MAX_BACKOFF = 30000;
 
@@ -61,7 +62,7 @@ class Sync extends EventTarget {
     try {
       await this.flush();
       this.backoff = 0;
-      this.schedule(store.outbox.length ? 1500 : IDLE_MS);
+      this.schedule(store.outbox.length ? 1500 : store.view?.activeTrades?.length ? TRADE_MS : IDLE_MS);
     } catch (e) {
       if (e.kind === 'offline') {
         this.setStatus('offline');

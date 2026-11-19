@@ -133,6 +133,27 @@ export const SCHEMA = [
     created_at BIGINT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes (email, purpose)`,
+  // Trocas entre amigos: quem convida (from) e o amigo (to) escolhem cada um a perereca que vai dar;
+  // from_pick é a de quem convidou, to_pick a do amigo. Quando as duas estão escolhidas, troca.
+  // status: invited (esperando o amigo aceitar) · open (os dois escolhendo) · done · declined · cancelled · failed
+  `CREATE TABLE IF NOT EXISTS trades (
+    id TEXT PRIMARY KEY,
+    from_id TEXT NOT NULL,
+    to_id TEXT NOT NULL,
+    from_pick TEXT,
+    from_species TEXT,
+    from_size DOUBLE PRECISION,
+    to_pick TEXT,
+    to_species TEXT,
+    to_size DOUBLE PRECISION,
+    status TEXT NOT NULL,
+    reason TEXT,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    received_at BIGINT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_trades_from ON trades (from_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_trades_to ON trades (to_id)`,
   `CREATE INDEX IF NOT EXISTS idx_captures_player ON captures (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expeditions_player ON expeditions (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_operations_received ON operations (received_at)`,
@@ -255,6 +276,8 @@ const MIGRATIONS = [
   // aceite dos Termos de Uso e da Política de Privacidade (qual versão e quando)
   'ALTER TABLE players ADD COLUMN terms_version TEXT',
   'ALTER TABLE players ADD COLUMN terms_at BIGINT',
+  // perereca que saiu numa troca: continua contando XP para quem pegou, mas sai da bolsa
+  'ALTER TABLE captures ADD COLUMN traded_at BIGINT',
 ];
 
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {

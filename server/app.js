@@ -144,6 +144,7 @@ export async function createApp({
       id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar, look: p.look, friendCode: p.friend_code,
       createdAt: p.created_at, email: p.email || null, google: !!p.google_sub, hasPassword: hasPassword(p),
       termsAccepted: p.terms_version === TERMS_VERSION,
+      staff: !!Number(p.staff),   // conta da organização: vê o painel de demonstração
     };
   }
 
@@ -520,6 +521,22 @@ export async function createApp({
       return { top: boards.xp.top.slice(0, 20), me: boards.xp.me, players: rows.filter((r) => !r.staff).length, boards };
     },
 
+    // Perfil de um parceiro de brejo (só de quem já é amigo): nível, XP, Brejais ganhos, espécies, capturas
+    'GET /api/friends/profile': async (req, body, url) => {
+      const playerId = auth(req);
+      const id = String(url.searchParams.get('id') || '');
+      const f = await db.one(
+        `SELECT p.id, p.display_name, p.avatar, p.look, f.created_at FROM friendships f JOIN players p ON p.id = f.friend_id
+         WHERE f.player_id=$1 AND f.friend_id=$2`, [playerId, id],
+      );
+      if (!f) throw new HttpError(404, 'Esse jogador não é seu parceiro de brejo');
+      const r = (await sync.ranking()).find((x) => x.id === id) || {};
+      return {
+        id: f.id, displayName: f.display_name, avatar: f.avatar, look: f.look || null, since: Number(f.created_at),
+        level: r.level || 1, xp: r.xp || 0, gold: r.gold || 0, species: r.collected || 0, captures: r.captures || 0,
+      };
+    },
+
     'GET /api/players/code': async (req, body, url) => {
       auth(req);
       const code = String(url.searchParams.get('code') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -658,6 +675,7 @@ export async function createApp({
           await q.run(`DELETE FROM ${t} WHERE player_id=$1`, [p.id]);
         }
         await q.run('DELETE FROM friendships WHERE player_id=$1 OR friend_id=$1', [p.id]);
+        await q.run('DELETE FROM trades WHERE from_id=$1 OR to_id=$1', [p.id]);
         if (p.email) await q.run('DELETE FROM email_codes WHERE email=$1', [p.email]);
         await q.run('DELETE FROM players WHERE id=$1', [p.id]);
       });

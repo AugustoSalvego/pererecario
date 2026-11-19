@@ -3,7 +3,7 @@ import { GameMap, tilesAround, tileProvider } from './map.js';
 import { openCapture } from './capture.js';
 import { mountAlbum, renderAlbum, openSpecies } from './album.js';
 import { mountPond, renderPond } from './pond.js';
-import { mountFriends, renderFriends } from './friends.js';
+import { mountFriends, renderFriends, showTradeDone } from './friends.js';
 import { mountProfile, renderProfile, loadRanking, renderSyncCard } from './profile.js';
 import { openDemo } from './demo.js';
 import { openTutorial } from './tutorial.js';
@@ -86,7 +86,7 @@ export function startGame({ firstTime = false } = {}) {
       <button data-nav="album">${img('icon-book.png', 30, 'px-icon')}<span>Pererecário</span></button>
       <button data-nav="pond">${img('pond-small.png', 38, 'px-icon')}<span>Meu Brejo</span><b class="badge hidden"></b></button>
       <button data-nav="map" class="nav-map on"><span class="orb">${icons.map}</span><span>Mapa</span></button>
-      <button data-nav="friends">${img('icon-heart.png', 27, 'px-icon')}<span>Amigos</span></button>
+      <button data-nav="friends">${img('icon-heart.png', 27, 'px-icon')}<span>Amigos</span><b class="badge trade-badge hidden"></b></button>
       <button data-nav="profile"><span class="nav-head"></span><span>Perfil</span></button>
     </nav>`;
 
@@ -96,6 +96,8 @@ export function startGame({ firstTime = false } = {}) {
     openDemo: () => openDemo(ctx),
     openTutorial: () => openTutorial({ first: false, onDone: () => { refreshObjects(); renderAll(); } }),
     showMap: (follow) => { openScreen('map'); if (follow) recenter(); },
+    showPond: () => openScreen('pond'),
+    tradeDone: (t) => showTradeDone(t),
   };
 
   map = new GameMap($('.map-host', root), {
@@ -172,6 +174,7 @@ export function startGame({ firstTime = false } = {}) {
     if (op.type === 'frog.sell') return toast(`Venda desfeita: ${esc(result.error)}. A perereca voltou para o brejo.`, 'warn', 'cloudOff', 6000);
     toast(`O servidor recusou uma operação: ${esc(result.error)}`, 'warn', 'cloudOff', 5000);
   });
+  store.addEventListener('trades', (e) => tradeNotices(e.detail));
   store.addEventListener('resend', (e) => {
     toast(`O servidor estava sem ${e.detail.count} ${e.detail.count === 1 ? 'ação sua' : 'ações suas'}: este celular está mandando de novo.`, 'warn', 'sync', 5000);
   });
@@ -254,7 +257,10 @@ function renderHud() {
   $('.player-chip .name').textContent = v.player.displayName;
   $('.player-chip .name').classList.toggle('long', v.player.displayName.length > 10);
   $('.player-chip .xpbar i').style.width = `${(v.level.into / v.level.need) * 100}%`;
-  const badge = $('.navbar .badge');
+  const tb = $('.navbar .trade-badge');
+  tb.textContent = v.tradeActions;
+  tb.classList.toggle('hidden', !v.tradeActions);
+  const badge = $('.navbar [data-nav=pond] .badge');
   const newOnes = v.captures.filter((c) => c.pending).length;
   badge.textContent = newOnes;
   badge.classList.toggle('hidden', !newOnes);
@@ -721,9 +727,23 @@ function statusSheet() {
     <h3>${{ online: n ? '🟢 Online' : '🟢 Online · tudo salvo', syncing: '🔵 Sincronizando', offline: '🔴 Offline', 'server-down': '🟠 Servidor fora do ar', starting: '…' }[sync.status]}</h3>
     <p class="lead">${text}</p>
     <div class="kv"><div><span>Guardadas no celular, esperando para subir</span><b>${n} ${n === 1 ? 'ação' : 'ações'}</b></div><div><span>Última vez que salvou no servidor</span><b>${sync.lastSyncAt ? ago(sync.lastSyncAt) : '-'}</b></div></div>
-    <div class="row-btns"><button class="btn ghost" data-act="demo">Painel de testes</button><button class="btn" data-act="sync">Sincronizar</button></div>`);
+    <div class="row-btns">${store.view.player?.staff ? '<button class="btn ghost" data-act="demo">Painel de testes</button>' : ''}<button class="btn${store.view.player?.staff ? '' : ' block'}" data-act="sync">Sincronizar</button></div>`);
   $('[data-act=sync]', sheet).addEventListener('click', () => { sync.kick(0); closeSheet(); });
-  $('[data-act=demo]', sheet).addEventListener('click', () => { closeSheet(true); openDemo(ctx); });
+  $('[data-act=demo]', sheet)?.addEventListener('click', () => { closeSheet(true); openDemo(ctx); });
+}
+
+// avisos das trocas (o que o amigo fez); a troca feita abre a comemoração
+function tradeNotices(changes) {
+  for (const { kind, trade: t } of changes) {
+    const who = esc(t.friendName || 'Seu amigo');
+    if (kind === 'invited') { sfx.pop(); toast(`🔁 ${who} quer trocar uma perereca com você! Veja em Amigos.`, 'ok', null, 5000); }
+    else if (kind === 'open' && t.dir === 'out') { sfx.pop(); toast(`${who} aceitou a troca! Agora escolha a sua perereca.`, 'ok', null, 4500); }
+    else if (kind === 'picked') toast(`${who} escolheu a perereca que vai dar.`, '', null, 3500);
+    else if (kind === 'declined' && t.dir === 'out') toast(`${who} recusou a troca.`, 'warn', null, 4000);
+    else if (kind === 'cancelled' && !t.cancelledByMe) toast(`${who} cancelou a troca.`, 'warn', null, 4000);
+    else if (kind === 'failed') toast(`A troca com ${who} foi desfeita: ${esc(t.reason || 'uma das pererecas saiu do brejo')}.`, 'warn', null, 6000);
+    else if (kind === 'done') ctx.tradeDone?.(t);
+  }
 }
 
 let termsOpen = false;

@@ -43,6 +43,11 @@ export const BALANCO = {
   venda: { common: 6, uncommon: 14, rare: 35, special: 90 },   // B$ por raridade
   bonusTamanho: 0.5,         // a maior perereca da espécie vale até +50%; a menor vale o preço base
 
+  // --- amigos e trocas ---
+  porAmigo: 25,              // B$ que cada um ganha a cada novo parceiro de brejo (escaneando o QR)
+  amigosQuePagam: 20,        // só os 20 primeiros parceiros pagam (para ninguém criar contas só pelo dinheiro)
+  trocaValeHoras: 72,        // um convite de troca que ninguém terminou vence depois disso
+
   // --- distâncias do jogador ---
   capturaAteM: 10,           // pode tocar na perereca para capturar a até 10 m
   folgaDoGpsM: 10,           // folga extra quando o GPS do celular diz que está impreciso
@@ -347,12 +352,19 @@ export const CARS = [
 ];
 export const carById = (id) => CARS.find((c) => c.id === id) || null;
 
+// Brejais por parceiros de brejo: cada novo amigo paga BALANCO.porAmigo (até BALANCO.amigosQuePagam amigos)
+export const friendBonus = (friends) => Math.min(Math.max(0, Number(friends) || 0), BALANCO.amigosQuePagam) * BALANCO.porAmigo;
+
 // Saldo em Brejais: tudo o que os trabalhos pagaram menos tudo o que foi comprado.
-// saldo = trabalhos + vendas de pererecas − compras (calculado, nunca guardado: reenviar não muda nada)
-export const balanceOf = (jobs, purchases, sales = []) =>
+// saldo = trabalhos + vendas de pererecas + bônus de amigos − compras
+// (calculado, nunca guardado: reenviar não muda nada)
+export const balanceOf = (jobs, purchases, sales = [], friends = 0) =>
   jobs.reduce((s, j) => s + (Number(j.pay) || 0), 0)
   + sales.reduce((s, v) => s + (Number(v.price) || 0), 0)
+  + friendBonus(friends)
   - purchases.reduce((s, b) => s + (Number(b.price) || 0), 0);
+
+export const TRADE_TTL_MS = BALANCO.trocaValeHoras * 3600 * 1000;
 
 // preço de venda de uma perereca: base da raridade + bônus pelo tamanho (dentro da faixa da espécie)
 export function frogPrice(catalog, speciesId, sizeCm) {
@@ -466,12 +478,17 @@ export function giftFor(playerId, friendId, day, mask, catalog) {
 // ---------- progressão ----------
 // XP nunca é armazenado: é sempre recalculado a partir das capturas,
 // então não existe contador para entrar em conflito entre aparelhos.
+// XP vem só do que o próprio jogador pegou: perereca recebida numa troca (kind 'trade') não dá XP
+// nem bônus de espécie nova, mas entra na coleção (collected). Quem deu continua com o XP que ganhou.
 export function xpBreakdown(captures, catalog) {
   const sorted = [...captures].sort((a, b) => a.caughtAt - b.caughtAt || (a.id < b.id ? -1 : 1));
   const seen = new Set();
+  const collected = new Set();
   const perCapture = new Map();
   let total = 0;
   for (const c of sorted) {
+    collected.add(c.speciesId);
+    if (c.kind === 'trade') { perCapture.set(c.id, { xp: 0, isNew: false }); continue; }
     const tier = tierOf(catalog, c.speciesId);
     let xp = catalog.tiers[tier]?.xp ?? 0;
     const isNew = !seen.has(c.speciesId);
@@ -479,7 +496,7 @@ export function xpBreakdown(captures, catalog) {
     perCapture.set(c.id, { xp, isNew });
     total += xp;
   }
-  return { total, perCapture, species: seen };
+  return { total, perCapture, species: seen, collected };
 }
 
 // alcance efetivo de captura: 10 m + folga quando o GPS do aparelho está impreciso

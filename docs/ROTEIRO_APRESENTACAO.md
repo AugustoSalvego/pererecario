@@ -7,6 +7,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 - **Dois celulares** (A e B) com o jogo aberto no link do servidor, logados **na mesma conta** de demonstração (crie uma com e-mail e senha, ou entre nos dois com a mesma conta Google). Crie a conta **antes** da apresentação: com o código por e-mail ligado, o cadastro pede o código de 6 números que chega no e-mail.
 - **Notebook no projetor** com o painel do servidor aberto: `https://SEU-APP.onrender.com/admin` (com a `ADMIN_KEY`). Ele mostra capturas, log de operações, conflitos e atualiza a cada 3 s.
 - As lagoinhas aparecem sozinhas em qualquer lugar: o público só precisa abrir o link e criar uma conta (apelido, e-mail e senha, ou "Continuar com Google").
+- **Conta da organização**: o Painel de demonstração só aparece em contas marcadas como **organização** no `/admin` (jogadores comuns não veem). Marque a conta de demonstração antes.
 - **Um brejo na sala**: no celular, Perfil → Painel de demonstração → chave de admin → nome "Brejo da Sala" → raio 40 → **Criar brejo onde estou**. (Faça isso antes, no lugar da apresentação.)
 - Se o GPS dentro do prédio estiver ruim, toque no botão **GPS** do mapa para mudar para o **modo controle** e ande com o joystick (ou com as setas do teclado no notebook). Lembre que no modo controle aparecem menos raras.
 - **Mesma conta nos dois celulares = mesmas lagoinhas e pererecas.** Cada conta tem as suas; por isso o teste de conflito usa a mesma conta em A e B.

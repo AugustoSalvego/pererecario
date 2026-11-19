@@ -6,7 +6,7 @@
 
 export const TABLES = [
   'players', 'brejos', 'captures', 'expeditions', 'expedition_distance', 'friendships',
-  'operations', 'conflicts', 'settings', 'jobs', 'purchases', 'sales',
+  'operations', 'conflicts', 'settings', 'jobs', 'purchases', 'sales', 'trades',
 ];
 
 export async function exportAll(db, { now = Date.now(), version = '' } = {}) {

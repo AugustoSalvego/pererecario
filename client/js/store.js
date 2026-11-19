@@ -9,6 +9,8 @@ import { api } from './api.js';
 import { getCatalog } from './catalog.js';
 import { xpBreakdown, levelFor, windowOf, dayOf, dayExpeditionId, balanceOf, carById, frogPrice } from './shared/game.js';
 
+const ACTIVE_TRADE = new Set(['invited', 'open', 'finishing']);
+
 export const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
   : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
 
@@ -153,6 +155,7 @@ class Store extends EventTarget {
 
   // Resposta do servidor: remove da fila o que foi confirmado e adota o estado canônico.
   async applySync(resp, sentOps, sentAt, recvAt) {
+    const tradesBefore = new Map((this.snapshot?.trades || []).map((t) => [t.id, t]));
     const acked = [];
     const events = [];
     for (const r of resp.results || []) {
@@ -186,6 +189,7 @@ class Store extends EventTarget {
     this.outbox = this.outbox.filter((o) => !ackedSet.has(o.seq));
     this.recompute();
     if (resp.brejos) this.emit('brejos', this.brejos);
+    this.tradeChanges(tradesBefore, resp.state?.trades || []);
     await this.checkServerMemory(pid, resp.seen);
     return events;
   }
@@ -234,6 +238,7 @@ class Store extends EventTarget {
     const jobs = new Map((s.jobs || []).map((j) => [j.jobId, { ...j, pending: false }]));
     const purchases = new Map((s.purchases || []).map((b) => [b.item, { ...b, pending: false }]));
     const sales = new Map((s.sales || []).map((v) => [v.captureId, { ...v, pending: false }]));
+    const trades = new Map((s.trades || []).map((t) => [t.id, { ...t, pending: false }]));
     const player = s.player ? { ...s.player } : this.session?.player ? { ...this.session.player } : null;
     const me = this.deviceId;
     const ensureExp = (id, at) => {
@@ -277,6 +282,33 @@ class Store extends EventTarget {
         case 'friend.add':
           if (!friends.has(p.friendId)) friends.set(p.friendId, { id: p.friendId, displayName: p.displayName, avatar: p.avatar, since: p.at, pending: true });
           break;
+        // trocas: o celular mostra na hora o que fez; o servidor confirma (ou não) quando a fila chegar
+        case 'trade.offer':
+          if (!trades.has(p.tradeId)) {
+            trades.set(p.tradeId, { id: p.tradeId, dir: 'out', friendId: p.friendId, friendName: p.friendName || '', friendLook: p.friendLook || null,
+              status: 'invited', mine: null, theirs: null, createdAt: p.at, updatedAt: p.at, pending: true });
+          }
+          break;
+        case 'trade.respond': {
+          const t = trades.get(p.tradeId);
+          if (t && t.status === 'invited') { t.status = p.accept ? 'open' : 'declined'; t.pending = true; }
+          break;
+        }
+        case 'trade.pick': {
+          const t = trades.get(p.tradeId);
+          const cap = [...captures.values()].find((c) => c.id === p.captureId);
+          if (t && cap && (t.status === 'invited' || t.status === 'open')) {
+            t.mine = { captureId: cap.id, speciesId: cap.speciesId, sizeCm: cap.sizeCm };
+            t.pending = true;
+            if (t.status === 'open' && t.theirs) t.status = 'finishing';   // as duas escolhidas: o servidor troca
+          }
+          break;
+        }
+        case 'trade.cancel': {
+          const t = trades.get(p.tradeId);
+          if (t && (t.status === 'invited' || t.status === 'open')) { t.status = 'cancelled'; t.cancelledByMe = true; t.pending = true; }
+          break;
+        }
         case 'profile.look':
           if (player && p.ts > (player.lookTs || 0)) { player.look = p.look; player.lookTs = p.ts; }
           break;
@@ -289,7 +321,7 @@ class Store extends EventTarget {
         case 'shop.buy': {
           // compra otimista: só entra se o saldo local cobrir (o servidor confere de novo)
           const car = carById(p.item);
-          const bal = balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()]);
+          const bal = balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()], friends.size);
           if (car && !purchases.has(car.id) && bal >= car.price) purchases.set(car.id, { id: p.buyId, item: car.id, price: car.price, boughtAt: p.boughtAt, deviceId: me, pending: true });
           break;
         }
@@ -314,6 +346,8 @@ class Store extends EventTarget {
     }
 
     const capList = [...captures.values()].sort((a, b) => b.caughtAt - a.caughtAt);
+    const order = { invited: 0, open: 0, finishing: 0 };
+    const tradeList = [...trades.values()].sort((a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1) || b.updatedAt - a.updatedAt);
     const xp = catalog ? xpBreakdown(capList, catalog) : { total: 0, perCapture: new Map(), species: new Set() };
     const bySpecies = new Map();
     for (const c of [...capList].reverse()) {
@@ -339,7 +373,7 @@ class Store extends EventTarget {
       xp: xp.total,
       perCapture: xp.perCapture,
       level: levelFor(xp.total),
-      discovered: xp.species,
+      discovered: xp.collected,   // a coleção inclui as pererecas recebidas em trocas
       bySpecies,
       expeditions: expList,
       friends: [...friends.values()],
@@ -349,10 +383,17 @@ class Store extends EventTarget {
       jobsDone: new Set(jobs.keys()),
       purchases: [...purchases.values()],
       cars: new Set(purchases.keys()),
-      balance: balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()]),
+      balance: balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()], friends.size),
       sales: [...sales.values()].sort((a, b) => b.soldAt - a.soldAt),
       sold: new Set(sales.keys()),
-      bag: capList.filter((c) => !sales.has(c.id)),   // o Meu Brejo: o que não foi vendido
+      // o Meu Brejo: o que não foi vendido nem foi para um amigo numa troca
+      bag: capList.filter((c) => !sales.has(c.id) && !c.tradedAt),
+      trades: tradeList,
+      activeTrades: tradeList.filter((t) => ACTIVE_TRADE.has(t.status)),
+      // trocas esperando algo DESTE jogador: aceitar um convite, ou escolher a perereca
+      tradeActions: tradeList.filter((t) => (t.dir === 'in' && t.status === 'invited') || (t.status === 'open' && !t.mine)).length,
+      // pererecas escolhidas em trocas abertas: ficam reservadas (não vendem, não entram em outra troca)
+      reserved: new Set(tradeList.filter((t) => ACTIVE_TRADE.has(t.status) && t.mine).map((t) => t.mine.captureId)),
       vehicle: player?.vehicle && purchases.has(player.vehicle) ? player.vehicle : null,
     };
     this.emit('change', this.view);
@@ -452,6 +493,28 @@ class Store extends EventTarget {
   async setAvatar(speciesId) {
     await this.addOp('profile.avatar', { speciesId, ts: this.now() });
   }
+
+  // o que mudou nas trocas desde a última resposta do servidor (para avisar o jogador)
+  tradeChanges(before, after) {
+    const out = [];
+    for (const t of after) {
+      const b = before.get(t.id);
+      if (!b) { if (t.dir === 'in' && t.status === 'invited') out.push({ kind: 'invited', trade: t }); continue; }
+      if (b.status !== t.status) out.push({ kind: t.status, trade: t, before: b });
+      else if (t.theirs && t.theirs.captureId !== b.theirs?.captureId) out.push({ kind: 'picked', trade: t });
+    }
+    if (out.length) this.emit('trades', out);
+  }
+
+  // ----- trocas -----
+  async offerTrade(friend) {
+    const tradeId = uuid();
+    await this.addOp('trade.offer', { tradeId, friendId: friend.id, at: this.now(), friendName: friend.displayName, friendLook: friend.look || null });
+    return tradeId;
+  }
+  async respondTrade(t, accept) { await this.addOp('trade.respond', { tradeId: t.id, accept: !!accept }); }
+  async pickTrade(t, cap) { await this.addOp('trade.pick', { tradeId: t.id, captureId: cap.id }); }
+  async cancelTrade(t) { await this.addOp('trade.cancel', { tradeId: t.id }); }
 
   async addFriend(friend) {
     if (this.view.friends.some((f) => f.id === friend.id)) return false;

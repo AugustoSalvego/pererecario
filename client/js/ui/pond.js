@@ -1,11 +1,13 @@
 // Meu Brejo: a "bolsa" com as pererecas capturadas (inclusive repetidas), que podem ser vendidas
 // por Brejais (B$). O preço vem de frogPrice (raridade + tamanho), igual no celular e no servidor.
 // Favoritas ficam guardadas: não dá para vender sem tirar dos favoritos.
+// Pererecas escolhidas numa troca em andamento ficam "em troca": não dá para vender nem favoritar.
 import { findBrejo, frogPrice } from '../shared/game.js';
 import { frogImg, species, rarityBadge, getCatalog } from '../catalog.js';
 import { store } from '../store.js';
 import { icons } from './icons.js';
 import { coinBurst } from './jobs.js';
+import { openTrade } from './friends.js';
 import { $, $$, esc, toast, openSheet, closeSheet, fmtDate, fmtDateTime, fmtCm } from './common.js';
 import { sfx, vibrate } from '../audio.js';
 
@@ -38,6 +40,7 @@ export function mountPond(el) {
     if (fav) {
       e.stopPropagation();
       const c = store.view.bag.find((x) => x.spawnId === fav.dataset.fav);
+      if (c && store.view.reserved.has(c.id)) { sfx.error(); toast('Essa perereca está numa troca. Cancele a troca para guardar ela.', 'warn', null, 3000); return; }
       if (c) { sfx.tap(); await store.toggleFavorite(c); }
       return;
     }
@@ -52,8 +55,8 @@ export function mountPond(el) {
 const tierRank = { special: 0, rare: 1, uncommon: 2, common: 3 };
 
 // repetidas: de cada espécie fica uma (a favorita, senão a maior); o resto pode ser vendido.
-// Favoritas nunca entram na lista.
-export function duplicatesOf(bag) {
+// Favoritas e as que estão numa troca nunca entram na lista.
+export function duplicatesOf(bag, reserved = store.view?.reserved || new Set()) {
   const bySp = new Map();
   for (const c of bag) {
     if (!bySp.has(c.speciesId)) bySp.set(c.speciesId, []);
@@ -63,7 +66,7 @@ export function duplicatesOf(bag) {
   for (const list of bySp.values()) {
     if (list.length < 2) continue;
     const keep = list.find((c) => c.favorite) || [...list].sort((a, b) => b.sizeCm - a.sizeCm || b.caughtAt - a.caughtAt)[0];
-    for (const c of list) if (c !== keep && !c.favorite) out.push(c);
+    for (const c of list) if (c !== keep && !c.favorite && !reserved.has(c.id)) out.push(c);
   }
   return out;
 }
@@ -76,7 +79,7 @@ export function renderPond(el) {
   if (sort === 'size') list.sort((a, b) => b.sizeCm - a.sizeCm);
   if (sort === 'fav') list = list.filter((c) => c.favorite);
   const pending = bag.filter((c) => c.pending).length;
-  const worth = bag.filter((c) => !c.favorite).reduce((s, c) => s + priceOf(c), 0);
+  const worth = bag.filter((c) => !c.favorite && !v.reserved.has(c.id)).reduce((s, c) => s + priceOf(c), 0);
   $('.sub', el).textContent = `${bag.length} perereca${bag.length === 1 ? '' : 's'} na bolsa${pending ? ` · ${pending} aguardando sincronizar` : ''}`;
   const bv = $('.bag-value', el);
   bv.classList.toggle('hidden', !bag.length);
@@ -102,10 +105,11 @@ export function renderPond(el) {
   const cat = getCatalog();
   grid.innerHTML = list.map((c) => {
     const s = species(c.speciesId);
-    return `<div class="card spec-card ${c.pending ? 'pending' : ''}" data-spawn="${esc(c.spawnId)}" data-cap="${esc(c.id)}" style="--tier:${cat.tiers[s.tier].color}">
+    const inTrade = v.reserved.has(c.id);
+    return `<div class="card spec-card ${c.pending ? 'pending' : ''} ${inTrade ? 'in-trade' : ''}" data-spawn="${esc(c.spawnId)}" data-cap="${esc(c.id)}" style="--tier:${cat.tiers[s.tier].color}">
       ${c.pending ? `<span class="sync-tag">${icons.cloud}pendente</span>` : ''}
-      ${c.kind === 'gift' ? '<span class="gift-tag">🎁</span>' : ''}
-      <span class="price-tag ${c.favorite ? 'kept' : ''}">${c.favorite ? '★ guardada' : coin(priceOf(c))}</span>
+      ${c.kind === 'gift' ? '<span class="gift-tag">🎁</span>' : c.kind === 'trade' ? '<span class="gift-tag" title="Veio de uma troca">🔁</span>' : ''}
+      <span class="price-tag ${c.favorite || inTrade ? 'kept' : ''}">${inTrade ? '🔁 em troca' : c.favorite ? '★ guardada' : coin(priceOf(c))}</span>
       <div class="stage">${frogImg(c.speciesId, 70)}</div>
       <div class="row"><div><div class="nm">${esc(s.name)}</div><div class="meta">${fmtCm(c.sizeCm)} · ${fmtDate(c.caughtAt)}</div></div>
       <button class="fav-btn ${c.favorite ? 'on' : ''}" data-fav="${esc(c.spawnId)}" aria-label="Favoritar">${icons.star}</button></div>
@@ -143,25 +147,34 @@ function openSpecimen(spawnId, el) {
   const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
   const friend = store.view.friends.find((f) => f.id === c.friendId);
   const price = priceOf(c);
+  const trade = store.view.activeTrades.find((t) => t.mine?.captureId === c.id);
+  const cameFrom = c.kind === 'trade' ? store.view.trades.find((t) => c.spawnId === `trade:${t.id}`) : null;
+  const origin = c.kind === 'gift' ? `🎁 Presente de ${esc(friend?.displayName || 'um amigo')}`
+    : c.kind === 'trade' ? `🔁 Troca com ${esc(friend?.displayName || cameFrom?.friendName || 'um amigo')}`
+    : `📍 ${esc(brejo?.name || 'Lagoinha')}`;
   const sheet = openSheet(`
     <div class="stage-lg" style="--tier:${cat.tiers[s.tier].color}">${frogImg(c.speciesId, 150)}</div>
     <h3>${esc(s.name)}</h3>${rarityBadge(c.speciesId)}
     <div class="kv">
       <div><span>Tamanho</span><b>${fmtCm(c.sizeCm)}</b></div>
-      <div><span>XP ganho</span><b>+${store.view.perCapture.get(c.id)?.xp || 0}</b></div>
-      <div style="grid-column:span 2"><span>Capturada em</span><b>${fmtDateTime(c.caughtAt)}</b></div>
-      <div style="grid-column:span 2"><span>Origem</span><b>${c.kind === 'gift' ? `🎁 Presente de ${esc(friend?.displayName || 'um amigo')}` : `📍 ${esc(brejo?.name || 'Lagoinha')}`}</b></div>
+      <div><span>XP ganho</span><b>${c.kind === 'trade' ? '— (troca)' : `+${store.view.perCapture.get(c.id)?.xp || 0}`}</b></div>
+      <div style="grid-column:span 2"><span>${c.kind === 'trade' ? 'Chegou em' : 'Capturada em'}</span><b>${fmtDateTime(c.caughtAt)}</b></div>
+      <div style="grid-column:span 2"><span>Origem</span><b>${origin}</b></div>
       <div><span>Aparelho</span><b style="font-size:13px">${esc(c.deviceId)}${c.deviceId === store.deviceId ? ' (este)' : ''}</b></div>
       <div><span>Servidor</span><b style="font-size:14px">${c.pending ? '☁️ pendente' : '✅ sincronizada'}</b></div>
     </div>
-    <div class="sell-box ${c.favorite ? 'kept' : ''}">
+    ${trade ? `<div class="sell-box kept in-trade">
+      <div class="sb-info"><span>🔁 Em troca com ${esc(trade.friendName)}</span><b>${coin(price)}</b><small>Ela vai para ${esc(trade.friendName)} quando a troca fechar</small></div>
+      <button class="btn" data-act="trade">Ver troca</button>
+    </div>` : `<div class="sell-box ${c.favorite ? 'kept' : ''}">
       <div class="sb-info"><span>${c.favorite ? 'Favorita: fica guardada' : 'Vale na venda'}</span><b>${coin(price)}</b><small>${c.favorite ? 'Tire dos favoritos para poder vender' : `${esc(cat.tiers[s.tier].label)} · ${sizeNote(c)}`}</small></div>
       <button class="btn sun" data-act="sell" ${c.favorite ? 'disabled' : ''}>Vender</button>
     </div>
-    <button class="btn ${c.favorite ? 'ghost' : 'ghost'} block" data-act="fav">${c.favorite ? 'Remover dos favoritos' : '★ Favoritar (guardar)'}</button>
+    <button class="btn ghost block" data-act="fav">${c.favorite ? 'Remover dos favoritos' : '★ Favoritar (guardar)'}</button>`}
   `);
-  $('[data-act=fav]', sheet).addEventListener('click', async () => { await store.toggleFavorite(c); closeSheet(); });
-  $('[data-act=sell]', sheet).addEventListener('click', async (e) => {
+  $('[data-act=trade]', sheet)?.addEventListener('click', () => { closeSheet(true); openTrade(trade.id); });
+  $('[data-act=fav]', sheet)?.addEventListener('click', async () => { await store.toggleFavorite(c); closeSheet(); });
+  $('[data-act=sell]', sheet)?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
     $('.stage-lg', sheet).classList.add('hop-away');

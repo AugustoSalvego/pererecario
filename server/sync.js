@@ -15,6 +15,7 @@ import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
   distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo, visibleInMode,
   jobById, jobPay, JOB_RANGE_M, DELIVERY_RANGE_M, carById, balanceOf, frogPrice, BALANCO,
+  friendBonus, TRADE_TTL_MS,
 } from '../client/js/shared/game.js';
 
 const GPS_TOLERANCE_M = 45;
@@ -112,6 +113,78 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
          meters = CASE WHEN excluded.meters > expedition_distance.meters THEN excluded.meters ELSE expedition_distance.meters END`,
       [expeditionId, deviceId, meters],
     );
+  }
+
+  // ----- trocas: funções de apoio -----
+  const STATUS_PT = { invited: 'esperando o amigo aceitar', open: 'aberta', done: 'feita', declined: 'recusada', cancelled: 'cancelada', failed: 'desfeita', expired: 'vencida' };
+  const ACTIVE = ['invited', 'open'];
+
+  // a troca, já marcando como vencida se ficou parada tempo demais
+  async function liveTrade(q, id) {
+    if (!str(id, 64)) return null;
+    const tr = await q.one('SELECT * FROM trades WHERE id=$1', [id]);
+    if (tr && ACTIVE.includes(tr.status) && now() - Number(tr.received_at) > TRADE_TTL_MS) {
+      await q.run("UPDATE trades SET status='expired', updated_at=$1 WHERE id=$2", [now(), tr.id]);
+      return { ...tr, status: 'expired' };
+    }
+    return tr;
+  }
+
+  async function activeTradeBetween(q, a, b) {
+    const rows = await q.query(
+      `SELECT * FROM trades WHERE status IN ('invited','open') AND ((from_id=$1 AND to_id=$2) OR (from_id=$2 AND to_id=$1))`, [a, b],
+    );
+    return rows.find((r) => now() - Number(r.received_at) <= TRADE_TTL_MS) || null;
+  }
+
+  // perereca que pode entrar numa troca: é do jogador, não foi vendida nem trocada, não é favorita e
+  // não está escolhida em outra troca aberta
+  async function availableFrog(q, playerId, captureId, tradeId = null) {
+    if (!str(captureId, 64)) return { error: 'Perereca inválida' };
+    const cap = await q.one('SELECT * FROM captures WHERE id=$1 AND player_id=$2', [captureId, playerId]);
+    if (!cap) return { error: 'Essa perereca não está no seu brejo no servidor' };
+    if (cap.traded_at) return { error: 'Essa perereca já foi trocada' };
+    if (await q.one('SELECT 1 AS ok FROM sales WHERE player_id=$1 AND capture_id=$2', [playerId, captureId])) return { error: 'Essa perereca já foi vendida' };
+    if (cap.favorite) return { error: 'Perereca favorita não entra em troca: tire dos favoritos antes' };
+    const other = await q.query(
+      `SELECT id, received_at FROM trades WHERE status IN ('invited','open') AND id <> $1 AND (from_pick=$2 OR to_pick=$2)`, [tradeId || '', captureId],
+    );
+    if (other.some((t) => now() - Number(t.received_at) <= TRADE_TTL_MS)) return { error: 'Essa perereca já está escolhida em outra troca' };
+    return cap;
+  }
+
+  // as duas escolhidas: cada perereca muda de dono (a que sai fica marcada como trocada, e quem recebe
+  // ganha uma perereca nova do tipo "troca"). Tudo na mesma transação da operação.
+  async function completeTrade(q, tr) {
+    const a = await q.one('SELECT * FROM captures WHERE id=$1 AND player_id=$2', [tr.from_pick, tr.from_id]);
+    const b = await q.one('SELECT * FROM captures WHERE id=$1 AND player_id=$2', [tr.to_pick, tr.to_id]);
+    const gone = async (c, pid) => !c || c.traded_at || !!(await q.one('SELECT 1 AS ok FROM sales WHERE player_id=$1 AND capture_id=$2', [pid, c.id]));
+    if (await gone(a, tr.from_id) || await gone(b, tr.to_id)) {
+      await q.run("UPDATE trades SET status='failed', reason=$1, updated_at=$2 WHERE id=$3", ['uma das pererecas já tinha saído do brejo (vendida ou trocada)', now(), tr.id]);
+      return { error: 'uma das pererecas já tinha saído do brejo (vendida ou trocada): a troca foi desfeita' };
+    }
+    const t = now();
+    // marca as duas como trocadas; se outra operação já tinha pego alguma, desfaz tudo (a transação volta)
+    for (const c of [a, b]) {
+      const r = await q.run('UPDATE captures SET traded_at=$1 WHERE id=$2 AND traded_at IS NULL', [t, c.id]);
+      if (!r.changes) throw new Error('perereca trocada ao mesmo tempo em outra operação');
+    }
+    const give = async (c, to, from, n) => q.run(
+      `INSERT INTO captures (id, player_id, spawn_id, species_id, size_cm, kind, brejo_id, friend_id,
+        expedition_id, caught_at, device_id, received_at, favorite, favorite_ts, mode)
+       VALUES ($1,$2,$3,$4,$5,'trade',NULL,$6,NULL,$7,'troca',$7,0,0,'troca')`,
+      [`troca-${tr.id}-${n}`, to, `trade:${tr.id}`, c.species_id, c.size_cm, from, t],
+    );
+    await give(a, tr.to_id, tr.from_id, 1);
+    await give(b, tr.from_id, tr.to_id, 2);
+    await q.run("UPDATE trades SET status='done', updated_at=$1 WHERE id=$2", [t, tr.id]);
+    // outras trocas abertas que tinham escolhido alguma dessas pererecas perdem a escolha
+    for (const c of [a, b]) {
+      await q.run("UPDATE trades SET from_pick=NULL, from_species=NULL, from_size=NULL, updated_at=$1 WHERE status IN ('invited','open') AND from_pick=$2", [t, c.id]);
+      await q.run("UPDATE trades SET to_pick=NULL, to_species=NULL, to_size=NULL, updated_at=$1 WHERE status IN ('invited','open') AND to_pick=$2", [t, c.id]);
+    }
+    log(`troca ${tr.id.slice(0, 8)} feita: ${a.species_id} ⇄ ${b.species_id}`);
+    return { ok: true };
   }
 
   const handlers = {
@@ -263,7 +336,8 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       const jobs = await q.query('SELECT pay FROM jobs WHERE player_id=$1', [playerId]);
       const buys = await q.query('SELECT price FROM purchases WHERE player_id=$1', [playerId]);
       const sold = await q.query('SELECT price FROM sales WHERE player_id=$1', [playerId]);
-      const balance = balanceOf(jobs, buys, sold);
+      const friends = Number((await q.one('SELECT COUNT(*) AS n FROM friendships WHERE player_id=$1', [playerId])).n);
+      const balance = balanceOf(jobs, buys, sold, friends);
       if (balance < car.price) return { status: 'rejected', error: `Saldo insuficiente no servidor (B$ ${balance} de B$ ${car.price})` };
       await q.run(
         'INSERT INTO purchases (id, player_id, item, price, bought_at, device_id, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
@@ -281,6 +355,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       if (!str(p.sellId, 64) || !str(p.captureId, 64) || at === null) return { status: 'rejected', error: 'Venda malformada' };
       const cap = await q.one('SELECT * FROM captures WHERE id=$1 AND player_id=$2', [p.captureId, playerId]);
       if (!cap) return { status: 'rejected', error: 'Essa perereca não está no seu brejo no servidor' };
+      if (cap.traded_at) return { status: 'rejected', error: 'Essa perereca já foi para um amigo numa troca' };
       const sold = await q.one('SELECT * FROM sales WHERE player_id=$1 AND capture_id=$2', [playerId, p.captureId]);
       if (sold) return { status: 'conflict', conflict: { kept: { id: sold.id, deviceId: sold.device_id }, policy: 'a mesma perereca só é vendida uma vez: não pagou de novo' } };
       if (cap.favorite) return { status: 'rejected', error: 'Perereca favorita não pode ser vendida' };
@@ -290,6 +365,66 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
         [p.sellId, playerId, p.captureId, cap.species_id, price, at, deviceId, now()],
       );
       return { status: 'applied', price };
+    },
+
+    // ----- Trocas entre amigos -----
+    // Fluxo: convidar (trade.offer) → o amigo aceita (trade.respond) → cada um escolhe a perereca que vai
+    // dar (trade.pick, pode trocar de ideia até o outro escolher) → com as duas escolhidas, o servidor troca
+    // as duas de dono numa transação só. Qualquer um cancela antes disso (trade.cancel). Tudo pode ser feito
+    // offline: as operações ficam na fila e o servidor decide na ordem em que chegam.
+    async 'trade.offer'(q, playerId, deviceId, p) {
+      const at = num(p.at);
+      if (!str(p.tradeId, 64) || !str(p.friendId, 64) || at === null) return { status: 'rejected', error: 'Troca malformada' };
+      if (!(await q.one('SELECT 1 AS ok FROM friendships WHERE player_id=$1 AND friend_id=$2', [playerId, p.friendId]))) {
+        return { status: 'rejected', error: 'Vocês ainda não são parceiros de brejo' };
+      }
+      if (await q.one('SELECT id FROM trades WHERE id=$1', [p.tradeId])) return { status: 'rejected', error: 'Troca repetida' };
+      const open = await activeTradeBetween(q, playerId, p.friendId);
+      if (open) return { status: 'conflict', conflict: { kept: { tradeId: open.id }, policy: 'já existe uma troca aberta entre vocês: vale a primeira' } };
+      const t = now();
+      await q.run(
+        `INSERT INTO trades (id, from_id, to_id, status, created_at, updated_at, received_at) VALUES ($1,$2,$3,'invited',$4,$5,$5)`,
+        [p.tradeId, playerId, p.friendId, at, t],
+      );
+      return { status: 'applied' };
+    },
+
+    async 'trade.respond'(q, playerId, deviceId, p) {
+      const tr = await liveTrade(q, p.tradeId);
+      if (!tr || tr.to_id !== playerId) return { status: 'rejected', error: 'Convite de troca não encontrado' };
+      if (tr.status !== 'invited') return { status: 'conflict', conflict: { kept: { status: tr.status }, policy: `a troca já estava ${STATUS_PT[tr.status] || tr.status}` } };
+      await q.run('UPDATE trades SET status=$1, updated_at=$2 WHERE id=$3', [p.accept ? 'open' : 'declined', now(), tr.id]);
+      return { status: 'applied' };
+    },
+
+    async 'trade.pick'(q, playerId, deviceId, p) {
+      const tr = await liveTrade(q, p.tradeId);
+      if (!tr || (tr.from_id !== playerId && tr.to_id !== playerId)) return { status: 'rejected', error: 'Troca não encontrada' };
+      const side = tr.from_id === playerId ? 'from' : 'to';
+      // quem convidou já pode escolher enquanto espera; o amigo, depois de aceitar
+      const canPick = tr.status === 'open' || (tr.status === 'invited' && side === 'from');
+      if (!canPick) return { status: 'conflict', conflict: { kept: { status: tr.status }, policy: `a troca já estava ${STATUS_PT[tr.status] || tr.status}` } };
+      const cap = await availableFrog(q, playerId, p.captureId, tr.id);
+      if (cap.error) return { status: 'rejected', error: cap.error };
+      // UPDATE ... RETURNING: se os dois escolhem ao mesmo tempo, o segundo vê a escolha do primeiro
+      const row = await q.one(
+        `UPDATE trades SET ${side}_pick=$1, ${side}_species=$2, ${side}_size=$3, updated_at=$4 WHERE id=$5 AND status IN ('invited','open') RETURNING *`,
+        [cap.id, cap.species_id, cap.size_cm, now(), tr.id],
+      );
+      if (!row) return { status: 'conflict', conflict: { policy: 'a troca acabou antes da sua escolha chegar' } };
+      if (row.status === 'open' && row.from_pick && row.to_pick) {
+        const done = await completeTrade(q, row);
+        return done.error ? { status: 'conflict', conflict: { policy: done.error } } : { status: 'applied', trade: 'done' };
+      }
+      return { status: 'applied' };
+    },
+
+    async 'trade.cancel'(q, playerId, deviceId, p) {
+      const tr = await liveTrade(q, p.tradeId);
+      if (!tr || (tr.from_id !== playerId && tr.to_id !== playerId)) return { status: 'rejected', error: 'Troca não encontrada' };
+      if (tr.status !== 'invited' && tr.status !== 'open') return { status: 'conflict', conflict: { kept: { status: tr.status }, policy: `a troca já estava ${STATUS_PT[tr.status] || tr.status}` } };
+      await q.run('UPDATE trades SET status=$1, reason=$2, updated_at=$3 WHERE id=$4', ['cancelled', playerId === tr.from_id ? 'from' : 'to', now(), tr.id]);
+      return { status: 'applied' };
     },
 
     // Carro em uso: última escrita vence (como o visual). Só vale carro que o jogador tem.
@@ -355,8 +490,13 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
     const buys = await db.query('SELECT * FROM purchases WHERE player_id=$1 ORDER BY bought_at, id', [playerId]);
     const sales = await db.query('SELECT * FROM sales WHERE player_id=$1 ORDER BY sold_at, id', [playerId]);
     const friends = await db.query(
-      `SELECT f.friend_id, f.created_at, p.display_name, p.avatar FROM friendships f
+      `SELECT f.friend_id, f.created_at, p.display_name, p.avatar, p.look FROM friendships f
        JOIN players p ON p.id = f.friend_id WHERE f.player_id=$1 ORDER BY f.created_at`, [playerId],
+    );
+    const trades = await db.query(
+      `SELECT t.*, pf.display_name AS from_name, pf.look AS from_look, pt.display_name AS to_name, pt.look AS to_look
+       FROM trades t JOIN players pf ON pf.id = t.from_id JOIN players pt ON pt.id = t.to_id
+       WHERE t.from_id=$1 OR t.to_id=$1 ORDER BY t.updated_at DESC LIMIT 30`, [playerId],
     );
     const byExp = new Map();
     for (const d of dist) {
@@ -370,6 +510,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
         vehicle: p.vehicle || null, vehicleTs: Number(p.vehicle_ts) || 0,
         email: p.email || null, google: !!p.google_sub, hasPassword: String(p.pass_hash || '').startsWith('scrypt$'),
         termsAccepted: p.terms_version === TERMS_VERSION,
+        staff: !!Number(p.staff),
       },
       jobs: jobs.map((j) => ({ id: j.id, jobId: j.job_id, type: j.type, pay: j.pay, mode: j.mode, doneAt: Number(j.done_at), deviceId: j.device_id })),
       purchases: buys.map((b) => ({ id: b.id, item: b.item, price: b.price, boughtAt: Number(b.bought_at), deviceId: b.device_id })),
@@ -378,12 +519,27 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
         id: c.id, spawnId: c.spawn_id, speciesId: c.species_id, sizeCm: c.size_cm, kind: c.kind,
         brejoId: c.brejo_id, friendId: c.friend_id, expeditionId: c.expedition_id, caughtAt: c.caught_at,
         deviceId: c.device_id, favorite: !!c.favorite, favoriteTs: c.favorite_ts,
+        tradedAt: c.traded_at ? Number(c.traded_at) : null,
       })),
+      // trocas do ponto de vista deste jogador: "mine" é o que ele dá, "theirs" o que o amigo dá
+      trades: trades.map((t) => {
+        const out = t.from_id === playerId;
+        const pick = (side) => (t[`${side}_pick`] ? { captureId: t[`${side}_pick`], speciesId: t[`${side}_species`], sizeCm: Number(t[`${side}_size`]) } : null);
+        const expired = ACTIVE.includes(t.status) && now() - Number(t.received_at) > TRADE_TTL_MS;
+        return {
+          id: t.id, dir: out ? 'out' : 'in', friendId: out ? t.to_id : t.from_id,
+          friendName: out ? t.to_name : t.from_name, friendLook: out ? t.to_look : t.from_look,
+          status: expired ? 'expired' : t.status, reason: t.reason || null,
+          cancelledByMe: t.status === 'cancelled' ? t.reason === (out ? 'from' : 'to') : false,
+          mine: pick(out ? 'from' : 'to'), theirs: pick(out ? 'to' : 'from'),
+          createdAt: Number(t.created_at), updatedAt: Number(t.updated_at),
+        };
+      }),
       expeditions: exps.map((e) => ({
         id: e.id, startedAt: e.started_at, endedAt: e.ended_at, status: e.status, updatedAt: e.updated_at,
         distance: byExp.get(e.id) || {},
       })),
-      friends: friends.map((f) => ({ id: f.friend_id, displayName: f.display_name, avatar: f.avatar, since: f.created_at })),
+      friends: friends.map((f) => ({ id: f.friend_id, displayName: f.display_name, avatar: f.avatar, look: f.look || null, since: f.created_at })),
     };
   }
 
@@ -393,11 +549,12 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
   async function ranking() {
     if (now() - rankCache.at < 15000) return rankCache.rows;
     const players = await db.query('SELECT id, display_name, avatar, look, staff FROM players');
-    const caps = await db.query('SELECT id, player_id, species_id, caught_at FROM captures');
+    const caps = await db.query('SELECT id, player_id, species_id, caught_at, kind FROM captures');
+    const nFriends = new Map((await db.query('SELECT player_id, COUNT(*) AS n FROM friendships GROUP BY player_id')).map((r) => [r.player_id, Number(r.n)]));
     const pays = await db.query('SELECT player_id, pay FROM jobs');
     const sold = await db.query('SELECT player_id, price FROM sales');
     const byPlayer = new Map(players.map((p) => [p.id, []]));
-    for (const c of caps) byPlayer.get(c.player_id)?.push({ id: c.id, speciesId: c.species_id, caughtAt: c.caught_at });
+    for (const c of caps) byPlayer.get(c.player_id)?.push({ id: c.id, speciesId: c.species_id, caughtAt: c.caught_at, kind: c.kind });
     const gold = new Map();
     for (const j of pays) gold.set(j.player_id, (gold.get(j.player_id) || 0) + (Number(j.pay) || 0));
     for (const v of sold) gold.set(v.player_id, (gold.get(v.player_id) || 0) + (Number(v.price) || 0));
@@ -405,8 +562,9 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       const b = xpBreakdown(byPlayer.get(p.id) || [], catalog);
       return {
         id: p.id, displayName: p.display_name, avatar: p.avatar, look: p.look || null, xp: b.total,
-        level: levelFor(b.total).level, species: b.species.size, captures: (byPlayer.get(p.id) || []).length,
-        gold: gold.get(p.id) || 0, staff: !!Number(p.staff),
+        level: levelFor(b.total).level, species: b.species.size, collected: b.collected.size,
+        captures: (byPlayer.get(p.id) || []).filter((c) => c.kind !== 'trade').length,
+        gold: (gold.get(p.id) || 0) + friendBonus(nFriends.get(p.id) || 0), staff: !!Number(p.staff),
       };
     }).sort((a, b) => b.xp - a.xp || a.displayName.localeCompare(b.displayName));
     rankCache = { at: now(), rows };

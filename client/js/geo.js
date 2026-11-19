@@ -7,8 +7,7 @@ import { distanceM, offsetLatLng } from './shared/game.js';
 import { store } from './store.js';
 
 const MAX_ACCURACY_FOR_DISTANCE = 35;
-const WALK_SPEED = 6;    // m/s andando até o ponto tocado no mapa
-const JOY_SPEED = 3.5;   // m/s com o joystick todo inclinado
+const JOY_SPEED = 3.5;   // m/s a pé (joystick todo inclinado ou tocando no mapa: a mesma velocidade)
 
 class Geo extends EventTarget {
   pos = null;
@@ -121,20 +120,28 @@ class Geo extends EventTarget {
     this.emit('change', this.pos);
   }
 
-  // modo simulado: anda até o ponto tocado no mapa
+  // modo controle: anda até o ponto tocado no mapa, na MESMA velocidade do joystick todo inclinado
+  // (a pé ou de carro), e com o mesmo passo de 0,1 s, para os dois jeitos parecerem iguais
   walkTo(lat, lng) {
     if (this.mode !== 'sim' || !this.pos) return;
     clearInterval(this.walkTimer);
-    const from = { ...this.pos };
-    const total = distanceM(from, { lat, lng });
-    const steps = Math.max(1, Math.round(total / WALK_SPEED / 0.25));
-    let i = 0;
+    const target = { lat, lng };
+    let last = performance.now();
     this.walkTimer = setInterval(() => {
-      i++;
-      const t = i / steps;
-      this.update({ lat: from.lat + (lat - from.lat) * t, lng: from.lng + (lng - from.lng) * t, accuracy: 5, simulated: true });
-      if (i >= steps) clearInterval(this.walkTimer);
-    }, 250);
+      const t = performance.now();
+      const dt = Math.min(0.25, (t - last) / 1000);
+      last = t;
+      if (!this.pos) return;
+      const left = distanceM(this.pos, target);
+      const step = this.joySpeed * dt;
+      if (left <= step) {
+        clearInterval(this.walkTimer);
+        this.update({ ...target, accuracy: 5, simulated: true });
+        return;
+      }
+      const k = step / left;
+      this.update({ lat: this.pos.lat + (target.lat - this.pos.lat) * k, lng: this.pos.lng + (target.lng - this.pos.lng) * k, accuracy: 5, simulated: true });
+    }, 100);
   }
 
   // modo controle: x = leste, y = norte, de -1 a 1 (joystick ou setas do teclado)

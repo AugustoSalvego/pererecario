@@ -37,7 +37,7 @@ export function mountProfile(el, context) {
       <div class="list settings-list">
         <div class="card list-item tog" data-act="visible">${icons.people}<div class="grow"><div class="t">Aparecer no mapa dos outros</div><div class="s">Quem estiver a até 300 m vê o seu boneco e o seu nome</div></div><div class="switch ${store.settings.hidePresence ? '' : 'on'}"></div></div>
         <div class="card list-item" data-act="howto">${icons.sparkle}<div class="grow"><div class="t">Como jogar</div><div class="s">Rever as dicas do jogo</div></div></div>
-        <div class="card list-item" data-act="demo">${icons.bug}<div class="grow"><div class="t">Painel de demonstração</div><div class="s">Testes de conexão, modo controle, céu, conflitos</div></div></div>
+        <div class="card list-item staff-only hidden" data-act="demo">${icons.bug}<div class="grow"><div class="t">Painel de demonstração</div><div class="s">Testes de conexão, modo controle, céu, conflitos</div></div></div>
         <div class="card list-item" data-act="logout">${icons.logout}<div class="grow"><div class="t">Sair da conta</div><div class="s">Seu progresso continua salvo no servidor</div></div></div>
       </div>
     </div>`;
@@ -135,7 +135,10 @@ function openRanking(start = 'xp') {
     const step = (r, i) => r ? `<div class="pod p${i + 1} ${r.id === me ? 'me' : ''}">
         <div class="pod-face">${face(r, 58)}${medal(i)}</div>
         <div class="pod-name">${esc(r.displayName)}</div><div class="pod-val">${B.value(r)}</div>
-        <div class="pod-step"><b>${i + 1}º</b></div></div>` : '<div class="pod empty"></div>';
+        <div class="pod-step"><b>${i + 1}º</b></div></div>`
+      // lugar ainda vago no pódio: aparece apagado, para o formato 2º · 1º · 3º ficar claro
+      : `<div class="pod p${i + 1} empty"><div class="pod-face"><span class="pod-vago">?</span></div>
+        <div class="pod-name">vago</div><div class="pod-val">&nbsp;</div><div class="pod-step"><b>${i + 1}º</b></div></div>`;
     const rest = board.top.slice(3).map((r, i) => rankRow(r, i + 3, key, me)).join('');
     const mine = board.me && board.me.rank > board.top.length ? `<div class="rank-gap">· · ·</div>${rankRow(board.me, board.me.rank - 1, key, me)}` : '';
     body.innerHTML = `<div class="podium">${step(b, 1)}${step(a, 0)}${step(c, 2)}</div><div class="list">${rest}${mine}</div>`;
@@ -152,6 +155,8 @@ function openRanking(start = 'xp') {
 export function renderProfile(el) {
   const v = store.view;
   if (!v.player) return;
+  // painel de demonstração: só contas da organização (marcadas no /admin)
+  el.querySelectorAll('.staff-only').forEach((x) => x.classList.toggle('hidden', !v.player.staff));
   const cat = getCatalog();
   const lv = v.level;
   $('.hero-slot', el).innerHTML = `<div class="profile-hero">
@@ -168,10 +173,11 @@ export function renderProfile(el) {
       </button>
     </div>`;
 
-  const huntDays = new Set(v.captures.map((c) => dayOf(c.caughtAt))).size;
+  const caught = v.captures.filter((c) => c.kind !== 'trade');   // as recebidas em troca não contam como captura
+  const huntDays = new Set(caught.map((c) => dayOf(c.caughtAt))).size;
   $('.stats', el).innerHTML = [
     ['book', '#4cb944', `${v.discovered.size}/${cat.species.length}`, 'espécies'],
-    ['pond', '#3bb5cf', v.captures.length, 'capturas'],
+    ['pond', '#3bb5cf', caught.length, 'capturas'],
     ['route', '#ff7a5c', fmtDist(v.totalMeters), 'caminhados'],
     ['flag', '#9b67e0', huntDays, huntDays === 1 ? 'dia de caçada' : 'dias de caçada'],
   ].map(([ic, c, b, s]) => `<div class="card stat"><div class="ico" style="background:${c}">${icons[ic]}</div><div><b>${b}</b><span>${s}</span></div></div>`).join('');
@@ -201,13 +207,16 @@ function diaryRow(c, withDay = true) {
   const sp = species(c.speciesId);
   const tier = getCatalog().tiers[sp.tier];
   const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
-  const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha');
+  const friend = c.friendId ? store.view.friends.find((f) => f.id === c.friendId) : null;
+  const where = c.kind === 'gift' ? '🎁 presente de amigo'
+    : c.kind === 'trade' ? `🔁 troca com ${esc(friend?.displayName || 'amigo')}`
+    : esc(brejo?.name || 'lagoinha');
   const night = isNightAt(c.caughtAt, brejo || geo.pos);
   return `<div class="card diary-row">
     <div class="d-frog" style="--tier:${tier.color}">${frogImg(c.speciesId, 36)}</div>
     <div class="d-main"><div class="d-name">${esc(sp.name)}</div>
       <div class="d-meta"><span class="d-sky" title="${night ? 'Noite' : 'Dia'}">${night ? icons.moon : icons.sun}</span>${withDay ? `${fmtDay(dayOf(c.caughtAt))}, ` : ''}${fmtTime(c.caughtAt)} · ${where}${c.pending ? ' · ☁️ pendente' : ''}</div></div>
-    <div class="d-side">${rarityBadge(c.speciesId)}<span class="pill-xp">+${store.view.perCapture.get(c.id)?.xp || 0} XP</span></div>
+    <div class="d-side">${rarityBadge(c.speciesId)}<span class="pill-xp">${c.kind === 'trade' ? 'troca' : `+${store.view.perCapture.get(c.id)?.xp || 0} XP`}</span></div>
   </div>`;
 }
 

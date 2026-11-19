@@ -16,7 +16,9 @@ Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especi
 
 **Dia e noite.** O jogo calcula a altura do sol no lugar e na hora em que o jogador está. De dia o mapa fica nas cores normais; à noite (sol abaixo de 4° do horizonte) fica azulado, com uma luz em volta do boneco e vaga-lumes, e o minijogo de captura mostra lua e estrelas.
 
-Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
+Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo", quem escaneou ganha uma perereca-presente e **cada parceiro novo vale B$ 25** para os dois (até 20 parceiros).
+
+**Trocas entre parceiros.** Tocando num parceiro, o jogador vê o perfil dele (nível, XP, Brejais ganhos, espécies e capturas) e pode **oferecer uma troca**. Se o outro aceitar, cada um escolhe a perereca que vai dar; quando os dois escolheram, elas trocam de dono na hora. A perereca recebida entra no Pererecário (conta para a coleção), mas não dá XP: o XP é de quem capturou. Favoritas não entram em troca, e uma perereca escolhida numa troca fica marcada "em troca" no Meu Brejo, sem poder ser vendida. Uma troca que ninguém termina vence em 72 horas.
 
 **Trabalhos e Brejais.** Pelo mapa aparecem moradores (NPCs) pedindo ajuda, com um balãozinho que mostra o serviço: o **pedreiro** constrói uma casinha, a **mecânica** conserta um carro, o **agricultor** cuida da horta e o **carteiro** pede uma entrega. Eles aparecem em qualquer lugar e mudam a cada 15 minutos, pelo mesmo sorteio determinístico das lagoinhas (grade de ~180 m, semente = jogador + janela + ponto da grade), então o celular offline e o servidor chegam aos mesmos moradores. Cada trabalho é um minijogo de 3 etapas, só de tocar, em que cada toque muda um pedaço da cena de vez: a parede sobe tijolo por tijolo, o telhado fecha, a tinta cobre a casa; as porcas saem da roda, a fumaça do motor diminui a cada parafuso, o barro sai do carro; o mato é arrancado, a terra fica molhada e os tomates vão para o cesto. Cada trabalho leva no máximo 5 minutos; a entrega é diferente: o jogador leva a caixa até uma lagoinha a 140–260 m, com 5 minutos de prazo. No fim aparece só o agradecimento ("O pedreiro agradece!") e o botão **Coletar B$ X**. A moeda do jogo são os **Brejais (B$)**; quem faz o trabalho no modo GPS ganha 50 % a mais.
 
@@ -24,7 +26,7 @@ Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro
 
 **Meu Brejo como bolsa.** As pererecas capturadas podem ser vendidas por Brejais: o preço depende da raridade e do tamanho (a maior da espécie vale até 50 % a mais). Dá para vender uma de cada vez ou todas as repetidas de uma vez (fica a maior de cada espécie). Favoritas ficam guardadas e não são vendidas. Vender não apaga a espécie do Pererecário nem o XP.
 
-**Ranking.** Três quadros: mais XP, mais capturas e mais Brejais ganhos (trabalhos + vendas; comprar carro não tira pontos). No perfil aparecem os 5 primeiros de XP com medalhas de ouro, prata e bronze; "Ver todos" abre o pódio e as três abas.
+**Ranking.** Três quadros: mais XP, mais capturas e mais Brejais ganhos (trabalhos + vendas + parceiros; comprar carro não tira pontos). Pererecas recebidas em troca não contam como captura. No perfil aparecem os 5 primeiros de XP com medalhas de ouro, prata e bronze; "Ver todos" abre o pódio e as três abas.
 
 **Loja e carros.** Com os Brejais o jogador compra um carro na **Loja do Brejo**: Hatch (B$ 150), Sedã (250), Picape (400), Jipe (600, revela os matinhos de mais longe) e Superesportivo (1500). O carro deixa o joystick mais rápido (de 3,5 m/s a pé até 12 m/s) e **só anda no modo Controle**: no GPS o jogador sempre está a pé. Os carros têm o tamanho do boneco, nas 4 direções, e quem está perto vê o carro com um balãozinho do rosto e do nome de quem está dirigindo.
 
@@ -195,6 +197,26 @@ O caso típico do enunciado: o mesmo jogador, em dois aparelhos offline, mexe na
 
 Como o XP é derivado das capturas, ele converge sozinho depois que as capturas convergem.
 
+### Troca entre jogadores: uma transação distribuída
+
+A troca é o único ponto em que **dois jogadores diferentes** mexem no mesmo dado, e cada um pode estar offline em momentos diferentes. Ela foi modelada como uma pequena máquina de estados guardada no servidor (tabela `trades`), em que cada passo é uma operação comum da fila offline, com id único (então reenviar não repete nada):
+
+`trade.offer` (convite) → `trade.respond` (aceitar ou recusar) → `trade.pick` de cada lado → **troca feita**. `trade.cancel` encerra a qualquer momento antes do fim.
+
+Estados: `invited` → `open` → `done`, ou `declined`, `cancelled`, `failed` e `expired`. A **efetivação** acontece no servidor, dentro de uma única transação do banco, no momento em que chega a segunda escolha: as duas pererecas são marcadas como trocadas (`traded_at`) e cada jogador recebe uma cópia nova, com id fixo (`troca-<troca>-1` e `-2`). Se qualquer passo falhar, a transação volta inteira, então nunca acontece de um lado receber e o outro não.
+
+| Situação de conflito | Política |
+|---|---|
+| Os dois escolhem ao mesmo tempo | Cada escolha grava só o próprio lado com `UPDATE … RETURNING`; quem chega por último vê os dois lados preenchidos e efetiva. Exatamente uma das duas operações efetiva a troca. |
+| A perereca escolhida foi vendida (ou trocada) em outro aparelho, offline, antes da troca fechar | Na efetivação o servidor confere de novo: se alguma já saiu do brejo, a troca vira `failed` e **ninguém perde nada** (a outra perereca continua com o dono). Os dois são avisados. |
+| A mesma perereca em duas trocas | Não é possível escolher uma perereca que está em outra troca aberta; se mesmo assim duas chegarem juntas, a marca `traded_at IS NULL` só deixa uma efetivar e a outra perde a escolha. |
+| Convite duplicado (os dois se convidam offline ao mesmo tempo) | Só uma troca aberta por par de amigos: o segundo convite recebe `conflict`. |
+| Favorita | O servidor recusa escolher uma favorita. |
+| Ninguém termina | Vence em 72 h, contadas pelo **relógio do servidor** (hora em que o convite chegou), não pelo do celular. |
+| Recusar/cancelar e escolher ao mesmo tempo | Vale o estado do servidor quando a operação chega: uma escolha numa troca já cancelada é recusada (`rejected`) e a perereca continua com o dono. |
+
+No celular, cada passo aparece na hora (a fila offline é reaplicada sobre o último estado do servidor, como nas capturas), e enquanto houver troca andando o app sincroniza a cada 6 s para mostrar logo a resposta do outro. Pererecas trocadas continuam na história de quem as capturou (XP e coleção não diminuem); só saem da bolsa.
+
 ![conflito](img/conflito.jpg)
 
 ### Presença: um dado que não precisa de sincronização
@@ -229,7 +251,7 @@ A posição dos outros jogadores segue uma regra diferente do resto do jogo. Cap
 
 A rodada sem a anti-entropia mostra que o teste pega a perda quando ela existe, e que o problema é silencioso: os celulares "concordam" com o servidor e as capturas somem sem aviso.
 
-Para a apresentação, o painel de demonstração (Perfil → Painel de demonstração) e o painel do servidor (`/admin`) permitem **simular** cada uma dessas falhas: modo avião simulado, derrubar o servidor por 60 s (o servidor responde 503 e volta sozinho), perder a resposta da próxima sincronização e reenviar uma operação confirmada. Há também o registro de eventos com cada etapa.
+Para a apresentação, o painel de demonstração (Perfil → Painel de demonstração, que só aparece em contas marcadas como organização) e o painel do servidor (`/admin`) permitem **simular** cada uma dessas falhas: modo avião simulado, derrubar o servidor por 60 s (o servidor responde 503 e volta sozinho), perder a resposta da próxima sincronização e reenviar uma operação confirmada. Há também o registro de eventos com cada etapa.
 
 ![painel](img/painel-demo.jpg)
 
@@ -304,9 +326,11 @@ Em `test/seguranca.test.js`, 4 testes cobrem o painel e as contas da organizaç�
 
 Em `test/codigo.test.js`, 13 testes cobrem o código por e-mail, com o Brevo trocado por um carteiro de mentira: a conta só nasce com o código certo (e o banco não guarda o código nem a senha), código vencido, limite de 5 tentativas, reenvio só depois de 1 minuto (o código novo vale e o velho não), pedido novo invalidando o anterior, limites de e-mails por endereço e por aparelho, esqueci a senha do começo ao fim, falha no envio sem deixar nada pendurado, Google ligando a uma conta confirmada sem desativar a senha, o jogo sem o Brevo configurado, o e-mail de teste do painel e o formato da chamada à API do Brevo.
 
+Em `test/trocas.test.js`, 5 testes cobrem as trocas e o bônus de parceiro: os B$ 25 por amigo (com limite) e o perfil do parceiro; a troca completa (cada um fica com a perereca do outro, sem XP extra, e reenviar não troca de novo); recusa, cancelamento, convite duplicado e favorita recusada; perereca vendida no meio da troca (a troca é desfeita e ninguém perde nada); e troca vencida depois de 72 h.
+
 No GitHub, os mesmos testes rodam também contra um PostgreSQL de verdade, com um teste a mais: derrubar todas as conexões do banco (como quando ele reinicia ou "dorme") não derruba o servidor.
 
-Os fluxos completos (login, cadastro com o código do e-mail, esqueci a senha, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro e outro jogador vendo o carro) também foram exercitados num navegador Chrome automatizado.
+Os fluxos completos (login, cadastro com o código do e-mail, esqueci a senha, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro, outro jogador vendo o carro e uma troca entre dois jogadores, do convite à comemoração) também foram exercitados num navegador Chrome automatizado.
 
 ## 11. Limitações conhecidas
 
@@ -319,4 +343,5 @@ Os fluxos completos (login, cadastro com o código do e-mail, esqueci a senha, m
 - No iPhone, o sensor de movimento só pode ser liberado após um toque do usuário (o app pede na primeira abertura).
 - Limpar os dados do navegador apaga o que ainda não subiu (o que já subiu está no servidor). No iPhone, o Safari apaga dados de sites não abertos por 7 dias, a menos que o jogo esteja na Tela de Início; por isso o jogo deve ser instalado.
 - A anti-entropia recupera operações que algum aparelho ainda tem no histórico. Um jogador criado depois do último backup e que perdeu o banco ainda não existe no backup restaurado; ele precisaria criar a conta de novo (as lagoinhas dependem do id do jogador, então o histórico antigo não vale para a conta nova).
+- A troca precisa que os dois jogadores fiquem online em algum momento: offline, cada um pode aceitar e escolher, mas ela só fecha no servidor. Se ninguém terminar em 72 h, ela vence e as pererecas continuam com os donos.
 - O relógio do aparelho é corrigido a cada sincronização; se o celular nunca ficou online depois de ter o relógio muito alterado, uma captura pode cair fora da janela e ser rejeitada.
