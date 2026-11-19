@@ -74,7 +74,7 @@ function openSpecimen(spawnId) {
   if (!c) return;
   const s = species(c.speciesId);
   const cat = getCatalog();
-  const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos) : null;
+  const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
   const friend = store.view.friends.find((f) => f.id === c.friendId);
   const sheet = openSheet(`
     <div class="stage-lg" style="--tier:${cat.tiers[s.tier].color}">${frogImg(c.speciesId, 150)}</div>

@@ -297,7 +297,7 @@ class Store extends EventTarget {
   }
 
   // ---------- ações do jogador ----------
-  async capture(spawn, pos) {
+  async capture(spawn, pos, mode = 'gps') {
     const exp = await this.ensureExpedition();
     const t = this.now();
     const isNew = !this.view.discovered.has(spawn.speciesId);
@@ -308,6 +308,7 @@ class Store extends EventTarget {
     };
     if (pos && spawn.kind === 'wild') { payload.lat = pos.lat; payload.lng = pos.lng; }
     if (spawn.kind === 'gift') payload.mask = spawn.mask;
+    else payload.mode = mode === 'controle' ? 'controle' : 'gps';
     await this.addOp('capture', payload, { kv: { activity: this.activity } });
     const xp = this.view.perCapture.get(payload.captureId)?.xp || 0;
     return { capture: this.view.captures.find((c) => c.id === payload.captureId), isNew, xp };

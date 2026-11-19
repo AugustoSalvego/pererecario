@@ -11,6 +11,10 @@ Todos os números ficam num bloco só, no começo de `client/js/shared/game.js` 
 3. **Pererecas.** Cada lagoinha tem 4 pererecas em volta, que mudam a cada 15 minutos. As **comuns** ficam à vista dando pulinhos; as **incomuns, raras e a especial** ficam escondidas num **matinho**.
 4. **O que aparece na tela.** Só as pererecas a até 70 m do jogador (mais longe, somem) e as lagoinhas a até 400 m. Sem perereca por perto, a setinha no topo aponta a lagoinha mais próxima.
 
+**Modo controle.** Quem anda com o joystick vê só uma parte das pererecas mais raras: 80 % das incomuns, 35 % das raras e 15 % das especiais (`noModoControle`). No modo GPS aparecem todas.
+
+**Cada jogador tem as suas.** O sorteio usa o id do jogador, então cada um tem lagoinhas e pererecas próprias.
+
 Tudo isso vem de um sorteio com "semente" fixa: o mesmo ponto da grade sempre tem a mesma lagoinha, e a mesma lagoinha, no mesmo horário, sempre tem as mesmas pererecas, em qualquer celular, mesmo offline.
 
 ## Valores atuais e o que mexer
@@ -28,6 +32,8 @@ Tudo isso vem de um sorteio com "semente" fixa: o mesmo ponto da grade sempre te
 | `vePererecasAteM` | 70 | quer ver pererecas de mais longe | 100 |
 | `veLagoinhasAteM` | 400 | quer o mapa mais limpo | 250 |
 | `vaoEntrePererecasM` | 12 | pererecas grudadas | 15 |
+| `noModoControle.rare` | 0,35 | quer o modo controle mais generoso | 0,6 |
+| `noModoControle.special` | 0,15 | quer a especial quase só no GPS | 0,05 |
 
 **Raridade, XP e toques** ficam em `client/assets/species.json`, no bloco `tiers`: `weight` é a chance de cada raridade (hoje 55 / 28 / 13 / 4, somando 100), `xp` é quanto cada uma vale e `taps` é o mínimo de toques para capturar. Para a especial aparecer mais, troque 55/28/13/4 por, por exemplo, 52/28/14/6.
 

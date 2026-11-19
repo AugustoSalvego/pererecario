@@ -12,7 +12,7 @@
 import crypto from 'node:crypto';
 import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
-  distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo,
+  distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo, visibleInMode,
 } from '../client/js/shared/game.js';
 
 const GPS_TOLERANCE_M = 45;
@@ -24,6 +24,8 @@ const str = (v, max = 80) => (typeof v === 'string' && v.length > 0 && v.length 
 export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }) {
   const speciesIds = new Set(catalog.species.map((s) => s.id));
   const stats = { duplicates: 0 };
+
+  const modeOf = (p) => (p.mode === 'controle' ? 'controle' : 'gps');
 
   async function validateCapture(q, playerId, p) {
     const parsed = parseSpawnId(p.spawnId);
@@ -37,11 +39,12 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       let b = await q.one('SELECT * FROM brejos WHERE id=$1', [parsed.brejoId]);
       if (!b) {
         const manual = await q.query('SELECT id, name, lat, lng, radius FROM brejos WHERE active=1 ORDER BY created_at, id');
-        b = findBrejo(parsed.brejoId, manual);
+        b = findBrejo(parsed.brejoId, manual, playerId);   // as lagoinhas de cada jogador são só dele
       }
       if (!b) return { error: 'Brejo não existe' };
-      const spawn = spawnsFor(b, parsed.win, catalog)[parsed.index];
+      const spawn = spawnsFor(b, parsed.win, catalog, playerId)[parsed.index];
       if (!spawn) return { error: 'Perereca não existe neste brejo' };
+      if (!visibleInMode(spawn, modeOf(p))) return { error: 'Essa perereca só aparece no modo GPS' };
       if (spawn.speciesId !== p.speciesId) return { error: 'Espécie não confere com o encontro' };
       if (caughtAt < windowStart(parsed.win) || caughtAt > windowEnd(parsed.win) + GRACE_MS) {
         return { error: 'Perereca já tinha ido embora nesse horário' };
@@ -67,10 +70,11 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
   async function insertCapture(q, playerId, deviceId, p, v, fav = { favorite: 0, ts: 0 }) {
     await q.run(
       `INSERT INTO captures (id, player_id, spawn_id, species_id, size_cm, kind, brejo_id, friend_id,
-        expedition_id, caught_at, device_id, received_at, favorite, favorite_ts)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        expedition_id, caught_at, device_id, received_at, favorite, favorite_ts, mode)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [p.captureId, playerId, p.spawnId, v.spawn.speciesId, v.spawn.sizeCm, v.spawn.kind, v.brejoId,
-        v.friendId, str(p.expeditionId, 64), p.caughtAt, deviceId, now(), fav.favorite, fav.ts],
+        v.friendId, str(p.expeditionId, 64), p.caughtAt, deviceId, now(), fav.favorite, fav.ts,
+        v.spawn.kind === 'gift' ? 'presente' : modeOf(p)],
     );
   }
 

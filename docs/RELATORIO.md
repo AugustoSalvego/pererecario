@@ -6,9 +6,17 @@ Trabalho prático de Sistemas Distribuídos: jogo para computação móvel com f
 
 O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são áreas circulares sobre o mapa real, desenhadas como **lagoinhas**. Elas aparecem **em qualquer lugar**, sem cadastro (uma a cada ~130 m), como no Pokémon GO; os organizadores também podem cadastrar brejos à mão em pontos específicos. Em volta de cada lagoinha vivem de 3 a 7 pererecas (4 nas automáticas), que mudam a cada 15 minutos. As **comuns** ficam à vista no mapa, dando pulinhos; as **incomuns, raras e a especial** se escondem num **matinho** (que mostra um "?" de tempos em tempos): o jogador caminha até lá (GPS) e, a até 20 m, **toca no matinho** ou **chacoalha o celular**; o matinho espia por 1 s e a perereca sai. Depois, a até **10 m**, toca nela no mapa para escolhê-la e entra no minijogo de captura: a perereca pula entre as vitórias-régias da tela e o jogador **toca rápido** nela até pegar: no mínimo 3 toques, mais nas raras, sem mostrar quantos faltam.
 
-**Como as lagoinhas e as pererecas aparecem.** Não existe um "sorteio" no servidor que precise ser enviado aos celulares. O mundo é coberto por uma grade fixa de ~130 m; para cada ponto da grade, um gerador pseudoaleatório determinístico (semente = o ponto da grade) decide se ali existe uma lagoinha, onde exatamente ela fica e o nome dela. Da mesma forma, as pererecas de cada lagoinha saem de um gerador alimentado pelo id da lagoinha e pela janela de 15 minutos. Assim, o celular offline e o servidor chegam exatamente às mesmas pererecas, e o servidor consegue conferir qualquer captura recebida depois: a partir do id da lagoinha ele recalcula onde ela fica, sem precisar de nada guardado no banco. As pererecas nascem afastadas da lagoinha e umas das outras. No mapa, só aparecem as pererecas a até 70 m do jogador e as lagoinhas a até 400 m; quando não há nada por perto, uma seta indica a lagoinha mais próxima. Todos esses números ficam num único bloco de balanceamento (`client/js/shared/game.js`, explicado em `docs/BALANCEAMENTO.md`).
+**Como as lagoinhas e as pererecas aparecem.** Não existe um "sorteio" no servidor que precise ser enviado aos celulares. O mundo é coberto por uma grade fixa de ~130 m; para cada ponto da grade, um gerador pseudoaleatório determinístico (semente = **o jogador** + o ponto da grade) decide se ali existe uma lagoinha, onde exatamente ela fica e o nome dela. Da mesma forma, as pererecas de cada lagoinha saem de um gerador alimentado pelo jogador, pelo id da lagoinha e pela janela de 15 minutos. Por isso **cada jogador tem as suas lagoinhas e as suas pererecas**: dois jogadores lado a lado veem lagoinhas diferentes, e um não "rouba" a perereca do outro. Os dois aparelhos de um mesmo jogador, porém, veem exatamente as mesmas (é isso que permite o teste de conflito). Assim, o celular offline e o servidor chegam exatamente às mesmas pererecas, e o servidor consegue conferir qualquer captura recebida depois: a partir do id da lagoinha ele recalcula onde ela fica, sem precisar de nada guardado no banco. As pererecas nascem afastadas da lagoinha e umas das outras. No mapa, só aparecem as pererecas a até 70 m do jogador e as lagoinhas a até 400 m; quando não há nada por perto, uma seta indica a lagoinha mais próxima. Todos esses números ficam num único bloco de balanceamento (`client/js/shared/game.js`, explicado em `docs/BALANCEAMENTO.md`).
 
-Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu explorador (2 modelos × 3 tons de pele), que anda no mapa nas 4 direções. Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
+Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu boneco entre **18 estilos** (do Capuz de Sapo ao Ninja, Samurai, Cavaleiro, Mágica e Piloto de Robô), em versão masculina ou feminina e 3 tons de pele; ele anda no mapa nas 4 direções.
+
+**Dois modos de andar.** No **modo GPS** o boneco segue o celular e aparecem todas as pererecas. No **modo controle** o jogador anda com um joystick na tela (ou com as setas do teclado), sem sair do lugar, mas só aparece uma parte das raras (80 % das incomuns, 35 % das raras e 15 % das especiais). Quem anda de verdade é recompensado. Cada captura leva o modo em que foi feita, e o servidor recusa uma perereca "só de GPS" capturada no modo controle.
+
+**Jogadores juntos no mapa.** Quem está com o jogo aberto a até 300 m aparece no mapa dos outros, com o boneco e o nome. Se várias pessoas estão no mesmo lugar (por exemplo, numa sala, onde o GPS de todos dá praticamente o mesmo ponto), os bonecos são afastados automaticamente até uma distância mínima na tela, sempre do mesmo jeito, então o mapa fica estável. Quem não quiser aparecer desliga isso no Perfil.
+
+**Dia e noite.** O jogo calcula a altura do sol no lugar e na hora em que o jogador está. De dia o mapa é claro; no entardecer ganha um tom alaranjado; à noite fica azulado, com uma luz em volta do boneco e vaga-lumes, e o minijogo de captura mostra lua e estrelas.
+
+Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
 | Requisito do enunciado | No jogo |
 |---|---|
@@ -78,6 +86,7 @@ Rotas principais:
 | `POST /api/sync` | Envia até 100 operações e recebe o resultado de cada uma, o estado canônico do jogador e os brejos (se mudaram) |
 | `GET /api/brejos` | Lista de brejos e a versão da lista |
 | `GET /api/ranking` | Ranking geral |
+| `POST /api/presence` | Informa a posição atual e recebe os jogadores por perto (a até 300 m) |
 | `GET /api/players/code?code=` | Busca jogador pelo código de amigo |
 | `GET /api/health`, `/healthz` | Verificação de disponibilidade |
 | `/api/admin/*` | Painel do servidor, cadastro de brejos e simulação de queda (exige `X-Admin-Key`) |
@@ -165,6 +174,10 @@ Como o XP é derivado das capturas, ele converge sozinho depois que as capturas 
 
 ![conflito](img/conflito.jpg)
 
+### Presença: um dado que não precisa de sincronização
+
+A posição dos outros jogadores segue uma regra diferente do resto do jogo. Capturas, favoritos, boneco e distância são **dados duráveis**: entram na fila offline, têm id único e não podem se perder nem duplicar. Já a posição de agora é um **dado passageiro (soft state)**: vale só por alguns segundos e uma posição velha não serve para nada. Por isso ela não entra no IndexedDB nem na fila: o celular envia a posição a cada 4 s quando está online, o servidor guarda só na memória, com validade de 45 s, e responde com quem está por perto. Sem internet, os outros jogadores simplesmente somem do mapa, e o resto do jogo continua normalmente.
+
 ## 7. Tratamento de falhas de comunicação
 
 | Falha | Como o sistema reage |
@@ -191,6 +204,9 @@ O jogo muda conforme o ambiente físico do jogador:
 | **Movimento: chacoalhar** | Acelerômetro (`devicemotion`) | As pererecas mais raras (incomuns, raras e especial) se escondem num matinho. Chacoalhar o celular a até 20 m revela de uma vez todos os matinhos por perto (tocar num matinho revela só aquele): o matinho se mexe por 1 s e a perereca sai. |
 | **Proximidade entre jogadores** | Câmera + QR code | Cada jogador tem um QR no perfil. Escanear o de outra pessoa exige estar perto dela: cria a amizade e libera uma perereca-presente. O QR carrega os dados necessários, então funciona até offline. |
 | **Contexto temporal** | Relógio corrigido pelo servidor | As pererecas de cada brejo mudam a cada 15 min; os presentes são diários. |
+| **Dia e noite** | Posição + hora (cálculo da altura do sol, sem internet) | O mapa e o minijogo mudam de aparência: dia, entardecer/amanhecer e noite (mapa azulado, luz em volta do boneco, vaga-lumes, lua e estrelas). |
+| **Forma de se deslocar** | GPS real ou joystick (modo controle) | Andar de verdade mostra todas as pererecas; no modo controle aparecem menos raras. |
+| **Presença de outros jogadores** | Posição dos jogadores com o jogo aberto | Quem está a até 300 m aparece no mapa, com boneco e nome; os bonecos se afastam para não se amontoar. |
 | **Retorno físico** | Vibração e som (Web Audio) | Vibra a cada toque certeiro, ao capturar e ao chacoalhar; sons sintetizados na hora (bolhas, folhas, respingos), sem arquivos de áudio. |
 
 **Por que não Bluetooth:** navegadores não permitem que um celular procure outros aparelhos por perto (a Web Bluetooth só conecta a um dispositivo escolhido pelo usuário e não existe no iPhone). O QR code cumpre o mesmo papel de "prova de proximidade" e funciona em qualquer celular com câmera.
@@ -200,12 +216,14 @@ O jogo muda conforme o ambiente físico do jogador:
 ## 9. Validação e segurança no servidor
 
 - Toda captura é revalidada: o servidor recalcula a perereca a partir do brejo e da janela de tempo e confere espécie, horário (dentro da janela + 10 min de tolerância, nunca no futuro) e distância do jogador (com tolerância de GPS). O tamanho gravado é o calculado pelo próprio servidor, não o enviado pelo aparelho.
+- Lagoinhas e pererecas são recalculadas com a semente **do jogador autenticado**: um jogador não consegue capturar uma perereca que pertence a outro. No modo controle, perereca "só de GPS" é recusada.
+- Presença: a posição recebida é arredondada para ~5 m antes de ser mostrada aos outros, só vai para quem está a até 300 m e some sozinha após 45 s sem notícias. O jogador pode se esconder no Perfil.
 - Presentes do QR: confere que o amigo existe, que não é o próprio jogador e que a espécie bate com o cálculo determinístico.
 - Senhas com scrypt; tokens com HMAC-SHA256; limite de tentativas de login por IP; rotas de administração protegidas por chave.
 
 ## 10. Testes automatizados
 
-`npm test` roda 16 testes (`test/sync.test.js`) com o servidor real e banco em memória:
+`npm test` roda 19 testes (`test/sync.test.js`) com o servidor real e banco em memória:
 
 1. cadastro, login e acesso sem token;
 2. servidor e cliente calculam as mesmas pererecas;
@@ -221,7 +239,10 @@ O jogo muda conforme o ambiente físico do jogador:
 12. brejo novo recusado quando fica em cima ou colado em outro;
 13. pererecas nascem afastadas entre si e fora da lagoinha;
 14. lagoinhas automáticas em qualquer lugar do mundo: não se sobrepõem, o servidor aceita a captura sem cadastro e recusa uma lagoinha que não existe;
-15. brejo cadastrado à mão esconde a lagoinha automática que está em cima dele (e o servidor recusa capturas nela).
+15. brejo cadastrado à mão esconde a lagoinha automática que está em cima dele (e o servidor recusa capturas nela);
+16. cada jogador tem lagoinhas e pererecas próprias, e um não consegue capturar a perereca do outro;
+17. modo controle: perereca "só de GPS" é recusada, e a mesma perereca no modo GPS é aceita;
+18. presença: jogadores perto se veem, longe não, quem se esconde some e a presença expira sozinha.
 
 Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor) também foram exercitados num navegador Chrome automatizado.
 
@@ -229,6 +250,8 @@ Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reab
 
 - As lagoinhas automáticas podem cair em cima de um prédio, de uma rua ou de uma área cercada, porque o jogo não conhece o desenho do lugar; com o alcance de 10 m e a folga de GPS, normalmente dá para capturar da calçada. Quando isso atrapalhar, dá para cadastrar um brejo à mão no lugar certo (ele esconde a automática que estiver em cima). O servidor recusa um brejo cadastrado em cima ou colado em outro (folga mínima de 15 m entre as bordas).
 - As artes atuais do boneco, das lagoinhas e dos matinhos são provisórias (ver `docs/ARTES.md`).
+- O modo de andar (GPS ou controle) é informado pelo próprio celular; um celular adulterado poderia mentir o modo, assim como poderia falsificar o GPS. Para um jogo acadêmico, a validação de distância, horário e espécie no servidor é suficiente.
+- A presença fica só na memória do servidor: se o servidor reiniciar, os jogadores somem do mapa por alguns segundos, até o próximo envio (a cada 4 s).
 - O mapa offline mostra apenas a região já vista ou baixada antecipadamente ao redor dos brejos; fora disso aparece o gramado do jogo.
 - No iPhone, o sensor de movimento só pode ser liberado após um toque do usuário (o app pede na primeira abertura).
 - O relógio do aparelho é corrigido a cada sincronização; se o celular nunca ficou online depois de ter o relógio muito alterado, uma captura pode cair fora da janela e ser rejeitada.

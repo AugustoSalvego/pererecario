@@ -9,7 +9,7 @@ import * as db from '../db.js';
 import { sensors } from '../sensors.js';
 import { distanceM } from '../shared/game.js';
 import { icons } from './icons.js';
-import { $, esc, openSheet, closeSheet, toast, fmtTime, fmtDist } from './common.js';
+import { $, $$, esc, openSheet, closeSheet, toast, fmtTime, fmtDist } from './common.js';
 
 export function openDemo(ctx) {
   const s = store.settings;
@@ -27,7 +27,11 @@ export function openDemo(ctx) {
     </div>
 
     <h4>Localização</h4>
-    <div class="card tog" data-tog="sim"><div><div class="t">GPS simulado</div><div class="s">Toque no mapa para o explorador andar até lá</div></div><div class="switch ${geo.mode === 'sim' ? 'on' : ''}"></div></div>
+    <div class="card tog" data-tog="sim"><div><div class="t">Modo controle (GPS simulado)</div><div class="s">Ande com o joystick, as setas do teclado ou tocando no mapa. Aparecem menos pererecas raras.</div></div><div class="switch ${geo.mode === 'sim' ? 'on' : ''}"></div></div>
+
+    <h4>Céu do mapa</h4>
+    <div class="seg sky-seg">${[['auto', 'Automático'], ['dia', 'Dia'], ['noite', 'Noite']].map(([k, t]) => `<button data-sky="${k}" class="${(s.sky || 'auto') === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="s" style="font-size:12.5px;color:var(--ink-soft);margin-top:6px">No automático, o jogo calcula a altura do sol no lugar onde você está.</div>
     <div class="list brejo-list" style="margin-top:8px"></div>
 
     <h4>Sensores</h4>
@@ -97,7 +101,12 @@ export function openDemo(ctx) {
     const act = e.target.closest('[data-act]')?.dataset.act;
     const go = e.target.closest('[data-go]')?.dataset.go;
     const del = e.target.closest('[data-del]')?.dataset.del;
+    const sky = e.target.closest('[data-sky]')?.dataset.sky;
     try {
+      if (sky) {
+        await store.saveSettings({ sky: sky === 'auto' ? null : sky });
+        $$('[data-sky]', sheet).forEach((b) => b.classList.toggle('on', b.dataset.sky === sky));
+      }
       if (tog === 'offline') {
         await store.saveSettings({ forcedOffline: !store.settings.forcedOffline });
         $('[data-tog=offline] .switch', sheet).classList.toggle('on', store.settings.forcedOffline);

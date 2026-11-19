@@ -12,6 +12,21 @@ const charVars = `--fw:${CHAR.fw};--fh:${CHAR.fh};--hh:${CHAR.head}`;
 
 export const lookOf = (player) => normalizeLook(player?.look);
 
+// nome do estilo, no masculino ou no feminino
+const LOOK_NAMES = {
+  froghood: ['Capuz de Sapo'], explorer: ['Explorador', 'Exploradora'], dartfrog: ['Rã-Flecha'],
+  raincoat: ['Capa de Chuva'], scientist: ['Cientista'], fisher: ['Pescador', 'Pescadora'], sporty: ['Esportista'],
+  farmer: ['Jardineiro', 'Jardineira'], student: ['Universitário', 'Universitária'],
+  lantern: ['Caçador Noturno', 'Caçadora Noturna'], mage: ['Mago do Brejo', 'Maga do Brejo'], royal: ['Realeza do Brejo'],
+  ninja: ['Ninja'], samurai: ['Samurai'], knight: ['Cavaleiro', 'Cavaleira'], pirate: ['Pirata'],
+  magical: ['Mágico', 'Mágica'], pilot: ['Piloto de Robô', 'Pilota de Robô'],
+};
+export function lookName(look) {
+  const [m, g] = normalizeLook(look).split('-');
+  const n = LOOK_NAMES[m] || [m];
+  return g === 'feminino' && n[1] ? n[1] : n[0];
+}
+
 // Boneco inteiro (20x27 pixels de arte), escalado sem borrar.
 export function charHtml(look, { dir = 'down', scale = 3, walking = false, cls = '' } = {}) {
   const l = normalizeLook(look);

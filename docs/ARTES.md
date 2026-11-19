@@ -7,11 +7,15 @@ Regras gerais (o matinho e o balão "?" já são arte definitiva em alta resolu�
 - Pixel art pode ficar pequena: o jogo amplia sem borrar (`image-rendering: pixelated`). Desenhe no tamanho "de pixel" e não amplie antes.
 - Depois de trocar, aumente a versão em `client/sw.js` (`const VERSION = 'pererecario-v1.1.1'`, por exemplo). Sem isso, celulares que já abriram o jogo continuam com a arte antiga guardada no cache.
 
-## Bonecos: `char-<modelo>-<gênero>-<tom>.png` (12 arquivos)
+## Bonecos: `char-<estilo>-<gênero>-<tom>.png` (108 arquivos)
 
-| Modelo | Gênero | Tom de pele |
+18 estilos × 2 gêneros × 3 tons de pele, todos gerados por `python3 scripts/gerar_bonecos.py` (cores e formas de cada estilo ficam no dicionário `MODELS` do script). Para conferir todos de uma vez: `python3 scripts/gerar_bonecos.py --previa previa.png`.
+
+| Estilos | Gênero | Tom de pele |
 |---|---|---|
-| `froghood` (capuz de sapinho), `explorer` (explorador de chapéu) | `masculino`, `feminino` | `clara`, `media`, `escura` |
+| `froghood` (Capuz de Sapo), `explorer` (Explorador), `dartfrog` (Rã-Flecha), `raincoat` (Capa de Chuva), `scientist` (Cientista), `fisher` (Pescador), `sporty` (Esportista), `farmer` (Jardineiro), `student` (Universitário), `lantern` (Caçador Noturno), `mage` (Mago do Brejo), `royal` (Realeza do Brejo), `ninja` (Ninja), `samurai` (Samurai), `knight` (Cavaleiro), `pirate` (Pirata), `magical` (Mágica), `pilot` (Piloto de Robô) | `masculino`, `feminino` | `clara`, `media`, `escura` |
+
+Os estilos são personagens originais. Não use personagens de anime, de jogos ou de desenhos (nem partes marcantes deles, como um cabelo ou um chapéu característico): eles têm direitos autorais.
 
 Exemplo: `char-froghood-feminino-media.png`.
 
@@ -34,7 +38,7 @@ linha 3     parado        passo 1       passo 2      ← de costas (andando para
 - O pé do boneco deve encostar na **borda de baixo** do quadro: é esse ponto que fica sobre a posição do GPS.
 - A animação de andar segue a ordem passo 1 → parado → passo 2 → parado.
 
-Quer um terceiro boneco ou mais tons de pele? Me avise: aí é preciso mexer nas listas `LOOK_MODELS`/`LOOK_SKINS` (`client/js/shared/game.js`) e na validação do servidor.
+Quer outro estilo ou mais tons de pele? Além do script, é preciso acrescentar o nome em `LOOK_MODELS` (`client/js/shared/game.js`), em `LOOK_NAMES` (`client/js/ui/sprites.js`) e na lista de bonecos do `client/sw.js`.
 
 ## Cenário e efeitos
 
@@ -57,4 +61,4 @@ As **15 pererecas** continuam vindo do atlas original (`client/assets/frogs_atla
 
 1. `npm start` e abra `http://localhost:8080`.
 2. Perfil → **Como jogar**: o tutorial mostra os bonecos parados e andando, e a última tela mostra os 3 tons.
-3. No mapa, ligue o **GPS simulado** (painel de demonstração) e toque no mapa: o boneco anda nas 4 direções.
+3. No mapa, toque no botão **GPS** para mudar para o **modo controle** e ande com o joystick: o boneco anda nas 4 direções.

@@ -7,6 +7,10 @@ import { mountFriends, renderFriends } from './friends.js';
 import { mountProfile, renderProfile, loadRanking, renderSyncCard } from './profile.js';
 import { openDemo } from './demo.js';
 import { openTutorial } from './tutorial.js';
+import { mountJoystick } from './joystick.js';
+import { mountOthers } from './others.js';
+import { skyPhase } from './daynight.js';
+import { presence } from '../presence.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
 import { $, $$, esc, toast, openSheet, closeSheet, fmtDist } from './common.js';
@@ -18,20 +22,22 @@ import { sensors } from '../sensors.js';
 import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
-  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, findBrejo,
+  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, findBrejo, visibleInMode,
   FROG_VIEW_M, POND_VIEW_M,
 } from '../shared/game.js';
 
 // ponto de referência para o raio de visão: o jogador (ou o centro do mapa, sem GPS)
 const viewPoint = () => geo.pos || map?.center;
+// cada jogador tem as suas lagoinhas e pererecas (a semente do sorteio é o id dele)
+const seed = () => store.view.player?.id || '';
 // lagoinhas em volta do jogador: as automáticas (que existem em qualquer lugar) e as
 // cadastradas à mão. Recalcula só quando o jogador anda uns 20 m ou os brejos mudam.
 let shownCache = { key: null, list: [] };
 function brejosShown() {
   const vp = viewPoint();
   if (!vp) return [];
-  const key = `${store.brejosVersion}|${store.brejos.length}|${Math.round(vp.lat * 5000)}|${Math.round(vp.lng * 5000)}`;
-  if (shownCache.key !== key) shownCache = { key, list: brejosNear(store.brejos, vp, POND_VIEW_M + 60) };
+  const key = `${seed()}|${store.brejosVersion}|${store.brejos.length}|${Math.round(vp.lat * 5000)}|${Math.round(vp.lng * 5000)}`;
+  if (shownCache.key !== key) shownCache = { key, list: brejosNear(store.brejos, vp, POND_VIEW_M + 60, seed()) };
   return shownCache.list;
 }
 
@@ -46,12 +52,13 @@ export function startGame({ firstTime = false } = {}) {
   root.innerHTML = `
     <div class="map-host"></div>
     <div class="hud-top">
-      <button class="player-chip" data-nav="profile" aria-label="Perfil"><div class="avatar-wrap"><div class="avatar"></div><span class="lvl"></span></div><div class="who"><div class="name"></div><div class="xpbar"><i></i></div></div></button>
-      <div class="status-col"><button class="status-pill" aria-label="Estado da conexão"></button><div class="gps-chip"></div></div>
+      <div class="left-col"><button class="player-chip" data-nav="profile" aria-label="Perfil"><div class="avatar-wrap"><div class="avatar"></div><span class="lvl"></span></div><div class="who"><div class="name"></div><div class="xpbar"><i></i></div></div></button><div class="nearby-chip hidden"></div></div>
+      <div class="status-col"><button class="status-pill" aria-label="Estado da conexão"></button><button class="mode-btn" aria-label="Modo de andar"></button><div class="gps-chip"></div></div>
     </div>
     <div class="hint-bubble hidden"></div>
     <button class="compass hidden" aria-label="Lagoinha mais próxima"><span class="arrow">➤</span><span class="txt"></span></button>
     <button class="hud-expedition" data-nav="profile"></button>
+    <div class="joystick hidden"></div>
     <div class="hud-right">
       <button class="icon-btn shake-btn hidden" aria-label="Chacoalhar">${icons.shake}</button>
       <button class="icon-btn recenter hidden" aria-label="Centralizar">${icons.locate}</button>
@@ -83,7 +90,11 @@ export function startGame({ firstTime = false } = {}) {
       if (geo.mode === 'sim') { geo.walkTo(ll.lat, ll.lng); sfx.tap(); }
     },
     onUserMove: () => $('.recenter', root).classList.remove('hidden'),
+    onRender: placeLight,
   });
+  mountJoystick($('.joystick', root));
+  mountOthers(map);
+  presence.addEventListener('change', renderNearby);
   const start = geo.pos || store.settings.simPos || store.brejos[0];
   if (start) map.setCenter(start.lat, start.lng);
 
@@ -100,10 +111,11 @@ export function startGame({ firstTime = false } = {}) {
   $('.recenter', root).addEventListener('click', recenter);
   $('.status-pill', root).addEventListener('click', statusSheet);
   $('.compass', root).addEventListener('click', () => {
-    const b = findBrejo($('.compass', root).dataset.target, store.brejos);
+    const b = findBrejo($('.compass', root).dataset.target, store.brejos, seed());
     if (b) { map.follow = false; $('.recenter', root).classList.remove('hidden'); map.setCenter(b.lat, b.lng, true); }
   });
   $('.shake-btn', root).addEventListener('click', () => doShake());
+  $('.mode-btn', root).addEventListener('click', toggleMode);
 
   // eventos do jogo
   let lastLevel = store.view.level.level;
@@ -118,7 +130,7 @@ export function startGame({ firstTime = false } = {}) {
   });
   store.addEventListener('brejos', () => { refreshObjects(); prefetchTiles(); });
   store.addEventListener('revealed', () => refreshObjects());
-  store.addEventListener('settings', () => { renderStatus(); renderGpsChip(); });
+  store.addEventListener('settings', () => { renderStatus(); renderGpsChip(); applySky(); });
   sync.addEventListener('status', () => { renderStatus(); if (current === 'profile') renderSyncCard(screens.profile); });
   sync.addEventListener('synced', () => { if (current === 'profile') renderSyncCard(screens.profile); });
   sync.addEventListener('conflict', (e) => {
@@ -131,12 +143,13 @@ export function startGame({ firstTime = false } = {}) {
   sync.addEventListener('auth-expired', async () => { toast('Sessão expirada. Entre novamente.', 'warn'); await store.logout(); setTimeout(() => location.reload(), 1500); });
   geo.addEventListener('change', onGeo);
   geo.addEventListener('error', () => renderHint());
-  geo.addEventListener('mode', () => { renderGpsChip(); renderHint(); });
+  geo.addEventListener('mode', () => { renderGpsChip(); renderHint(); refreshObjects(); });
   sensors.addEventListener('shake', () => doShake());
 
   setInterval(tick, 1000);
   refreshObjects();
   renderAll();
+  applySky();
 
   if (!store.settings.tutorialDone) {
     openTutorial({ first: true, firstTime, onDone: () => { geo.start(); refreshObjects(); renderAll(); } });
@@ -144,6 +157,7 @@ export function startGame({ firstTime = false } = {}) {
     geo.start();
     if (!sensors.needsPermission()) sensors.request();
   }
+  presence.start();
   store.ensureExpedition();
   prefetchTiles();
 }
@@ -205,10 +219,59 @@ function renderGpsChip() {
   const chip = $('.gps-chip');
   if (!chip) return;
   const parts = [];
-  if (geo.mode === 'sim') parts.push(`<span class="chip">${icons.walk}GPS simulado</span>`);
   if (store.settings.forcedOffline) parts.push(`<span class="chip">${icons.cloudOff}Modo avião simulado</span>`);
   chip.innerHTML = parts.join('');
-  $('.shake-btn').classList.toggle('hidden', !(geo.mode === 'sim' || !sensors.hasMotion));
+  const ctl = geo.mode === 'sim';
+  const btn = $('.mode-btn');
+  btn.className = `mode-btn ${ctl ? 'controle' : ''}`;
+  btn.innerHTML = ctl ? `${icons.gamepad}Controle` : `${icons.gps}GPS`;
+  $('#game').classList.toggle('controle', ctl);
+  $('.joystick').classList.toggle('hidden', !ctl);
+  $('.shake-btn').classList.toggle('hidden', !(ctl || !sensors.hasMotion));
+}
+
+// GPS: anda de verdade e aparecem todas as pererecas. Controle: joystick, menos raras.
+async function toggleMode() {
+  unlockAudio();
+  sfx.tap();
+  if (geo.mode === 'real') {
+    await geo.setMode('sim');
+    toast('🎮 Modo controle: ande com o joystick. Aqui aparecem menos pererecas raras.', '', null, 4000);
+  } else {
+    await geo.setMode('real');
+    toast('📍 Modo GPS: ande de verdade e todas as pererecas aparecem, inclusive as raras!', 'ok', null, 4000);
+  }
+}
+
+function renderNearby() {
+  const el = $('.nearby-chip');
+  if (!el) return;
+  const n = presence.others.size;
+  el.classList.toggle('hidden', !n);
+  el.innerHTML = `${icons.people}${n} ${n === 1 ? 'jogador' : 'jogadores'} por perto`;
+}
+
+// céu do mapa conforme a altura do sol no lugar e na hora (ou forçado no painel)
+let skyNow = null;
+function applySky() {
+  if (!map) return;
+  const phase = skyPhase(new Date(), geo.pos || map.center);
+  if (phase === skyNow) return;
+  const first = skyNow === null;
+  skyNow = phase;
+  map.el.classList.toggle('night', phase === 'night');
+  map.el.classList.toggle('dusk', phase === 'dusk');
+  document.documentElement.dataset.sky = phase;
+  if (!first && phase === 'night') toast('🌙 Anoiteceu no brejo. Os vaga-lumes saíram!', '', null, 3000);
+  if (!first && phase === 'day') toast('☀️ Amanheceu no brejo!', 'ok', null, 3000);
+}
+
+// a luz da noite fica em volta do boneco (mesmo quando o mapa é arrastado)
+function placeLight() {
+  const pos = geo.pos;
+  const p = pos ? map.latLngToScreen(pos.lat, pos.lng) : { x: map.W / 2, y: map.H / 2 };
+  map.el.style.setProperty('--lx', `${Math.round(p.x)}px`);
+  map.el.style.setProperty('--ly', `${Math.round(p.y - 22)}px`);
 }
 
 function renderExpedition() {
@@ -251,8 +314,9 @@ function visibleSpawns() {
   if (!vp) return out;
   for (const b of brejosShown()) {
     if (distanceM(vp, b) > FROG_VIEW_M + b.radius) continue;
-    for (const s of spawnsFor(b, w, catalog)) {
+    for (const s of spawnsFor(b, w, catalog, seed())) {
       if (store.view.capturedSpawns.has(s.id)) continue;
+      if (!visibleInMode(s, geo.playMode)) continue; // no modo controle aparecem menos raras
       if (distanceM(vp, s) <= FROG_VIEW_M) out.push(s); // longe demais: some do mapa
     }
   }
@@ -360,7 +424,9 @@ function recenter() {
   if (pos) map.setCenter(pos.lat, pos.lng, true);
 }
 
+let ticks = 0;
 function tick() {
+  if (++ticks % 30 === 0) applySky();
   const w = windowOf(store.now());
   if (w !== lastWin) {
     if (lastWin != null) toast('🐸 Novas pererecas chegaram às lagoinhas!', 'ok', null, 2500);
@@ -373,6 +439,10 @@ function tick() {
 function onTapObject(key, data) {
   unlockAudio();
   if (key.startsWith('pond:')) return brejoSheet(data);
+  if (key.startsWith('other:')) {
+    sfx.pop();
+    return toast(`${data.mode === 'controle' ? '🎮' : '📍'} ${esc(data.name)} está caçando por perto! Para virarem amigos, troquem o QR code em Amigos.`, '', 'friends', 4000);
+  }
   if (!key.startsWith('frog:')) return;
   const s = data;
   const pos = geo.pos;

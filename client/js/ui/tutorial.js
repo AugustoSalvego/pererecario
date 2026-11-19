@@ -3,13 +3,13 @@ import { store } from '../store.js';
 import { sensors } from '../sensors.js';
 import { frogImg } from '../catalog.js';
 import { LOOK_MODELS, LOOK_GENDERS, LOOK_SKINS } from '../shared/game.js';
-import { charHtml, img, lookOf } from './sprites.js';
+import { charHtml, img, lookOf, lookName } from './sprites.js';
 import { icons } from './icons.js';
 import { $, $$, h, esc } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
-const MODEL_NAME = { froghood: 'Capuz de sapinho', explorer: 'Explorador' };
 const GENDER_NAME = { masculino: 'Masculino', feminino: 'Feminino' };
+const SKIN_COLOR = { clara: '#f6cfa3', media: '#d49a6a', escura: '#8f5a37' };
 
 function slides(look) {
   return [
@@ -71,11 +71,14 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
   const next = $('.next', el);
 
   function picker() {
-    return `<div style="display:flex;flex-direction:column;align-items:center;width:100%">
-      <div style="height:150px;display:grid;place-items:center">${charHtml(cur(), { dir: 'down', walking: true, scale: 5 })}</div>
-      <div class="picker-models">${LOOK_MODELS.map((m) => `<button data-model="${m}" class="${m === model ? 'on' : ''}">${MODEL_NAME[m]}</button>`).join('')}</div>
-      <div class="picker-models">${LOOK_GENDERS.map((g) => `<button data-gender="${g}" class="${g === gender ? 'on' : ''}">${GENDER_NAME[g]}</button>`).join('')}</div>
-      <div class="picker">${LOOK_SKINS.map((s) => `<button data-skin="${s}" class="${s === skin ? 'on' : ''}" aria-label="Tom de pele ${s}">${charHtml(`${model}-${gender}-${s}`, { scale: 2.4 })}</button>`).join('')}</div>
+    return `<div class="look-picker">
+      <div class="lp-hero">${charHtml(cur(), { dir: 'down', walking: true, scale: 4.4 })}</div>
+      <div class="lp-name">${esc(lookName(cur()))}</div>
+      <div class="lp-styles">${LOOK_MODELS.map((m) => `<button data-model="${m}" class="${m === model ? 'on' : ''}" aria-label="${esc(lookName(`${m}-${gender}-${skin}`))}">${charHtml(`${m}-${gender}-${skin}`, { scale: 1.7 })}</button>`).join('')}</div>
+      <div class="lp-row">
+        <div class="lp-gender">${LOOK_GENDERS.map((g) => `<button data-gender="${g}" class="${g === gender ? 'on' : ''}">${GENDER_NAME[g]}</button>`).join('')}</div>
+        <div class="lp-skins">${LOOK_SKINS.map((s) => `<button data-skin="${s}" class="${s === skin ? 'on' : ''}" style="--c:${SKIN_COLOR[s]}" aria-label="Tom de pele ${s}"></button>`).join('')}</div>
+      </div>
     </div>`;
   }
 
@@ -101,9 +104,12 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
     const mb = e.target.closest('[data-model]');
     const sb = e.target.closest('[data-skin]');
     const gb = e.target.closest('[data-gender]');
+    const keep = $('.lp-styles', stage)?.scrollLeft || 0;
     if (gb) { gender = gb.dataset.gender; sfx.tap(); render(); }
     if (mb) { model = mb.dataset.model; sfx.tap(); render(); }
     if (sb) { skin = sb.dataset.skin; sfx.tap(); render(); }
+    const strip = $('.lp-styles', stage);
+    if (strip) strip.scrollLeft = keep;
   });
   $('.skip', el).addEventListener('click', () => { idx = list.length; sfx.tap(); render(); });
   next.addEventListener('click', async () => {

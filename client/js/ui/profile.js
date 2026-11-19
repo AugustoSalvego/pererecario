@@ -28,8 +28,9 @@ export function mountProfile(el, context) {
       <div class="card sync-card" style="padding:14px"></div>
       <div class="section-title">Opções</div>
       <div class="list settings-list">
+        <div class="card list-item tog" data-act="visible">${icons.people}<div class="grow"><div class="t">Aparecer no mapa dos outros</div><div class="s">Quem estiver a até 300 m vê o seu boneco e o seu nome</div></div><div class="switch ${store.settings.hidePresence ? '' : 'on'}"></div></div>
         <div class="card list-item" data-act="howto">${icons.sparkle}<div class="grow"><div class="t">Como jogar</div><div class="s">Rever o tutorial e trocar o seu explorador</div></div></div>
-        <div class="card list-item" data-act="demo">${icons.bug}<div class="grow"><div class="t">Painel de demonstração</div><div class="s">Testes de conexão, GPS simulado, conflitos</div></div></div>
+        <div class="card list-item" data-act="demo">${icons.bug}<div class="grow"><div class="t">Painel de demonstração</div><div class="s">Testes de conexão, modo controle, céu, conflitos</div></div></div>
         <div class="card list-item" data-act="logout">${icons.logout}<div class="grow"><div class="t">Sair da conta</div><div class="s">Seu progresso continua salvo no servidor</div></div></div>
       </div>
     </div>`;
@@ -40,6 +41,11 @@ export function mountProfile(el, context) {
     if (act === 'demo') ctx.openDemo();
     if (act === 'logout') confirmLogout();
     if (act === 'howto') ctx.openTutorial();
+    if (act === 'visible') {
+      await store.saveSettings({ hidePresence: !store.settings.hidePresence });
+      e.target.closest('[data-act]').querySelector('.switch').classList.toggle('on', !store.settings.hidePresence);
+      toast(store.settings.hidePresence ? 'Você não aparece mais para os outros jogadores.' : 'Agora os jogadores por perto veem você no mapa.', '', 'people', 2500);
+    }
     if (act === 'sync-now') { sync.kick(0); toast('Sincronizando…', '', 'sync', 1500); }
   });
 }
@@ -96,7 +102,7 @@ export function renderProfile(el) {
   const recent = v.captures.slice(0, 12);
   $('.history', el).innerHTML = recent.length ? recent.map((c) => {
     const sp = species(c.speciesId);
-    const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos) : null;
+    const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
     const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha');
     return `<div class="card list-item diary">
       <div class="avatar" style="width:46px;height:46px">${frogImg(c.speciesId, 36)}</div>

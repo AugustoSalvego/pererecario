@@ -1,10 +1,14 @@
-// Localização do jogador: GPS real (watchPosition) ou simulada (modo demonstração,
-// para apresentar em sala sem sair andando). A distância percorrida alimenta a expedição.
-import { distanceM } from './shared/game.js';
+// Localização do jogador. Dois modos de andar:
+//  - GPS ("real"): o boneco segue o GPS do celular. Aparecem todas as pererecas.
+//  - Controle ("sim"): o boneco anda com o joystick da tela (ou tocando no mapa).
+//    Aparecem menos pererecas raras (BALANCO.noModoControle).
+// A distância percorrida alimenta a caçada do dia.
+import { distanceM, offsetLatLng } from './shared/game.js';
 import { store } from './store.js';
 
 const MAX_ACCURACY_FOR_DISTANCE = 35;
-const WALK_SPEED = 6; // m/s no modo simulado
+const WALK_SPEED = 6;    // m/s andando até o ponto tocado no mapa
+const JOY_SPEED = 3.5;   // m/s com o joystick todo inclinado
 
 class Geo extends EventTarget {
   pos = null;
@@ -12,6 +16,12 @@ class Geo extends EventTarget {
   mode = 'real';
   watchId = null;
   walkTimer = null;
+  joy = { x: 0, y: 0 };
+  joyTimer = null;
+  glideTimer = null;
+
+  // 'gps' ou 'controle' (é o que vai junto com cada captura)
+  get playMode() { return this.mode === 'real' ? 'gps' : 'controle'; }
 
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
 
@@ -55,6 +65,7 @@ class Geo extends EventTarget {
   async setMode(mode) {
     this.mode = mode;
     clearInterval(this.walkTimer);
+    this.setJoystick(0, 0);
     await store.saveSettings({ simGps: mode === 'sim' });
     if (mode === 'sim') {
       this.stopWatch();
@@ -70,14 +81,35 @@ class Geo extends EventTarget {
 
   update(next, countDistance = true) {
     const prev = this.pos;
-    if (countDistance && prev) {
+    if (!next.simulated && prev) {
+      // GPS parado "tremendo": ignora pulinhos menores que parte da imprecisão informada
       const d = distanceM(prev, next);
-      if (next.simulated) store.addDistance(d);
-      else {
-        if (d < 3) return; // ruído do GPS: ignora
-        if (next.accuracy <= MAX_ACCURACY_FOR_DISTANCE && d < 80) store.addDistance(d);
-      }
+      const dead = Math.max(3, Math.min(12, (next.accuracy || 10) * 0.4));
+      if (d < dead) return;
+      if (countDistance && next.accuracy <= MAX_ACCURACY_FOR_DISTANCE && d < 80) store.addDistance(d);
+      // suaviza leituras imprecisas e desliza o boneco até o novo ponto (sem teletransporte)
+      const a = Math.max(0.4, Math.min(1, 12 / (next.accuracy || 12)));
+      const target = d > 60 ? next : { ...next, lat: prev.lat + (next.lat - prev.lat) * a, lng: prev.lng + (next.lng - prev.lng) * a };
+      this.glide(prev, target);
+      return;
     }
+    if (countDistance && prev && next.simulated) store.addDistance(distanceM(prev, next));
+    this.set(next);
+  }
+
+  glide(from, to) {
+    clearInterval(this.glideTimer);
+    const steps = 6;
+    let i = 0;
+    this.glideTimer = setInterval(() => {
+      i++;
+      const t = i / steps;
+      this.set({ ...to, lat: from.lat + (to.lat - from.lat) * t, lng: from.lng + (to.lng - from.lng) * t });
+      if (i >= steps) clearInterval(this.glideTimer);
+    }, 90);
+  }
+
+  set(next) {
     this.pos = { ...next, at: Date.now() };
     if (next.simulated) {
       clearTimeout(this.saveTimer);
@@ -100,6 +132,29 @@ class Geo extends EventTarget {
       this.update({ lat: from.lat + (lat - from.lat) * t, lng: from.lng + (lng - from.lng) * t, accuracy: 5, simulated: true });
       if (i >= steps) clearInterval(this.walkTimer);
     }, 250);
+  }
+
+  // modo controle: x = leste, y = norte, de -1 a 1 (joystick ou setas do teclado)
+  setJoystick(x, y) {
+    const m = Math.hypot(x, y);
+    this.joy = m > 1 ? { x: x / m, y: y / m } : { x, y };
+    if (m < 0.08 || this.mode !== 'sim') {
+      clearInterval(this.joyTimer);
+      this.joyTimer = null;
+      return;
+    }
+    if (this.joyTimer) return;
+    clearInterval(this.walkTimer);
+    let last = performance.now();
+    this.joyTimer = setInterval(() => {
+      const t = performance.now();
+      const dt = Math.min(0.25, (t - last) / 1000);
+      last = t;
+      if (!this.pos) return;
+      const n = this.joy.y * JOY_SPEED * dt, e = this.joy.x * JOY_SPEED * dt;
+      const p = offsetLatLng(this.pos.lat, this.pos.lng, n, e);
+      this.update({ lat: p.lat, lng: p.lng, accuracy: 5, simulated: true });
+    }, 100);
   }
 
   teleport(lat, lng) {

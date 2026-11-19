@@ -45,9 +45,9 @@ export function tilesAround(lat, lng, radiusM, z) {
 }
 
 export class GameMap {
-  constructor(el, { onTapGround, onTapObject, onUserMove, tilt = 0 } = {}) {
+  constructor(el, { onTapGround, onTapObject, onUserMove, onRender, tilt = 0 } = {}) {
     this.el = el;
-    this.cb = { onTapGround, onTapObject, onUserMove };
+    this.cb = { onTapGround, onTapObject, onUserMove, onRender };
     this.tilt = tilt;
     this.center = { lat: -23.1, lng: -50.36 };
     this.zoom = BASE_ZOOM;
@@ -59,7 +59,9 @@ export class GameMap {
     if (!tilt) el.classList.add('flat');
     el.innerHTML = `<div class="map-sky"><div class="cloud" style="left:10%"></div><div class="cloud" style="left:60%;animation-delay:-30s;width:60px"></div></div>
       <div class="map-plane"><div class="map-ground"></div><div class="map-tiles"></div><div class="map-features"></div></div>
-      <div class="map-objects"></div><div class="map-fog"></div><div class="map-attrib">${provider.attribution}</div>`;
+      <div class="map-objects"></div><div class="map-night"></div>
+      <div class="fireflies">${Array.from({ length: 14 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--y:${(i * 61 + 13) % 100}%;--t:${6 + (i % 5) * 1.7}s;--dl:${-i * 1.3}s"></i>`).join('')}</div>
+      <div class="map-fog"></div><div class="map-attrib">${provider.attribution}</div>`;
     this.plane = el.querySelector('.map-plane');
     this.tileLayer = el.querySelector('.map-tiles');
     this.featLayer = el.querySelector('.map-features');
@@ -215,6 +217,7 @@ export class GameMap {
       o.el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${k})`;
       o.el.style.zIndex = String(o.ground ? 1 : o.top ? 100000 : 1000 + Math.round(s.y));
     }
+    this.cb.onRender?.();
   }
 
   // ----- gestos: arrastar, pinça, roda do mouse, toque -----

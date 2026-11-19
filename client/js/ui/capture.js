@@ -3,6 +3,7 @@
 import { species, tier, frogImg, rarityBadge } from '../catalog.js';
 import { store } from '../store.js';
 import { geo } from '../geo.js';
+import { skyPhase } from './daynight.js';
 import { sfx, vibrate } from '../audio.js';
 import { icons } from './icons.js';
 import { $, h, esc, fmtCm, toast } from './common.js';
@@ -58,13 +59,15 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
   let frog = { x: pads[padIdx].x, y: pads[padIdx].y };
   const view = 0;
 
-  const el = h(`<div class="capture">
+  const sky = skyPhase(new Date(), geo.pos);
+  const el = h(`<div class="capture ${sky === 'day' ? '' : sky}">
     <div class="cap-world" style="width:${W}px">
       <div class="cap-sky"></div>
       ${treeline(W, Math.round(H * 0.18))}
       <div class="cap-water"></div>
       ${pads.map((p) => `<img class="px cap-lily" src="assets/sprites/lilypad.png" style="left:${p.x}px;top:${p.y}px" alt="">`).join('')}
       ${reeds(-20, 130)}${reeds(W - 120, 140)}
+      <div class="cap-night"></div><div class="cap-stars"></div>
       <div class="cap-frog"><div class="hitbox"></div>${frogImg(sp.id, Math.min(140, W * 0.34))}</div>
     </div>
     <div class="cap-hud">
@@ -167,7 +170,7 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
     vibrate([40, 60, 40]);
     let result;
     try {
-      result = await store.capture(spawn, geo.pos);
+      result = await store.capture(spawn, geo.pos, geo.playMode);
     } catch (err) {
       toast('Não foi possível salvar a captura no aparelho.', 'warn');
       close();

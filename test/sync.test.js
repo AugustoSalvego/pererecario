@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { spawnsFor, windowOf, giftFor, dayOf, maskFromSpecies, pondsNear, brejosNear, distanceM } from '../client/js/shared/game.js';
+import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, brejosNear, distanceM } from '../client/js/shared/game.js';
 
 let server, base, app, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
@@ -86,12 +86,12 @@ test('lagoinhas automáticas em qualquer lugar: o servidor aceita, sem cadastro'
   const p = await newPlayer('nina');
   // um lugar qualquer, longe de todos os brejos cadastrados
   const here = { lat: 48.8584, lng: 2.2945 };
-  const ponds = pondsNear(here, 400);
+  const ponds = pondsNear(here, 400, p.id);
   assert.ok(ponds.length >= 12, `poucas lagoinhas: ${ponds.length}`);
   for (let i = 0; i < ponds.length; i++) for (let j = i + 1; j < ponds.length; j++) {
     assert.ok(distanceM(ponds[i], ponds[j]) >= ponds[i].radius + ponds[j].radius, 'lagoinhas sobrepostas');
   }
-  const spawn = spawnsFor(ponds[0], windowOf(clock), app.catalog)[0];
+  const spawn = spawnsFor(ponds[0], windowOf(clock), app.catalog, p.id)[0];
   const ok = await sync(p, 'c1', [captureOp(spawn, clock)]);
   assert.equal(ok.body.results[0].status, 'applied', JSON.stringify(ok.body.results[0]));
   // id de lagoinha que não existe (o sorteio daquele ponto da grade deu "sem lagoinha") é recusado
@@ -102,13 +102,13 @@ test('lagoinhas automáticas em qualquer lugar: o servidor aceita, sem cadastro'
 
 test('brejo cadastrado à mão esconde a lagoinha automática que está em cima dele', async () => {
   const p = await newPlayer('otto');
-  const pond = pondsNear({ lat: -22.95, lng: -43.21 }, 300)[0];
+  const pond = pondsNear({ lat: -22.95, lng: -43.21 }, 300, p.id)[0];
   const r = await call('POST', '/api/admin/brejos', { name: 'Brejo da Sala', lat: pond.lat, lng: pond.lng + 0.0001, radius: 30 }, { 'X-Admin-Key': ADMIN });
   assert.equal(r.status, 200);
-  const shown = brejosNear(r.body.brejos, pond, 300);
+  const shown = brejosNear(r.body.brejos, pond, 300, p.id);
   assert.ok(!shown.some((b) => b.id === pond.id), 'a automática deveria sumir');
   assert.ok(shown.some((b) => b.name === 'Brejo da Sala'));
-  const spawn = spawnsFor(pond, windowOf(clock), app.catalog)[0];
+  const spawn = spawnsFor(pond, windowOf(clock), app.catalog, p.id)[0];
   const res = await sync(p, 'c1', [captureOp(spawn, clock)]);
   assert.equal(res.body.results[0].status, 'rejected');
 });
@@ -122,10 +122,63 @@ test('o servidor recalcula as mesmas pererecas que o cliente', async () => {
   assert.ok(a.length >= 3);
 });
 
+test('cada jogador tem lagoinhas e pererecas próprias', async () => {
+  const a = await newPlayer('lia');
+  const b = await newPlayer('teo');
+  const here = { lat: -23.1068, lng: -50.3602 };
+  const pa = pondsNear(here, 400, a.id), pb = pondsNear(here, 400, b.id);
+  assert.notDeepEqual(pa.map((x) => [x.id, x.lat]), pb.map((x) => [x.id, x.lat]), 'lagoinhas iguais para jogadores diferentes');
+  const br = await ensureBrejo();
+  const sa = spawnsFor(br, windowOf(clock), app.catalog, a.id), sb = spawnsFor(br, windowOf(clock), app.catalog, b.id);
+  assert.notDeepEqual(sa.map((x) => [x.speciesId, x.lat]), sb.map((x) => [x.speciesId, x.lat]));
+  // a perereca de um jogador não pode ser capturada por outro
+  const r = await sync(b, 'c1', [captureOp(spawnsFor(pa[0], windowOf(clock), app.catalog, a.id)[0], clock)]);
+  assert.notEqual(r.body.results[0].status, 'applied');
+});
+
+test('modo controle: pererecas "só GPS" são recusadas; no modo GPS valem', async () => {
+  const p = await newPlayer('rui');
+  const here = { lat: -23.2, lng: -50.5 };
+  let gpsOnly = null;
+  for (let w = 0; w < 400 && !gpsOnly; w++) {
+    for (const pond of pondsNear(here, 400, p.id)) {
+      gpsOnly = spawnsFor(pond, windowOf(clock) - w, app.catalog, p.id).find((s) => s.gpsOnly);
+      if (gpsOnly) break;
+    }
+  }
+  assert.ok(gpsOnly, 'deveria existir alguma perereca só de GPS');
+  const at = windowStart(gpsOnly.win) + 1000;
+  const ctl = await sync(p, 'c1', [captureOp(gpsOnly, at, { mode: 'controle' })]);
+  assert.equal(ctl.body.results[0].status, 'rejected');
+  const gps = await sync(p, 'c1', [captureOp(gpsOnly, at, { mode: 'gps' })]);
+  assert.equal(gps.body.results[0].status, 'applied', JSON.stringify(gps.body.results[0]));
+});
+
+test('presença: jogadores perto se veem, longe não, e quem se esconde some', async () => {
+  const a = await newPlayer('ana2'), b = await newPlayer('bel2'), c = await newPlayer('cid2');
+  const sala = { lat: -23.10680, lng: -50.36020 };
+  await call('POST', '/api/presence', { ...sala }, auth(a));
+  await call('POST', '/api/presence', { lat: sala.lat + 0.00001, lng: sala.lng, look: 'ninja-feminino-media' }, auth(b));
+  await call('POST', '/api/presence', { lat: sala.lat + 0.05, lng: sala.lng }, auth(c)); // ~5 km
+  const r = await call('POST', '/api/presence', { ...sala }, auth(a));
+  const ids = r.body.players.map((o) => o.id);
+  assert.ok(ids.includes(b.id) && !ids.includes(c.id) && !ids.includes(a.id));
+  assert.equal(r.body.players.find((o) => o.id === b.id).look, 'ninja-feminino-media');
+  await call('POST', '/api/presence', { ...sala, hidden: true }, auth(b));
+  const r2 = await call('POST', '/api/presence', { ...sala }, auth(a));
+  assert.ok(!r2.body.players.some((o) => o.id === b.id));
+  const r3 = await call('POST', '/api/presence', { ...sala }, auth(c)); // c chega na sala: vê a
+  assert.ok(r3.body.players.some((o) => o.id === a.id));
+  clock += 60_000; // sem notícias de a por 1 min: a presença expira sozinha
+  const r4 = await call('POST', '/api/presence', { ...sala }, auth(c));
+  assert.ok(!r4.body.players.some((o) => o.id === a.id));
+  clock -= 60_000;
+});
+
 test('reenvio da mesma operação não duplica a captura (idempotência)', async () => {
   const p = await newPlayer('bia');
   const b = await ensureBrejo();
-  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[0];
+  const spawn = spawnsFor(b, windowOf(clock), app.catalog, p.id)[0];
   const op = captureOp(spawn, clock);
   const first = await sync(p, 'celular-1', [op]);
   assert.equal(first.body.results[0].status, 'applied');
@@ -139,7 +192,7 @@ test('reenvio da mesma operação não duplica a captura (idempotência)', async
 test('captura inválida é rejeitada', async () => {
   const p = await newPlayer('caio');
   const b = await ensureBrejo();
-  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[1];
+  const spawn = spawnsFor(b, windowOf(clock), app.catalog, p.id)[1];
   const wrongSpecies = captureOp({ ...spawn, speciesId: spawn.speciesId === 'frog_star' ? 'frog_leaf' : 'frog_star' }, clock);
   const tooLate = captureOp(spawn, clock + 2 * 60 * 60 * 1000 - 1000);
   const tooFar = captureOp(spawn, clock, { lat: spawn.lat + 0.01 });
@@ -150,10 +203,10 @@ test('captura inválida é rejeitada', async () => {
 
 test('conflito: mesma perereca em dois aparelhos offline -> vence a primeira captura, em qualquer ordem', async () => {
   const b = await ensureBrejo();
-  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[2];
 
   for (const order of [['A', 'B'], ['B', 'A']]) {
     const p = await newPlayer(`dani${order.join('')}`.toLowerCase());
+    const spawn = spawnsFor(b, windowOf(clock), app.catalog, p.id)[2]; // mesmo jogador = mesmas pererecas nos dois aparelhos
     const ops = { A: captureOp(spawn, clock + 1000), B: captureOp(spawn, clock + 5000) }; // A pegou antes
     const dev = { A: 'aparelho-A', B: 'aparelho-B' };
     const r1 = await sync(p, dev[order[0]], [ops[order[0]]]);
@@ -172,7 +225,7 @@ test('conflito: mesma perereca em dois aparelhos offline -> vence a primeira cap
 test('favorito usa "última escrita vence"', async () => {
   const p = await newPlayer('edu');
   const b = await ensureBrejo();
-  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[0];
+  const spawn = spawnsFor(b, windowOf(clock), app.catalog, p.id)[0];
   await sync(p, 'c1', [captureOp(spawn, clock)]);
   const fav = (v, ts) => ({ opId: crypto.randomUUID(), type: 'favorite', ts, payload: { spawnId: spawn.id, favorite: v, ts } });
   await sync(p, 'c1', [fav(true, clock + 20)]);
@@ -244,7 +297,7 @@ test('servidor indisponível responde 503 e volta sozinho', async () => {
 test('lote parcialmente aplicado: reenviar o lote inteiro é seguro', async () => {
   const p = await newPlayer('ivo');
   const b = await ensureBrejo();
-  const spawns = spawnsFor(b, windowOf(clock), app.catalog);
+  const spawns = spawnsFor(b, windowOf(clock), app.catalog, p.id);
   const ops = spawns.slice(0, 3).map((s, i) => captureOp(s, clock + i));
   // primeira tentativa: só a primeira operação chegou (ex.: conexão caiu no meio)
   await sync(p, 'c1', [ops[0]]);
@@ -256,7 +309,7 @@ test('lote parcialmente aplicado: reenviar o lote inteiro é seguro', async () =
 test('ranking e progresso recuperado em outro aparelho', async () => {
   const p = await newPlayer('julia');
   const b = await ensureBrejo();
-  const spawn = spawnsFor(b, windowOf(clock), app.catalog)[0];
+  const spawn = spawnsFor(b, windowOf(clock), app.catalog, p.id)[0];
   await sync(p, 'celular', [captureOp(spawn, clock)]);
   const login = await call('POST', '/api/auth/login', { username: 'julia', password: 'senha123' });
   const other = await sync({ token: login.body.token }, 'tablet', []);

@@ -20,6 +20,11 @@ export const BALANCO = {
   maxPererecas: 7,           // nem mais que isso
   trocaACadaMin: 15,         // a cada 15 min as pererecas de cada lagoinha mudam (novas nascem)
 
+  // --- modo de andar ---
+  // No modo GPS (andando de verdade) aparecem todas as pererecas. No modo controle (joystick)
+  // só aparece esta fração de cada raridade: 1 = todas, 0,35 = cerca de 1 em cada 3.
+  noModoControle: { common: 1, uncommon: 0.8, rare: 0.35, special: 0.15 },
+
   // --- distâncias do jogador ---
   capturaAteM: 10,           // pode tocar na perereca para capturar a até 10 m
   folgaDoGpsM: 10,           // folga extra quando o GPS do celular diz que está impreciso
@@ -130,8 +135,9 @@ export const MIN_BREJO_GAP_M = BALANCO.vaoEntreBrejosM;
 // ---------- lagoinhas automáticas em qualquer lugar ----------
 // O mundo inteiro é coberto por uma grade fixa de ~130 m (BALANCO.lagoinhaACadaM). Cada ponto
 // da grade tem um sorteio próprio, com semente fixa, que decide se ali existe uma lagoinha,
-// onde exatamente ela fica e qual o nome dela. Como o sorteio depende só do ponto da grade,
-// qualquer celular (mesmo offline) e o servidor chegam às mesmas lagoinhas, sem cadastro.
+// onde exatamente ela fica e qual o nome dela. A semente inclui o id do jogador: cada jogador
+// tem as suas lagoinhas e as suas pererecas. Como o sorteio depende só do jogador e do ponto
+// da grade, qualquer celular dele (mesmo offline) e o servidor chegam às mesmas lagoinhas.
 export const AUTO = { cell: BALANCO.lagoinhaACadaM, radius: BALANCO.raioDaLagoinhaM, chance: BALANCO.chanceDeLagoinha };
 export const FROG_VIEW_M = BALANCO.vePererecasAteM;
 export const POND_VIEW_M = BALANCO.veLagoinhasAteM;
@@ -144,8 +150,8 @@ const colStep = (i) => AUTO.cell / (M_PER_DEG * Math.cos(rad(rowLat(i))));      
 const POND_ID = /^p(-?\d+)_(-?\d+)$/;
 
 // a lagoinha do ponto (i, j) da grade, ou null se o sorteio disse que ali não tem
-export function pondAt(i, j) {
-  const next = rng(hash32(`lagoinha|${i}|${j}`));
+export function pondAt(i, j, seed = '') {
+  const next = rng(hash32(`lagoinha|${seed}|${i}|${j}`));
   if (next() > AUTO.chance) return null;
   const north = (next() - 0.5) * AUTO.cell * 0.4;   // leve desvio, para não ficar tudo alinhado
   const east = (next() - 0.5) * AUTO.cell * 0.4;
@@ -154,13 +160,13 @@ export function pondAt(i, j) {
   return { id: `p${i}_${j}`, name, lat: p.lat, lng: p.lng, radius: AUTO.radius, auto: true };
 }
 
-export function pondById(id) {
+export function pondById(id, seed = '') {
   const m = POND_ID.exec(String(id));
-  return m ? pondAt(Number(m[1]), Number(m[2])) : null;
+  return m ? pondAt(Number(m[1]), Number(m[2]), seed) : null;
 }
 
 // todas as lagoinhas automáticas a até radiusM de um ponto
-export function pondsNear(p, radiusM) {
+export function pondsNear(p, radiusM, seed = '') {
   if (!p) return [];
   const out = [];
   const i0 = Math.floor((p.lat * M_PER_DEG - radiusM) / AUTO.cell) - 1;
@@ -170,7 +176,7 @@ export function pondsNear(p, radiusM) {
     const dLng = radiusM / (M_PER_DEG * Math.cos(rad(rowLat(i))));
     const j0 = Math.floor((p.lng - dLng) / step) - 1, j1 = Math.ceil((p.lng + dLng) / step) + 1;
     for (let j = j0; j <= j1; j++) {
-      const b = pondAt(i, j);
+      const b = pondAt(i, j, seed);
       if (b && distanceM(p, b) <= radiusM) out.push(b);
     }
   }
@@ -179,20 +185,20 @@ export function pondsNear(p, radiusM) {
 
 // Lagoinhas do jogo perto de um ponto: os brejos cadastrados à mão têm prioridade e
 // escondem a lagoinha automática que estiver em cima deles.
-export function brejosNear(manual, p, radiusM) {
+export function brejosNear(manual, p, radiusM, seed = '') {
   const kept = visibleBrejos(manual || []);
   if (!p) return kept;
   const mine = kept.filter((b) => distanceM(p, b) <= radiusM + b.radius);
-  const auto = pondsNear(p, radiusM).filter((a) => kept.every((m) => distanceM(a, m) >= a.radius + m.radius));
+  const auto = pondsNear(p, radiusM, seed).filter((a) => kept.every((m) => distanceM(a, m) >= a.radius + m.radius));
   return [...mine, ...auto];
 }
 
 // acha um brejo pelo id: cadastrado à mão ou automático (null se não existe ou está escondido)
-export function findBrejo(id, manual) {
+export function findBrejo(id, manual, seed = '') {
   const kept = visibleBrejos(manual || []);
   const m = (manual || []).find((b) => b.id === id);
   if (m) return m;
-  const a = pondById(id);
+  const a = pondById(id, seed);
   if (!a || !kept.every((k) => distanceM(a, k) >= a.radius + k.radius)) return null;
   return a;
 }
@@ -207,9 +213,12 @@ export function visibleBrejos(brejos) {
   return kept;
 }
 
-export function spawnsFor(brejo, win, catalog) {
-  const next = rng(hash32(`${brejo.id}|${win}`));          // espécie e tamanho
-  const pos = rng(hash32(`${brejo.id}|${win}|pos`));       // posição
+// seed = id do jogador (cada um tem as suas pererecas)
+export function spawnsFor(brejo, win, catalog, seed = '') {
+  const key = seed ? `${seed}|${brejo.id}|${win}` : `${brejo.id}|${win}`;
+  const next = rng(hash32(key));                 // espécie e tamanho
+  const pos = rng(hash32(`${key}|pos`));         // posição
+  const modo = rng(hash32(`${key}|modo`));       // quais aparecem no modo controle
   const n = spawnCount(brejo);
   const rMin = Math.max(POND_CLEAR_M, brejo.radius * 0.3);
   const rMax = Math.max(rMin + 10, brejo.radius * 0.9);
@@ -238,12 +247,16 @@ export function spawnsFor(brejo, win, catalog) {
       speciesId: sp.id,
       sizeCm: sizeFor(next, sp),
       hidden: sp.tier !== 'common', // comuns ficam à vista; as demais se escondem num matinho
+      gpsOnly: modo() >= (BALANCO.noModoControle[sp.tier] ?? 1), // só aparece andando com GPS
       lat: ll.lat,
       lng: ll.lng,
     });
   }
   return out;
 }
+
+// a perereca aparece neste modo de andar? ('gps' ou 'controle')
+export const visibleInMode = (spawn, mode) => mode !== 'controle' || !spawn.gpsOnly;
 
 export function parseSpawnId(id) {
   const parts = String(id).split(':');
@@ -320,11 +333,13 @@ export const dayFromExpeditionId = (id) => Number(String(id).split(':')[2]);
 
 // Boneco: modelo-gênero-tom, ex.: "froghood-feminino-media".
 // (O formato antigo "modelo-tom" continua aceito e vale como "masculino".)
-export const LOOK_MODELS = ['froghood', 'explorer'];
+export const LOOK_MODELS = ['froghood', 'explorer', 'dartfrog', 'raincoat', 'scientist', 'fisher', 'sporty', 'farmer', 'student',
+  'lantern', 'mage', 'royal', 'ninja', 'samurai', 'knight', 'pirate', 'magical', 'pilot'];
 export const LOOK_GENDERS = ['masculino', 'feminino'];
 export const LOOK_SKINS = ['clara', 'media', 'escura'];
 export const DEFAULT_LOOK = 'froghood-masculino-clara';
-export const validLook = (look) => /^(froghood|explorer)(-(masculino|feminino))?-(clara|media|escura)$/.test(String(look));
+const LOOK_RE = new RegExp(`^(${LOOK_MODELS.join('|')})(-(masculino|feminino))?-(clara|media|escura)$`);
+export const validLook = (look) => LOOK_RE.test(String(look));
 export function normalizeLook(look) {
   if (!validLook(look)) return DEFAULT_LOOK;
   const p = String(look).split('-');

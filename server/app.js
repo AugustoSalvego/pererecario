@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, makeTokens, friendCode } from './auth.js';
 import { makeSync } from './sync.js';
-import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M } from '../client/js/shared/game.js';
+import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLIENT_DIR = path.join(ROOT, 'client');
@@ -58,6 +58,18 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
   }
 
   let outageUntil = 0;
+
+  // Presença: quem está com o jogo aberto agora e onde. É um estado "leve": fica só na memória
+  // do servidor e expira sozinho (PRESENCE_TTL). Não vai para o banco nem para a fila offline,
+  // porque uma posição velha não tem valor. Cada jogador só recebe quem está perto dele.
+  const PRESENCE_TTL = 45_000;
+  const PRESENCE_RADIUS_M = 300;
+  const presence = new Map(); // playerId -> { id, name, look, lat, lng, mode, ts }
+  const round5 = (v) => Math.round(v * 20000) / 20000; // ~5 m: ninguém precisa da posição exata dos outros
+  function cleanPresence() {
+    const t = now();
+    for (const [k, v] of presence) if (t - v.ts > PRESENCE_TTL) presence.delete(k);
+  }
   const rate = new Map();
 
   async function brejos() {
@@ -153,6 +165,33 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
       };
     },
 
+    'POST /api/presence': async (req, body) => {
+      const playerId = auth(req);
+      const lat = Number(body?.lat), lng = Number(body?.lng);
+      cleanPresence();
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        throw new HttpError(400, 'Posição inválida');
+      }
+      if (body.hidden) presence.delete(playerId);
+      else {
+        const p = await db.one('SELECT display_name, look FROM players WHERE id=$1', [playerId]);
+        if (!p) throw new HttpError(401, 'Sessão inválida');
+        presence.set(playerId, {
+          id: playerId, name: p.display_name, look: validLook(body.look) ? body.look : p.look, lat: round5(lat), lng: round5(lng),
+          mode: body.mode === 'controle' ? 'controle' : 'gps', ts: now(),
+        });
+      }
+      const me = { lat, lng };
+      const players = [...presence.values()]
+        .filter((o) => o.id !== playerId)
+        .map((o) => ({ ...o, d: distanceM(me, o) }))
+        .filter((o) => o.d <= PRESENCE_RADIUS_M)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 30)
+        .map(({ d, ts, ...o }) => ({ ...o, age: now() - ts }));
+      return { players, serverTime: now() };
+    },
+
     'GET /api/ranking': async (req) => {
       const playerId = auth(req);
       const rows = await sync.ranking();
@@ -180,6 +219,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
         serverTime: t,
         db: db.kind,
         outageUntil,
+        online: (cleanPresence(), presence.size),
         counts: {
           players: players.length,
           captures: Number((await db.one('SELECT COUNT(*) AS n FROM captures')).n),
@@ -191,7 +231,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
         },
         players: players.map((p) => ({ ...p, xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
         captures: await db.query(
-          `SELECT c.id, c.spawn_id, c.species_id, c.kind, c.caught_at, c.received_at, c.device_id, p.username
+          `SELECT c.id, c.spawn_id, c.species_id, c.kind, c.mode, c.caught_at, c.received_at, c.device_id, p.username
            FROM captures c JOIN players p ON p.id = c.player_id ORDER BY c.received_at DESC LIMIT 40`),
         operations: await db.query(
           `SELECT o.op_id, o.type, o.status, o.device_id, o.client_ts, o.received_at, p.username

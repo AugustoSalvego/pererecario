@@ -13,12 +13,13 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 ## Como jogar
 
 1. Abra o link do jogo no celular (Chrome no Android ou Safari no iPhone), crie a conta e permita **localização** e **sensores de movimento**.
-2. Na primeira vez, um tutorial curto explica o jogo e você escolhe o seu explorador.
-3. Ande até uma **lagoinha** (a setinha no topo aponta a mais próxima). As pererecas comuns ficam à vista, pulando em volta dela; as mais raras se escondem nos **matinhos com "?"**.
+2. Na primeira vez, um tutorial curto explica o jogo e você escolhe o seu boneco: são **18 estilos** (Capuz de Sapo, Explorador, Ninja, Samurai, Cavaleiro, Pirata, Mágica, Piloto de Robô e outros), masculino ou feminino, em 3 tons de pele.
+3. Escolha como andar no botão do mapa: **GPS** (anda de verdade; aparecem todas as pererecas) ou **Controle** (joystick na tela; aparecem menos raras). Ande até uma **lagoinha** (a setinha no topo aponta a mais próxima). As pererecas comuns ficam à vista, pulando em volta dela; as mais raras se escondem nos **matinhos com "?"**.
 4. Chegou a 20 m de um matinho? **Toque nele** ou **chacoalhe o celular** (revela todos por perto) para a perereca sair.
 5. A até **10 m**, toque na perereca para escolhê-la. Na captura, **toque rápido** nela várias vezes, enquanto ela pula entre as vitórias-régias, até encher o pote.
-6. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
-7. Complete o **Pererecário** (15 espécies, das comuns até a especial) e veja suas repetidas no **Meu Brejo**. Cada dia em que você joga é uma **caçada**; no Perfil ficam a caçada de hoje, o ranking e o **Diário de campo** com as últimas capturas.
+6. Quem estiver jogando a até 300 m aparece no seu mapa, com o nome (dá para se esconder no Perfil). De dia o mapa é claro; à noite fica azulado, com vaga-lumes e uma luz em volta do seu boneco.
+7. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
+8. Complete o **Pererecário** (15 espécies, das comuns até a especial) e veja suas repetidas no **Meu Brejo**. Cada dia em que você joga é uma **caçada**; no Perfil ficam a caçada de hoje, o ranking e o **Diário de campo** com as últimas capturas.
 
 Para instalar como app: no Android, menu ⋮ → "Instalar app"/"Adicionar à tela inicial"; no iPhone, Compartilhar → "Adicionar à Tela de Início".
 
@@ -46,7 +47,7 @@ Observações do plano gratuito do Render: o servidor "dorme" após 15 min sem a
 
 ## Onde aparecem as lagoinhas
 
-**Em qualquer lugar, sem cadastro.** O mundo inteiro é coberto por uma grade invisível de ~130 m, e cada ponto da grade tem um sorteio fixo que decide se ali existe uma lagoinha (75 % de chance). Cada lagoinha tem 4 pererecas, que mudam a cada **15 minutos**. Celular e servidor fazem o mesmo sorteio, então chegam às mesmas lagoinhas e pererecas, mesmo com o celular offline.
+**Em qualquer lugar, sem cadastro, e diferentes para cada jogador.** O mundo inteiro é coberto por uma grade invisível de ~130 m, e cada ponto da grade tem um sorteio fixo, feito com o id do jogador, que decide se ali existe uma lagoinha (75 % de chance). Cada lagoinha tem 4 pererecas, que mudam a cada **15 minutos**. Celular e servidor fazem o mesmo sorteio, então chegam às mesmas lagoinhas e pererecas, mesmo com o celular offline. Dois jogadores lado a lado veem lagoinhas diferentes; a mesma conta em dois celulares vê as mesmas.
 
 No mapa, as pererecas e os matinhos só aparecem a até 70 m do jogador (mais longe, somem), e as lagoinhas a até 400 m. Quando não há perereca por perto, uma setinha no topo aponta a lagoinha mais próxima.
 

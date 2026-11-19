@@ -8,7 +8,8 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 - **Notebook no projetor** com o painel do servidor aberto: `https://SEU-APP.onrender.com/admin` (com a `ADMIN_KEY`). Ele mostra capturas, log de operações, conflitos e atualiza a cada 3 s.
 - As lagoinhas aparecem sozinhas em qualquer lugar: o público só precisa abrir o link e criar uma conta.
 - **Um brejo na sala**: no celular, Perfil → Painel de demonstração → chave de admin → nome "Brejo da Sala" → raio 40 → **Criar brejo onde estou**. (Faça isso antes, no lugar da apresentação.)
-- Se o GPS dentro do prédio estiver ruim, ligue **GPS simulado** no painel de demonstração e toque no mapa para o explorador andar (ou use "Ir" ao lado do brejo).
+- Se o GPS dentro do prédio estiver ruim, toque no botão **GPS** do mapa para mudar para o **modo controle** e ande com o joystick (ou com as setas do teclado no notebook). Lembre que no modo controle aparecem menos raras.
+- **Mesma conta nos dois celulares = mesmas lagoinhas e pererecas.** Cada conta tem as suas; por isso o teste de conflito usa a mesma conta em A e B.
 - Abra o servidor uns minutos antes: no plano grátis ele "dorme" e leva ~1 min para acordar.
 
 ## Teste 1: partida online com registro no servidor
@@ -63,3 +64,6 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 - **Chacoalhar** o celular perto de um matinho com "?" faz as pererecas saírem.
 - **QR code**: dois colegas abrem a aba Amigos e um escaneia o QR do outro: a perereca-presente aparece.
+- **Jogadores juntos**: com dois ou mais celulares de contas diferentes abertos na sala, cada um vê os outros no mapa (com o nome), afastados entre si mesmo estando no mesmo ponto. Aparece "N jogadores por perto". Ao ligar o modo avião, os outros somem; o resto do jogo continua (a presença é um dado passageiro, não entra na fila offline).
+- **Modo GPS × modo controle**: toque no botão do mapa para trocar. No `/admin`, a coluna **Modo** das capturas mostra 📍 GPS ou 🎮 controle.
+- **Dia e noite**: é automático pela posição do sol. Para mostrar a noite durante o dia: Painel de demonstração → **Céu do mapa** → Noite (depois volte para Automático). Capture uma perereca à noite para mostrar a lua e as estrelas.

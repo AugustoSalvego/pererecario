@@ -173,6 +173,7 @@ async function openPostgres(url) {
 const MIGRATIONS = [
   "ALTER TABLE players ADD COLUMN look TEXT NOT NULL DEFAULT 'froghood-masculino-clara'",
   'ALTER TABLE players ADD COLUMN look_ts BIGINT NOT NULL DEFAULT 0',
+  "ALTER TABLE captures ADD COLUMN mode TEXT NOT NULL DEFAULT 'gps'",
 ];
 
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {
