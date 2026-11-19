@@ -97,6 +97,11 @@ export const sfx = {
     tone({ type: 'triangle', from: 520, to: 430, dur: 0.11, gain: 0.1, delay: 0.13, filter: 1600 });
   },
   error: () => tone({ type: 'triangle', from: 330, to: 260, dur: 0.16, gain: 0.06 }),
+  // moedinhas: venda, pagamento ("tlim-tlim")
+  coin: () => {
+    tone({ type: 'square', from: 988, dur: 0.07, gain: 0.04, filter: 3500 });
+    tone({ type: 'square', from: 1319, dur: 0.16, gain: 0.04, delay: 0.07, filter: 3500 });
+  },
 };
 sfx.croak = sfx.ribbit;
 

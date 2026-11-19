@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
   distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo, visibleInMode,
-  jobById, jobPay, JOB_RANGE_M, DELIVERY_RANGE_M, carById, balanceOf, BALANCO,
+  jobById, jobPay, JOB_RANGE_M, DELIVERY_RANGE_M, carById, balanceOf, frogPrice, BALANCO,
 } from '../client/js/shared/game.js';
 
 const GPS_TOLERANCE_M = 45;
@@ -261,13 +261,34 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       if (owned) return { status: 'conflict', conflict: { kept: { id: owned.id, deviceId: owned.device_id }, policy: 'item já comprado em outro aparelho: não foi cobrado de novo' } };
       const jobs = await q.query('SELECT pay FROM jobs WHERE player_id=$1', [playerId]);
       const buys = await q.query('SELECT price FROM purchases WHERE player_id=$1', [playerId]);
-      const balance = balanceOf(jobs, buys);
+      const sold = await q.query('SELECT price FROM sales WHERE player_id=$1', [playerId]);
+      const balance = balanceOf(jobs, buys, sold);
       if (balance < car.price) return { status: 'rejected', error: `Saldo insuficiente no servidor (B$ ${balance} de B$ ${car.price})` };
       await q.run(
         'INSERT INTO purchases (id, player_id, item, price, bought_at, device_id, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [p.buyId, playerId, car.id, car.price, at, deviceId, now()],
       );
       return { status: 'applied' };
+    },
+
+    // Venda de perereca do Meu Brejo. A mesma perereca só é vendida uma vez (vender nos dois
+    // celulares paga uma vez só). Se a captura não existe no servidor (por exemplo, perdeu o
+    // conflito "primeira captura vence"), a venda é recusada e não entra dinheiro. Favorita não vende.
+    // O preço é calculado aqui (raridade + tamanho), não o que o celular mandou.
+    async 'frog.sell'(q, playerId, deviceId, p) {
+      const at = num(p.soldAt);
+      if (!str(p.sellId, 64) || !str(p.captureId, 64) || at === null) return { status: 'rejected', error: 'Venda malformada' };
+      const cap = await q.one('SELECT * FROM captures WHERE id=$1 AND player_id=$2', [p.captureId, playerId]);
+      if (!cap) return { status: 'rejected', error: 'Essa perereca não está no seu brejo no servidor' };
+      const sold = await q.one('SELECT * FROM sales WHERE player_id=$1 AND capture_id=$2', [playerId, p.captureId]);
+      if (sold) return { status: 'conflict', conflict: { kept: { id: sold.id, deviceId: sold.device_id }, policy: 'a mesma perereca só é vendida uma vez: não pagou de novo' } };
+      if (cap.favorite) return { status: 'rejected', error: 'Perereca favorita não pode ser vendida' };
+      const price = frogPrice(catalog, cap.species_id, cap.size_cm);
+      await q.run(
+        'INSERT INTO sales (id, player_id, capture_id, species_id, price, sold_at, device_id, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [p.sellId, playerId, p.captureId, cap.species_id, price, at, deviceId, now()],
+      );
+      return { status: 'applied', price };
     },
 
     // Carro em uso: última escrita vence (como o visual). Só vale carro que o jogador tem.
@@ -331,6 +352,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
     );
     const jobs = await db.query('SELECT * FROM jobs WHERE player_id=$1 ORDER BY done_at, id', [playerId]);
     const buys = await db.query('SELECT * FROM purchases WHERE player_id=$1 ORDER BY bought_at, id', [playerId]);
+    const sales = await db.query('SELECT * FROM sales WHERE player_id=$1 ORDER BY sold_at, id', [playerId]);
     const friends = await db.query(
       `SELECT f.friend_id, f.created_at, p.display_name, p.avatar FROM friendships f
        JOIN players p ON p.id = f.friend_id WHERE f.player_id=$1 ORDER BY f.created_at`, [playerId],
@@ -348,6 +370,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       },
       jobs: jobs.map((j) => ({ id: j.id, jobId: j.job_id, type: j.type, pay: j.pay, mode: j.mode, doneAt: Number(j.done_at), deviceId: j.device_id })),
       purchases: buys.map((b) => ({ id: b.id, item: b.item, price: b.price, boughtAt: Number(b.bought_at), deviceId: b.device_id })),
+      sales: sales.map((v) => ({ id: v.id, captureId: v.capture_id, speciesId: v.species_id, price: v.price, soldAt: Number(v.sold_at), deviceId: v.device_id })),
       captures: caps.map((c) => ({
         id: c.id, spawnId: c.spawn_id, speciesId: c.species_id, sizeCm: c.size_cm, kind: c.kind,
         brejoId: c.brejo_id, friendId: c.friend_id, expeditionId: c.expedition_id, caughtAt: c.caught_at,
@@ -362,22 +385,41 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
   }
 
   let rankCache = { at: 0, rows: [] };
+  // Rankings: mais XP, mais capturas e mais Brejais ganhos (trabalhos + vendas; comprar carro não
+  // tira ninguém do lugar). A lista principal (rows) continua ordenada por XP.
   async function ranking() {
     if (now() - rankCache.at < 15000) return rankCache.rows;
-    const players = await db.query('SELECT id, display_name, avatar FROM players');
+    const players = await db.query('SELECT id, display_name, avatar, look FROM players');
     const caps = await db.query('SELECT id, player_id, species_id, caught_at FROM captures');
+    const pays = await db.query('SELECT player_id, pay FROM jobs');
+    const sold = await db.query('SELECT player_id, price FROM sales');
     const byPlayer = new Map(players.map((p) => [p.id, []]));
     for (const c of caps) byPlayer.get(c.player_id)?.push({ id: c.id, speciesId: c.species_id, caughtAt: c.caught_at });
+    const gold = new Map();
+    for (const j of pays) gold.set(j.player_id, (gold.get(j.player_id) || 0) + (Number(j.pay) || 0));
+    for (const v of sold) gold.set(v.player_id, (gold.get(v.player_id) || 0) + (Number(v.price) || 0));
     const rows = players.map((p) => {
       const b = xpBreakdown(byPlayer.get(p.id) || [], catalog);
       return {
-        id: p.id, displayName: p.display_name, avatar: p.avatar, xp: b.total,
+        id: p.id, displayName: p.display_name, avatar: p.avatar, look: p.look || null, xp: b.total,
         level: levelFor(b.total).level, species: b.species.size, captures: (byPlayer.get(p.id) || []).length,
+        gold: gold.get(p.id) || 0,
       };
     }).sort((a, b) => b.xp - a.xp || a.displayName.localeCompare(b.displayName));
     rankCache = { at: now(), rows };
     return rows;
   }
 
-  return { applyOp, snapshot, ranking, handlers, stats };
+  // os três quadros, cada um com o top e a posição do jogador
+  async function boards(playerId, size = 50) {
+    const rows = await ranking();
+    const by = (key) => {
+      const sorted = [...rows].sort((a, b) => b[key] - a[key] || b.xp - a.xp || a.displayName.localeCompare(b.displayName));
+      const idx = sorted.findIndex((r) => r.id === playerId);
+      return { top: sorted.slice(0, size), me: idx >= 0 ? { rank: idx + 1, ...sorted[idx] } : null };
+    };
+    return { xp: by('xp'), captures: by('captures'), gold: by('gold') };
+  }
+
+  return { applyOp, snapshot, ranking, boards, handlers, stats };
 }

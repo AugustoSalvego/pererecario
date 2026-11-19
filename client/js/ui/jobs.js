@@ -288,9 +288,9 @@ export function showPayment(host, job, { art, pay, mode, onCollected }) {
   return res;
 }
 
-function coinBurst(from) {
+export function coinBurst(from, n = 10) {
   const r = from.getBoundingClientRect();
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < n; i++) {
     const c = h('<div class="coin-fly">B$</div>');
     c.style.left = `${r.left + r.width / 2}px`;
     c.style.top = `${r.top + r.height / 2}px`;

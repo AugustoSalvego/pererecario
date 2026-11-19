@@ -24,7 +24,7 @@ import { sensors } from '../sensors.js';
 import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
-  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, findBrejo, visibleInMode,
+  spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, moitasNear, findBrejo, visibleInMode,
   FROG_VIEW_M, POND_VIEW_M, jobsNear, JOB_VIEW_M, JOB_RANGE_M, DELIVERY_RANGE_M, carById,
 } from '../shared/game.js';
 
@@ -43,8 +43,20 @@ function brejosShown() {
   return shownCache.list;
 }
 
+// moitinhas por perto (pererecas soltas no mato, fora das lagoinhas). Não aparecem no mapa:
+// só as pererecas (ou o matinho com "?") delas.
+let moitaCache = { key: null, list: [] };
+function moitasShown() {
+  const vp = viewPoint();
+  if (!vp) return [];
+  const key = `${seed()}|${Math.round(vp.lat * 5000)}|${Math.round(vp.lng * 5000)}`;
+  if (moitaCache.key !== key) moitaCache = { key, list: moitasNear(vp, FROG_VIEW_M + 40, seed()) };
+  return moitaCache.list;
+}
+
 let map, current = 'map', ctx, lastWin = null, walkingTimer = null;
 let playerDir = 'down', walking = false, lastPos = null, justRevealed = new Set();
+let lastBalance = null;   // para animar o saldo quando entra dinheiro
 const revealing = new Set(); // matinhos no meio da animação (espiando por 1 s antes de virar perereca)
 const screens = {};
 
@@ -148,6 +160,7 @@ export function startGame({ firstTime = false } = {}) {
     const { op, result } = e.detail;
     if (op.type === 'job.done') return toast('Esse trabalho já tinha sido pago em outro aparelho: não paga duas vezes.', 'conflict', 'sync', 5000);
     if (op.type === 'shop.buy') return toast('Esse carro já tinha sido comprado em outro aparelho: não foi cobrado de novo.', 'conflict', 'sync', 5000);
+    if (op.type === 'frog.sell') return toast(`Essa ${esc(species(op.payload.speciesId)?.name || 'perereca')} já tinha sido vendida em outro aparelho: o dinheiro entrou uma vez só.`, 'conflict', 'sync', 5000);
     const name = species(op.payload.speciesId)?.name || 'perereca';
     if (result.status === 'conflict') toast(`Conflito resolvido: a ${esc(name)} já tinha sido capturada antes no aparelho ${esc(result.conflict.kept.deviceId)}. Ficou a primeira captura.`, 'conflict', 'sync', 6000);
     else toast(`Conflito resolvido: sua captura da ${esc(name)} foi a primeira e substituiu a do outro aparelho.`, 'conflict', 'sync', 6000);
@@ -155,6 +168,7 @@ export function startGame({ firstTime = false } = {}) {
   sync.addEventListener('rejected', (e) => {
     const { op, result } = e.detail;
     if (op.type === 'shop.buy') return toast(`Compra desfeita: ${esc(result.error)}. Seu dinheiro não saiu.`, 'warn', 'cloudOff', 6000);
+    if (op.type === 'frog.sell') return toast(`Venda desfeita: ${esc(result.error)}. A perereca voltou para o brejo.`, 'warn', 'cloudOff', 6000);
     toast(`O servidor recusou uma operação: ${esc(result.error)}`, 'warn', 'cloudOff', 5000);
   });
   sync.addEventListener('auth-expired', async () => { toast('Sessão expirada. Entre novamente.', 'warn'); await store.logout(); setTimeout(() => location.reload(), 1500); });
@@ -199,7 +213,21 @@ function renderAll() {
 function renderHud() {
   const v = store.view;
   if (!v.player) return;
-  $('.money-pill').innerHTML = `<span class="bcoin">B$</span> ${v.balance}`;
+  const mp = $('.money-pill');
+  mp.innerHTML = `<span class="bcoin">B$</span> ${v.balance}`;
+  // entrou dinheiro (trabalho, venda): o saldo pula e sobe um "+B$" embaixo dele
+  if (lastBalance != null && v.balance > lastBalance && mp.getBoundingClientRect().width > 0) {
+    mp.classList.remove('bump'); void mp.offsetWidth; mp.classList.add('bump');
+    const r = mp.getBoundingClientRect();
+    const plus = document.createElement('div');
+    plus.className = 'money-plus';
+    plus.innerHTML = `+<span class="bcoin">B$</span> ${v.balance - lastBalance}`;
+    plus.style.left = `${r.left + r.width / 2}px`;
+    plus.style.top = `${r.bottom + 4}px`;
+    document.body.appendChild(plus);
+    setTimeout(() => plus.remove(), 1400);
+  }
+  lastBalance = v.balance;
   const car = geo.mode === 'sim' ? carById(v.vehicle) : null;
   geo.joySpeed = car ? car.speed : 3.5;
   const look = lookOf(v.player);
@@ -338,7 +366,7 @@ function visibleSpawns() {
   const vp = viewPoint();
   const out = [];
   if (!vp) return out;
-  for (const b of brejosShown()) {
+  for (const b of [...brejosShown(), ...moitasShown()]) {
     if (distanceM(vp, b) > FROG_VIEW_M + b.radius) continue;
     for (const s of spawnsFor(b, w, catalog, seed())) {
       if (store.view.capturedSpawns.has(s.id)) continue;
@@ -423,14 +451,16 @@ function drawPlayer(force = false) {
   if (!pos || !map) return;
   const look = lookOf(store.view.player);
   const car = geo.mode === 'sim' ? store.view.vehicle : null;   // carro só no modo controle
-  const sig = `${look}|${playerDir}|${walking}|${car}`;
+  const name = store.view.player.displayName;
+  const sig = `${look}|${playerDir}|${walking}|${car}|${name}`;
   const o = map.objects.get('player');
+  // o próprio nome aparece em verde (os dos outros jogadores ficam em branco)
   map.setObject('player', {
     lat: pos.lat, lng: pos.lng, className: `mplayer ${car ? 'incar' : ''}`, depthScale: false, top: true,
     html: (!o || o.sig !== sig || force)
       ? (car
-        ? `<div class="cwrap">${faceBubble(look)}${carSprite(car, { dir: playerDir, moving: walking })}</div>`
-        : `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}</div>`)
+        ? `<div class="cwrap me">${faceBubble(look, name)}${carSprite(car, { dir: playerDir, moving: walking })}</div>`
+        : `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}<span class="oname me">${esc(name)}</span></div>`)
       : null,
   });
   map.objects.get('player').sig = sig;

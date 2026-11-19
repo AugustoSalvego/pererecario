@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, brejosNear, distanceM, jobsNear, jobPay } from '../client/js/shared/game.js';
+import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, moitasNear, brejosNear, distanceM, jobsNear, jobPay, visibleInMode, frogPrice } from '../client/js/shared/game.js';
 
 let server, base, app, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
@@ -96,6 +96,23 @@ test('lagoinhas automáticas em qualquer lugar: o servidor aceita, sem cadastro'
   assert.equal(ok.body.results[0].status, 'applied', JSON.stringify(ok.body.results[0]));
   // id de lagoinha que não existe (o sorteio daquele ponto da grade deu "sem lagoinha") é recusado
   const fake = { ...spawn, id: spawn.id.replace(ponds[0].id, 'p1_99999999') };
+  const bad = await sync(p, 'c1', [captureOp(fake, clock)]);
+  assert.notEqual(bad.body.results[0].status, 'applied');
+});
+
+test('pererecas soltas no mato: valem como as da lagoinha, e moitinha inventada é recusada', async () => {
+  const p = await newPlayer('moita');
+  const here = { lat: 48.8584, lng: 2.2945 };
+  const moitas = moitasNear(here, 300, p.id);
+  assert.ok(moitas.length >= 5, `poucas moitinhas: ${moitas.length}`);
+  for (const m of moitas) {
+    for (const pond of pondsNear(m, 120, p.id)) assert.ok(distanceM(m, pond) > pond.radius, 'moitinha em cima de lagoinha');
+  }
+  const spawn = spawnsFor(moitas[0], windowOf(clock), app.catalog, p.id).find((s) => visibleInMode(s, 'gps'));
+  assert.ok(distanceM(spawn, moitas[0]) <= moitas[0].radius + 1, 'perereca longe da moitinha');
+  const ok = await sync(p, 'c1', [captureOp(spawn, clock)]);
+  assert.equal(ok.body.results[0].status, 'applied', JSON.stringify(ok.body.results[0]));
+  const fake = { ...spawn, id: spawn.id.replace(moitas[0].id, 'm1_99999999') };
   const bad = await sync(p, 'c1', [captureOp(fake, clock)]);
   assert.notEqual(bad.body.results[0].status, 'applied');
 });
@@ -238,6 +255,44 @@ test('loja: sem saldo é recusada; item repetido não cobra; dois aparelhos gast
   assert.equal(v1.body.results[0].status, 'rejected');
   const v2 = await sync(p, 'A', [{ opId: crypto.randomUUID(), type: 'vehicle.select', ts: clock, payload: { vehicle: 'sedan', ts: clock } }]);
   assert.equal(v2.body.state.player.vehicle, 'sedan');
+});
+
+test('venda de perereca: paga uma vez só, preço do servidor, favorita e captura perdida não vendem', async () => {
+  const p = await newPlayer('vendedor');
+  const b = await ensureBrejo();
+  const spawns = spawnsFor(b, windowOf(clock), app.catalog, p.id);
+  const caps = spawns.slice(0, 3).map((s) => captureOp(s, clock));
+  await sync(p, 'c1', caps);
+  const sellOp = (cap, extra = {}) => ({ opId: crypto.randomUUID(), type: 'frog.sell', ts: clock, payload: { sellId: crypto.randomUUID(), captureId: cap.payload.captureId, soldAt: clock, ...extra } });
+  // venda normal: o preço é o do servidor (raridade + tamanho), mesmo que o celular mande outro
+  const s1 = await sync(p, 'A', [sellOp(caps[0], { price: 99999 })]);
+  assert.equal(s1.body.results[0].status, 'applied');
+  const expected = frogPrice(app.catalog, spawns[0].speciesId, spawns[0].sizeCm);
+  assert.equal(s1.body.results[0].price, expected);
+  // a mesma perereca vendida no outro aparelho: conflito, não paga de novo
+  const s2 = await sync(p, 'B', [sellOp(caps[0])]);
+  assert.equal(s2.body.results[0].status, 'conflict');
+  // favorita não vende
+  await sync(p, 'A', [{ opId: crypto.randomUUID(), type: 'favorite', ts: clock + 5, payload: { spawnId: spawns[1].id, favorite: true, ts: clock + 5 } }]);
+  const s3 = await sync(p, 'A', [sellOp(caps[1])]);
+  assert.equal(s3.body.results[0].status, 'rejected');
+  // captura que perdeu o conflito (mesmo encontro capturado antes em outro aparelho) não existe no servidor
+  const lost = captureOp(spawns[2], clock + 1);
+  const r = await sync(p, 'B', [lost, sellOp(lost)]);
+  assert.equal(r.body.results[0].status, 'conflict');
+  assert.equal(r.body.results[1].status, 'rejected');
+  const st = r.body.state;
+  assert.equal(st.sales.length, 1);
+  assert.equal(st.sales[0].price, expected);
+  // o dinheiro da venda entra no saldo que o servidor usa para a loja
+  const jobs = findJobs(p, 4);
+  await sync(p, 'A', jobs.map((j) => jobOp(j)));
+  const earned = (await sync(p, 'A', [])).body.state.jobs.reduce((t, j) => t + j.pay, 0);
+  const need = 150 - earned;   // quanto faltaria para o hatch sem a venda
+  if (need > 0 && need <= expected) {
+    const buy = await sync(p, 'A', [buyOp('hatch')]);
+    assert.equal(buy.body.results[0].status, 'applied');
+  }
 });
 
 test('reenvio da mesma operação não duplica a captura (idempotência)', async () => {

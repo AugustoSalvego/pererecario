@@ -12,7 +12,8 @@ const WALK = 3.5;
 // carro parado ou andando (folha 2 x 4 de 32 x 28): linha 0 frente, 1 esquerda, 2 direita, 3 costas
 export function carSprite(id, { dir = 'right', scale = 2.1667, moving = false } = {}) {
   const row = { down: 0, left: 1, right: 2, up: 3 }[dir] ?? 2;
-  return `<div class="car-sprite ${moving ? 'moving' : ''}" style="--w:${32 * scale}px;--h:${28 * scale}px;--row:${row};background-image:url(${SPR}car-${id}.png)"></div>`;
+  // andando, sai uma fumacinha do escapamento atrás do carro (ajuda a ver para onde ele vai)
+  return `<div class="car-sprite ${moving ? 'moving' : ''}" data-dir="${dir}" style="--w:${32 * scale}px;--h:${28 * scale}px;--row:${row};background-image:url(${SPR}car-${id}.png)">${moving ? '<i class="puff p1"></i><i class="puff p2"></i>' : ''}</div>`;
 }
 
 // balãozinho com o rosto (e o nome, nos outros jogadores) em cima de quem está de carro

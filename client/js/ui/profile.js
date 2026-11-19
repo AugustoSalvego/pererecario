@@ -5,7 +5,7 @@ import { sync } from '../sync.js';
 import { api } from '../api.js';
 import * as db from '../db.js';
 import { icons } from './icons.js';
-import { charHtml, lookOf, lookName } from './sprites.js';
+import { charHtml, headHtml, lookOf, lookName } from './sprites.js';
 import { openWardrobe } from './wardrobe.js';
 import { isNightAt } from './daynight.js';
 import { geo } from '../geo.js';
@@ -25,6 +25,7 @@ export function mountProfile(el, context) {
       <div class="exp-slot"></div>
       <div class="section-title">Ranking <small class="rk-note"></small></div>
       <div class="list rank"></div>
+      <button class="btn ghost block rank-all hidden" data-act="ranking">Ver todos os rankings</button>
       <div class="section-title">Diário de campo <small>últimas capturas</small></div>
       <div class="list history"></div>
       <div class="section-title">Sincronização</div>
@@ -46,6 +47,7 @@ export function mountProfile(el, context) {
     if (act === 'howto') ctx.openTutorial();
     if (act === 'look') openWardrobe();
     if (act === 'diary') openDiary();
+    if (act === 'ranking') openRanking();
     if (act === 'visible') {
       await store.saveSettings({ hidePresence: !store.settings.hidePresence });
       e.target.closest('[data-act]').querySelector('.switch').classList.toggle('on', !store.settings.hidePresence);
@@ -65,17 +67,81 @@ export async function loadRanking(el) {
   renderRanking(el);
 }
 
+// ---------- ranking ----------
+// Três quadros: mais XP, mais capturas e mais Brejais ganhos. No perfil aparecem os 5 primeiros
+// de XP (com medalhas de ouro, prata e bronze); "Ver todos" abre o pódio com as três abas.
+const BOARDS = {
+  xp: { label: 'Mais XP', value: (r) => `${r.xp} XP`, sub: (r) => `Nível ${r.level} · ${r.species} espécies` },
+  captures: { label: 'Mais capturas', value: (r) => `${r.captures} 🐸`, sub: (r) => `${r.species} espécies · nível ${r.level}` },
+  gold: { label: 'Mais Brejais', value: (r) => `<span class="bcoin">B$</span>&nbsp;${r.gold}`, sub: (r) => `Nível ${r.level} · ${r.captures} capturas` },
+};
+const MEDAL = ['ouro', 'prata', 'bronze'];
+
+function boardOf(key) {
+  if (ranking?.boards?.[key]) return ranking.boards[key];
+  if (key === 'xp' && ranking?.top) return { top: ranking.top, me: ranking.me };   // cache antigo
+  return null;
+}
+
+function face(r, size = 40) {
+  const look = r.look ? lookOf({ look: r.look }) : null;
+  return `<div class="avatar rk-face" style="width:${size}px;height:${size}px">${look ? headHtml(look, size >= 56 ? 2 : 1.45) : frogImg(r.avatar || 'frog_leaf', size * 0.75)}</div>`;
+}
+
+function medal(i) {
+  return i < 3 ? `<span class="medal ${MEDAL[i]}" aria-label="${i + 1}º lugar"><b>${i + 1}</b></span>` : `<span class="pos">${i + 1}</span>`;
+}
+
+function rankRow(r, i, key, me) {
+  const B = BOARDS[key];
+  return `<div class="card list-item rank-item ${r.id === me ? 'me' : ''} ${i < 3 ? `top${i + 1}` : ''}" style="animation-delay:${Math.min(i, 12) * 40}ms">
+    ${medal(i)}${face(r)}
+    <div class="grow"><div class="t">${esc(r.displayName)}${r.id === me ? ' <small class="you">você</small>' : ''}</div><div class="s">${B.sub(r)}</div></div>
+    <span class="pill-xp">${B.value(r)}</span></div>`;
+}
+
 function renderRanking(el) {
   const box = $('.rank', el);
-  if (!ranking) { box.innerHTML = '<div class="card list-item"><div class="s">Conecte-se para ver o ranking.</div></div>'; return; }
+  const board = boardOf('xp');
+  $('.rank-all', el).classList.toggle('hidden', !board);
+  if (!board) { box.innerHTML = '<div class="card list-item"><div class="s">Conecte-se para ver o ranking.</div></div>'; return; }
   $('.rk-note', el).textContent = `${ranking.players} jogador${ranking.players === 1 ? '' : 'es'}`;
   const me = store.view.player?.id;
-  const rows = ranking.top.slice(0, 10);
-  if (ranking.me && !rows.some((r) => r.id === me)) rows.push({ ...ranking.me, pos: ranking.me.rank });
-  box.innerHTML = rows.map((r, i) => `<div class="card list-item rank-item ${r.id === me ? 'me' : ''} ${i < 3 ? `top${i + 1}` : ''}">
-    <div class="pos">${r.pos || i + 1}</div><div class="avatar" style="width:40px;height:40px">${frogImg(r.avatar || 'frog_leaf', 30)}</div>
-    <div class="grow"><div class="t">${esc(r.displayName)}${r.id === me ? ' (você)' : ''}</div><div class="s">Nível ${r.level} · ${r.species} espécies</div></div>
-    <span class="pill-xp">${r.xp} XP</span></div>`).join('');
+  const rows = board.top.slice(0, 5).map((r, i) => rankRow(r, i, 'xp', me));
+  if (board.me && board.me.rank > 5) rows.push(`<div class="rank-gap">· · ·</div>${rankRow(board.me, board.me.rank - 1, 'xp', me)}`);
+  box.innerHTML = rows.join('');
+}
+
+function openRanking(start = 'xp') {
+  let key = start;
+  const sheet = openSheet(`
+    <h3 class="rk-title">Ranking do brejo</h3>
+    <p class="rk-hint hidden">Conta tudo o que cada um ganhou em trabalhos e vendas: comprar carro não tira pontos.</p>
+    <div class="segmented rk-tabs">${Object.entries(BOARDS).map(([k, b]) => `<button data-k="${k}" class="${k === key ? 'on' : ''}">${b.label}</button>`).join('')}</div>
+    <div class="rk-body"></div>`, { cls: 'rank-sheet' });
+  const body = $('.rk-body', sheet);
+  const me = store.view.player?.id;
+  const draw = () => {
+    $('.rk-hint', sheet).classList.toggle('hidden', key !== 'gold');
+    const board = boardOf(key);
+    if (!board || !board.top.length) { body.innerHTML = '<p class="muted" style="text-align:center;padding:30px 0">Ainda ninguém por aqui.</p>'; return; }
+    const B = BOARDS[key];
+    const [a, b, c] = board.top;
+    const step = (r, i) => r ? `<div class="pod p${i + 1} ${r.id === me ? 'me' : ''}">
+        <div class="pod-face">${face(r, 58)}${medal(i)}</div>
+        <div class="pod-name">${esc(r.displayName)}</div><div class="pod-val">${B.value(r)}</div>
+        <div class="pod-step"><b>${i + 1}º</b></div></div>` : '<div class="pod empty"></div>';
+    const rest = board.top.slice(3).map((r, i) => rankRow(r, i + 3, key, me)).join('');
+    const mine = board.me && board.me.rank > board.top.length ? `<div class="rank-gap">· · ·</div>${rankRow(board.me, board.me.rank - 1, key, me)}` : '';
+    body.innerHTML = `<div class="podium">${step(b, 1)}${step(a, 0)}${step(c, 2)}</div><div class="list">${rest}${mine}</div>`;
+  };
+  $$('.rk-tabs button', sheet).forEach((t) => t.addEventListener('click', () => {
+    key = t.dataset.k;
+    sfx.tap();
+    $$('.rk-tabs button', sheet).forEach((x) => x.classList.toggle('on', x === t));
+    draw();
+  }));
+  draw();
 }
 
 export function renderProfile(el) {

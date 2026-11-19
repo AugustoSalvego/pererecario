@@ -196,8 +196,9 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     'GET /api/ranking': async (req) => {
       const playerId = auth(req);
       const rows = await sync.ranking();
-      const idx = rows.findIndex((r) => r.id === playerId);
-      return { top: rows.slice(0, 20), me: idx >= 0 ? { rank: idx + 1, ...rows[idx] } : null, players: rows.length };
+      const boards = await sync.boards(playerId);
+      // top/me: o ranking de XP (formato antigo); boards: XP, capturas e Brejais ganhos
+      return { top: boards.xp.top.slice(0, 20), me: boards.xp.me, players: rows.length, boards };
     },
 
     'GET /api/players/code': async (req, body, url) => {

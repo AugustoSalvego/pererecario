@@ -6,7 +6,7 @@ Trabalho prático de Sistemas Distribuídos: jogo para computação móvel com f
 
 O Pererecário é um jogo de localização no estilo "anda e captura". Os **brejos** são áreas circulares sobre o mapa real, desenhadas como **lagoinhas**. Elas aparecem **em qualquer lugar**, sem cadastro (uma a cada ~130 m), como no Pokémon GO; os organizadores também podem cadastrar brejos à mão em pontos específicos. Em volta de cada lagoinha vivem de 3 a 7 pererecas (4 nas automáticas), que mudam a cada 15 minutos. As **comuns** ficam à vista no mapa, dando pulinhos; as **incomuns, raras e a especial** se escondem num **matinho** (que mostra um "?" de tempos em tempos): o jogador caminha até lá (GPS) e, a até 20 m, **toca no matinho** ou **chacoalha o celular**; o matinho espia por 1 s e a perereca sai. Depois, a até **10 m**, toca nela no mapa para escolhê-la e entra no minijogo de captura: a perereca pula entre as vitórias-régias da tela e o jogador **toca rápido** nela até pegar: no mínimo 3 toques, mais nas raras, sem mostrar quantos faltam.
 
-**Como as lagoinhas e as pererecas aparecem.** Não existe um "sorteio" no servidor que precise ser enviado aos celulares. O mundo é coberto por uma grade fixa de ~130 m; para cada ponto da grade, um gerador pseudoaleatório determinístico (semente = **o jogador** + o ponto da grade) decide se ali existe uma lagoinha, onde exatamente ela fica e o nome dela. Da mesma forma, as pererecas de cada lagoinha saem de um gerador alimentado pelo jogador, pelo id da lagoinha e pela janela de 15 minutos. Por isso **cada jogador tem as suas lagoinhas e as suas pererecas**: dois jogadores lado a lado veem lagoinhas diferentes, e um não "rouba" a perereca do outro. Os dois aparelhos de um mesmo jogador, porém, veem exatamente as mesmas (é isso que permite o teste de conflito). Assim, o celular offline e o servidor chegam exatamente às mesmas pererecas, e o servidor consegue conferir qualquer captura recebida depois: a partir do id da lagoinha ele recalcula onde ela fica, sem precisar de nada guardado no banco. As pererecas nascem afastadas da lagoinha e umas das outras. No mapa, só aparecem as pererecas a até 70 m do jogador e as lagoinhas a até 400 m; quando não há nada por perto, uma seta indica a lagoinha mais próxima. Todos esses números ficam num único bloco de balanceamento (`client/js/shared/game.js`, explicado em `docs/BALANCEAMENTO.md`).
+**Como as lagoinhas e as pererecas aparecem.** Não existe um "sorteio" no servidor que precise ser enviado aos celulares. O mundo é coberto por uma grade fixa de ~130 m; para cada ponto da grade, um gerador pseudoaleatório determinístico (semente = **o jogador** + o ponto da grade) decide se ali existe uma lagoinha, onde exatamente ela fica e o nome dela. Da mesma forma, as pererecas de cada lagoinha saem de um gerador alimentado pelo jogador, pelo id da lagoinha e pela janela de 15 minutos. Por isso **cada jogador tem as suas lagoinhas e as suas pererecas**: dois jogadores lado a lado veem lagoinhas diferentes, e um não "rouba" a perereca do outro. Os dois aparelhos de um mesmo jogador, porém, veem exatamente as mesmas (é isso que permite o teste de conflito). Assim, o celular offline e o servidor chegam exatamente às mesmas pererecas, e o servidor consegue conferir qualquer captura recebida depois: a partir do id da lagoinha ele recalcula onde ela fica, sem precisar de nada guardado no banco. As pererecas nascem afastadas da lagoinha e umas das outras. No mapa, só aparecem as pererecas a até 90 m do jogador e as lagoinhas a até 400 m; quando não há nada por perto, uma seta indica a lagoinha mais próxima. Todos esses números ficam num único bloco de balanceamento (`client/js/shared/game.js`, explicado em `docs/BALANCEAMENTO.md`).
 
 Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu boneco entre **18 estilos** (do Capuz de Sapo ao Ninja, Samurai, Cavaleiro, Mágica e Piloto de Robô), em versão masculina ou feminina e 3 tons de pele; ele anda no mapa nas 4 direções.
 
@@ -19,6 +19,12 @@ Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especi
 Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
 **Trabalhos e Brejais.** Pelo mapa aparecem moradores (NPCs) pedindo ajuda, com um balãozinho que mostra o serviço: o **pedreiro** constrói uma casinha, a **mecânica** conserta um carro, o **agricultor** cuida da horta e o **carteiro** pede uma entrega. Eles aparecem em qualquer lugar e mudam a cada 15 minutos, pelo mesmo sorteio determinístico das lagoinhas (grade de ~180 m, semente = jogador + janela + ponto da grade), então o celular offline e o servidor chegam aos mesmos moradores. Cada trabalho é um minijogo de 3 etapas, só de tocar, em que cada toque muda um pedaço da cena de vez: a parede sobe tijolo por tijolo, o telhado fecha, a tinta cobre a casa; as porcas saem da roda, a fumaça do motor diminui a cada parafuso, o barro sai do carro; o mato é arrancado, a terra fica molhada e os tomates vão para o cesto. Cada trabalho leva no máximo 5 minutos; a entrega é diferente: o jogador leva a caixa até uma lagoinha a 140–260 m, com 5 minutos de prazo. No fim aparece só o agradecimento ("O pedreiro agradece!") e o botão **Coletar B$ X**. A moeda do jogo são os **Brejais (B$)**; quem faz o trabalho no modo GPS ganha 50 % a mais.
+
+**Pererecas soltas no mato.** Além das lagoinhas, uma segunda grade invisível (~70 m) espalha "moitinhas" com 1 ou 2 pererecas soltas na grama, longe da água. Elas usam o mesmo sorteio determinístico e o mesmo formato de id de encontro (`m<i>_<j>:<janela>:<n>`), então o servidor valida a captura delas do mesmo jeito que a de uma lagoinha.
+
+**Meu Brejo como bolsa.** As pererecas capturadas podem ser vendidas por Brejais: o preço depende da raridade e do tamanho (a maior da espécie vale até 50 % a mais). Dá para vender uma de cada vez ou todas as repetidas de uma vez (fica a maior de cada espécie). Favoritas ficam guardadas e não são vendidas. Vender não apaga a espécie do Pererecário nem o XP.
+
+**Ranking.** Três quadros: mais XP, mais capturas e mais Brejais ganhos (trabalhos + vendas; comprar carro não tira pontos). No perfil aparecem os 5 primeiros de XP com medalhas de ouro, prata e bronze; "Ver todos" abre o pódio e as três abas.
 
 **Loja e carros.** Com os Brejais o jogador compra um carro na **Loja do Brejo**: Hatch (B$ 150), Sedã (250), Picape (400), Jipe (600, revela os matinhos de mais longe) e Superesportivo (1500). O carro deixa o joystick mais rápido (de 3,5 m/s a pé até 12 m/s) e **só anda no modo Controle**: no GPS o jogador sempre está a pé. Os carros têm o tamanho do boneco, nas 4 direções, e quem está perto vê o carro com um balãozinho do rosto e do nome de quem está dirigindo.
 
@@ -141,9 +147,9 @@ sequenceDiagram
   end
 ```
 
-**Tipos de operação:** `capture`, `favorite`, `expedition.start`, `expedition.progress`, `expedition.end`, `friend.add`, `profile.avatar`, `profile.look`, `job.done` (trabalho concluído), `shop.buy` (compra na loja) e `vehicle.select` (carro escolhido). As operações `expedition.*` atualizam a caçada do dia.
+**Tipos de operação:** `capture`, `favorite`, `expedition.start`, `expedition.progress`, `expedition.end`, `friend.add`, `profile.avatar`, `profile.look`, `job.done` (trabalho concluído), `shop.buy` (compra na loja), `frog.sell` (venda de perereca) e `vehicle.select` (carro escolhido). As operações `expedition.*` atualizam a caçada do dia.
 
-**Saldo derivado, não armazenado:** assim como o XP, o saldo de Brejais não é um número guardado que se incrementa. Ele é calculado como *soma dos pagamentos dos trabalhos − soma dos preços das compras* (`balanceOf` em `game.js`, usado pelo cliente e pelo servidor). Reenviar um trabalho ou uma compra não muda o saldo, porque cada um é uma linha com chave única.
+**Saldo derivado, não armazenado:** assim como o XP, o saldo de Brejais não é um número guardado que se incrementa. Ele é calculado como *soma dos pagamentos dos trabalhos + soma das vendas − soma dos preços das compras* (`balanceOf` em `game.js`, usado pelo cliente e pelo servidor). Reenviar um trabalho ou uma compra não muda o saldo, porque cada um é uma linha com chave única.
 
 **Quando sincroniza (automático, sem reiniciar a partida):**
 - logo após cada nova operação;
@@ -177,6 +183,8 @@ O caso típico do enunciado: o mesmo jogador, em dois aparelhos offline, mexe na
 | **Presente do QR** | Escaneado de novo no mesmo dia / em outro aparelho | O id do encontro inclui o dia (`gift:jogador:amigo:dia`), então vale a regra da captura: só o primeiro conta | Limita a um presente por amigo por dia mesmo offline. |
 | **Trabalho** | O mesmo morador ajudado nos dois aparelhos | **Paga uma vez só:** chave única `(jogador, trabalho)`; o segundo recebe `conflict` e não ganha nada | Como na captura, o morador é um encontro único da janela de 15 min. |
 | **Compra** | Os dois aparelhos, offline, gastam o mesmo dinheiro (cada um vê saldo suficiente) | **O servidor confere o saldo na hora em que a compra chega.** A primeira que chega é aplicada; a segunda é recusada (`rejected`, "saldo insuficiente no servidor") e o dinheiro não é descontado. Comprar o mesmo carro nos dois aparelhos dá `conflict` e cobra uma vez só | Dinheiro não pode ficar negativo nem ser gasto duas vezes. Aqui a ordem de chegada importa de propósito: é a mesma regra de um banco (a primeira transação que chega usa o saldo). O aparelho que perdeu recebe o aviso e o saldo volta a ser o do servidor. |
+| **Venda de perereca** | A mesma perereca vendida nos dois aparelhos offline | **Vende uma vez só:** chave única `(jogador, captura)`; a segunda recebe `conflict` e não paga | Igual ao trabalho: o dinheiro não pode entrar duas vezes. |
+| **Venda de captura que perdeu** | O aparelho B capturou e vendeu offline uma perereca que o aparelho A já tinha capturado antes | A captura de B perde ("primeira captura vence"); a venda dela chega em seguida e é **recusada** (`rejected`), porque essa captura não existe no servidor. O dinheiro não entra e o B recebe o aviso | Mostra como uma operação depende da anterior: a venda só vale se a captura sobreviveu. |
 | **Carro em uso** | Escolhido nos dois aparelhos | **Last-Writer-Wins**, e só vale um carro que o jogador tem | Preferência simples, como o boneco. |
 
 Como o XP é derivado das capturas, ele converge sozinho depois que as capturas convergem.
@@ -230,12 +238,13 @@ O jogo muda conforme o ambiente físico do jogador:
 - Presença: a posição recebida é arredondada para ~5 m antes de ser mostrada aos outros, só vai para quem está a até 300 m e some sozinha após 45 s sem notícias. O jogador pode se esconder no Perfil.
 - Presentes do QR: confere que o amigo existe, que não é o próprio jogador e que a espécie bate com o cálculo determinístico.
 - Trabalhos: o servidor recalcula o morador a partir do id (tipo, lugar e janela de 15 min), confere o horário, a distância até o morador (ou até o ponto de entrega, no caso do carteiro) e que ele ainda não foi ajudado. O pagamento gravado é o calculado pelo servidor (`jobPay`), não o enviado pelo aparelho.
+- Venda: o servidor confere que a captura existe, é do jogador, não foi vendida e não é favorita, e calcula o preço ele mesmo (`frogPrice`), sem usar o valor que o aparelho mandou.
 - Loja: o preço vem do catálogo do servidor; a compra só é aplicada se o saldo do servidor cobrir o preço. O carro só pode ser escolhido se o jogador tiver comprado.
 - Senhas com scrypt; tokens com HMAC-SHA256; limite de tentativas de login por IP; rotas de administração protegidas por chave.
 
 ## 10. Testes automatizados
 
-`npm test` roda 22 testes (`test/sync.test.js`) com o servidor real e banco em memória:
+`npm test` roda 24 testes (`test/sync.test.js`) com o servidor real e banco em memória:
 
 1. cadastro, login e acesso sem token;
 2. servidor e cliente calculam as mesmas pererecas;
@@ -257,7 +266,9 @@ O jogo muda conforme o ambiente físico do jogador:
 18. presença: jogadores perto se veem, longe não, quem se esconde some e a presença expira sozinha;
 19. trabalho paga uma vez só, no lugar e na hora certos, e no GPS paga mais;
 20. entrega só conta chegando ao ponto de entrega;
-21. loja: compra sem saldo é recusada, carro repetido não cobra duas vezes, dois aparelhos não gastam o mesmo dinheiro e não dá para usar um carro que não foi comprado.
+21. loja: compra sem saldo é recusada, carro repetido não cobra duas vezes, dois aparelhos não gastam o mesmo dinheiro e não dá para usar um carro que não foi comprado;
+22. pererecas soltas no mato: valem como as da lagoinha, e moitinha inventada é recusada;
+23. venda: paga uma vez só, com o preço do servidor; favorita e captura que perdeu o conflito não vendem.
 
 Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro e outro jogador vendo o carro) também foram exercitados num navegador Chrome automatizado.
 

@@ -7,12 +7,12 @@
 import * as db from './db.js';
 import { api } from './api.js';
 import { getCatalog } from './catalog.js';
-import { xpBreakdown, levelFor, windowOf, dayOf, dayExpeditionId, balanceOf, carById } from './shared/game.js';
+import { xpBreakdown, levelFor, windowOf, dayOf, dayExpeditionId, balanceOf, carById, frogPrice } from './shared/game.js';
 
 export const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
   : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
 
-const EMPTY = { player: null, captures: [], expeditions: [], friends: [], jobs: [], purchases: [] };
+const EMPTY = { player: null, captures: [], expeditions: [], friends: [], jobs: [], purchases: [], sales: [] };
 const PROGRESS_EVERY_MS = 60 * 1000;
 
 class Store extends EventTarget {
@@ -161,6 +161,7 @@ class Store extends EventTarget {
     const friends = new Map((s.friends || []).map((f) => [f.id, { ...f }]));
     const jobs = new Map((s.jobs || []).map((j) => [j.jobId, { ...j, pending: false }]));
     const purchases = new Map((s.purchases || []).map((b) => [b.item, { ...b, pending: false }]));
+    const sales = new Map((s.sales || []).map((v) => [v.captureId, { ...v, pending: false }]));
     const player = s.player ? { ...s.player } : this.session?.player ? { ...this.session.player } : null;
     const me = this.deviceId;
     const ensureExp = (id, at) => {
@@ -216,8 +217,16 @@ class Store extends EventTarget {
         case 'shop.buy': {
           // compra otimista: só entra se o saldo local cobrir (o servidor confere de novo)
           const car = carById(p.item);
-          const bal = balanceOf([...jobs.values()], [...purchases.values()]);
+          const bal = balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()]);
           if (car && !purchases.has(car.id) && bal >= car.price) purchases.set(car.id, { id: p.buyId, item: car.id, price: car.price, boughtAt: p.boughtAt, deviceId: me, pending: true });
+          break;
+        }
+        case 'frog.sell': {
+          // venda otimista: só se a perereca está no brejo, não foi vendida e não é favorita
+          const cap = [...captures.values()].find((c) => c.id === p.captureId);
+          if (cap && !sales.has(cap.id) && !cap.favorite) {
+            sales.set(cap.id, { id: p.sellId, captureId: cap.id, speciesId: cap.speciesId, price: frogPrice(catalog, cap.speciesId, cap.sizeCm), soldAt: p.soldAt, deviceId: me, pending: true });
+          }
           break;
         }
         case 'vehicle.select':
@@ -268,7 +277,10 @@ class Store extends EventTarget {
       jobsDone: new Set(jobs.keys()),
       purchases: [...purchases.values()],
       cars: new Set(purchases.keys()),
-      balance: balanceOf([...jobs.values()], [...purchases.values()]),
+      balance: balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()]),
+      sales: [...sales.values()].sort((a, b) => b.soldAt - a.soldAt),
+      sold: new Set(sales.keys()),
+      bag: capList.filter((c) => !sales.has(c.id)),   // o Meu Brejo: o que não foi vendido
       vehicle: player?.vehicle && purchases.has(player.vehicle) ? player.vehicle : null,
     };
     this.emit('change', this.view);
@@ -351,6 +363,14 @@ class Store extends EventTarget {
 
   async buy(carId) {
     await this.addOp('shop.buy', { buyId: uuid(), item: carId, boughtAt: this.now() });
+  }
+
+  // vende uma ou várias pererecas do Meu Brejo (cada uma vira uma operação: vender nos dois
+  // celulares paga uma vez só, e o servidor recalcula o preço)
+  async sell(captures) {
+    for (const c of [].concat(captures)) {
+      await this.addOp('frog.sell', { sellId: uuid(), captureId: c.id, speciesId: c.speciesId, soldAt: this.now() });
+    }
   }
 
   async selectVehicle(carId) {

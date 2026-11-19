@@ -11,13 +11,18 @@
 export const BALANCO = {
   // --- lagoinhas (aparecem sozinhas em qualquer lugar do mapa, como no Pokémon GO) ---
   lagoinhaACadaM: 130,       // distância média entre lagoinhas. Menor = mais lagoinhas.
-  chanceDeLagoinha: 0.75,    // 0 a 1: chance de cada ponto da grade ganhar lagoinha. 1 = todos.
+  chanceDeLagoinha: 0.85,    // 0 a 1: chance de cada ponto da grade ganhar lagoinha. 1 = todos.
   raioDaLagoinhaM: 30,       // tamanho da área de cada lagoinha (onde as pererecas nascem).
 
   // --- pererecas em cada lagoinha ---
-  metrosPorPerereca: 7,      // 1 perereca a cada 7 m de raio (lagoinha de 30 m = 4 pererecas)
-  minPererecas: 3,           // nunca menos que isso por lagoinha
-  maxPererecas: 7,           // nem mais que isso
+  metrosPorPerereca: 5,      // 1 perereca a cada 5 m de raio (lagoinha de 30 m = 6 pererecas)
+  minPererecas: 4,           // nunca menos que isso por lagoinha
+  maxPererecas: 8,           // nem mais que isso
+
+  // --- pererecas soltas no mato, fora das lagoinhas ---
+  moitaACadaM: 70,           // uma "moitinha" a cada ~70 m (outra grade, separada das lagoinhas)
+  chanceDeMoita: 0.7,        // chance de cada ponto da grade ter pererecas soltas
+  pererecasNaMoita: 2,       // até 2 pererecas em cada moitinha (sorteado: 1 ou 2)
   trocaACadaMin: 15,         // a cada 15 min as pererecas de cada lagoinha mudam (novas nascem)
 
   // --- modo de andar ---
@@ -26,19 +31,23 @@ export const BALANCO = {
   noModoControle: { common: 1, uncommon: 0.8, rare: 0.35, special: 0.15 },
 
   // --- trabalhos (NPCs que pagam em Brejais, B$) ---
-  trabalhoACadaM: 180,       // um NPC a cada ~180 m (sorteado de novo a cada janela de 15 min)
-  chanceDeTrabalho: 0.65,    // chance de cada ponto da grade ter um NPC naquela janela
+  trabalhoACadaM: 140,       // um NPC a cada ~140 m (sorteado de novo a cada janela de 15 min)
+  chanceDeTrabalho: 0.8,     // chance de cada ponto da grade ter um NPC naquela janela
   pagamento: { casa: 35, carro: 30, horta: 25, entrega: 40 },
-  veTrabalhosAteM: 160,      // NPCs aparecem no mapa a até 160 m (para dar tempo de ir até eles)
+  veTrabalhosAteM: 200,      // NPCs aparecem no mapa a até 200 m (para dar tempo de ir até eles)
   bonusNoGps: 1.5,           // no modo GPS o trabalho paga 1,5x
   entregaDistM: [140, 260],  // a entrega é numa lagoinha a esta distância do carteiro
   entregaMin: 5,             // minutos para entregar
+
+  // --- venda de pererecas no Meu Brejo (a "bolsa") ---
+  venda: { common: 6, uncommon: 14, rare: 35, special: 90 },   // B$ por raridade
+  bonusTamanho: 0.5,         // a maior perereca da espécie vale até +50%; a menor vale o preço base
 
   // --- distâncias do jogador ---
   capturaAteM: 10,           // pode tocar na perereca para capturar a até 10 m
   folgaDoGpsM: 10,           // folga extra quando o GPS do celular diz que está impreciso
   revelaMatinhoAteM: 20,     // tocar no matinho / chacoalhar funciona a até 20 m
-  vePererecasAteM: 70,       // pererecas e matinhos só aparecem a até 70 m (mais longe somem)
+  vePererecasAteM: 90,       // pererecas e matinhos só aparecem a até 90 m (mais longe somem)
   veLagoinhasAteM: 400,      // lagoinhas aparecem a até 400 m
 
   // --- espaço entre as coisas (para nada nascer embolado) ---
@@ -133,6 +142,7 @@ function sizeFor(next, sp) {
 
 // ---------- pererecas dos brejos ----------
 export function spawnCount(brejo) {
+  if (brejo.count) return brejo.count;   // moitinha: quantidade já sorteada
   const n = Math.round(brejo.radius / BALANCO.metrosPorPerereca);
   return Math.max(BALANCO.minPererecas, Math.min(BALANCO.maxPererecas, n));
 }
@@ -202,8 +212,53 @@ export function brejosNear(manual, p, radiusM, seed = '') {
   return [...mine, ...auto];
 }
 
-// acha um brejo pelo id: cadastrado à mão ou automático (null se não existe ou está escondido)
+// ---------- pererecas soltas no mato ----------
+// Uma segunda grade, mais fina, espalha "moitinhas" invisíveis pelo mapa: cada uma tem 1 ou 2
+// pererecas soltas na grama, longe das lagoinhas. Funcionam como um brejo pequeno, sem água:
+// mesmo sorteio determinístico, mesmo id de encontro (m<i>_<j>:<janela>:<n>) e mesma validação.
+const MOITA_ID = /^m(-?\d+)_(-?\d+)$/;
+const mCell = () => BALANCO.moitaACadaM;
+const mRowLat = (i) => (i * mCell()) / M_PER_DEG;
+const mColStep = (i) => mCell() / (M_PER_DEG * Math.cos(rad(mRowLat(i))));
+export const MOITA_RADIUS_M = 12;
+
+export function moitaAt(i, j, seed = '') {
+  const next = rng(hash32(`moita|${seed}|${i}|${j}`));
+  if (next() > BALANCO.chanceDeMoita) return null;
+  const north = (next() - 0.5) * mCell() * 0.6;
+  const east = (next() - 0.5) * mCell() * 0.6;
+  const count = 1 + Math.floor(next() * BALANCO.pererecasNaMoita);
+  const p = offsetLatLng(mRowLat(i), j * mColStep(i), north, east);
+  // não nasce em cima nem colada numa lagoinha
+  if (pondsNear(p, AUTO.radius + 8, seed).length) return null;
+  return { id: `m${i}_${j}`, name: 'No mato', lat: p.lat, lng: p.lng, radius: MOITA_RADIUS_M, auto: true, moita: true, count };
+}
+
+export function moitaById(id, seed = '') {
+  const m = MOITA_ID.exec(String(id));
+  return m ? moitaAt(Number(m[1]), Number(m[2]), seed) : null;
+}
+
+export function moitasNear(p, radiusM, seed = '') {
+  if (!p) return [];
+  const out = [];
+  const i0 = Math.floor((p.lat * M_PER_DEG - radiusM) / mCell()) - 1;
+  const i1 = Math.ceil((p.lat * M_PER_DEG + radiusM) / mCell()) + 1;
+  for (let i = i0; i <= i1; i++) {
+    const step = mColStep(i);
+    const dLng = radiusM / (M_PER_DEG * Math.cos(rad(mRowLat(i))));
+    const j0 = Math.floor((p.lng - dLng) / step) - 1, j1 = Math.ceil((p.lng + dLng) / step) + 1;
+    for (let j = j0; j <= j1; j++) {
+      const b = moitaAt(i, j, seed);
+      if (b && distanceM(p, b) <= radiusM) out.push(b);
+    }
+  }
+  return out;
+}
+
+// acha um brejo pelo id: cadastrado à mão, lagoinha automática ou moitinha (null se não existe ou está escondido)
 export function findBrejo(id, manual, seed = '') {
+  if (MOITA_ID.test(String(id))) return moitaById(id, seed);
   const kept = visibleBrejos(manual || []);
   const m = (manual || []).find((b) => b.id === id);
   if (m) return m;
@@ -293,8 +348,21 @@ export const CARS = [
 export const carById = (id) => CARS.find((c) => c.id === id) || null;
 
 // Saldo em Brejais: tudo o que os trabalhos pagaram menos tudo o que foi comprado.
-export const balanceOf = (jobs, purchases) =>
-  jobs.reduce((t, j) => t + (j.pay || 0), 0) - purchases.reduce((t, p) => t + (p.price || 0), 0);
+// saldo = trabalhos + vendas de pererecas − compras (calculado, nunca guardado: reenviar não muda nada)
+export const balanceOf = (jobs, purchases, sales = []) =>
+  jobs.reduce((s, j) => s + (Number(j.pay) || 0), 0)
+  + sales.reduce((s, v) => s + (Number(v.price) || 0), 0)
+  - purchases.reduce((s, b) => s + (Number(b.price) || 0), 0);
+
+// preço de venda de uma perereca: base da raridade + bônus pelo tamanho (dentro da faixa da espécie)
+export function frogPrice(catalog, speciesId, sizeCm) {
+  const sp = catalog?.species?.find((x) => x.id === speciesId);
+  if (!sp) return 0;
+  const base = BALANCO.venda[sp.tier] || 0;
+  const [a, b] = sp.sizeCm || catalog.tiers?.[sp.tier]?.sizeCm || [0, 0];
+  const f = b > a ? Math.min(1, Math.max(0, (Number(sizeCm) - a) / (b - a))) : 0;
+  return Math.round(base * (1 + BALANCO.bonusTamanho * f));
+}
 
 // Brejos criados antes da trava de distância podem estar sobrepostos: o jogo mostra
 // só o mais antigo de cada grupo sobreposto (a lista vem em ordem de criação).
@@ -313,8 +381,9 @@ export function spawnsFor(brejo, win, catalog, seed = '') {
   const pos = rng(hash32(`${key}|pos`));         // posição
   const modo = rng(hash32(`${key}|modo`));       // quais aparecem no modo controle
   const n = spawnCount(brejo);
-  const rMin = Math.max(POND_CLEAR_M, brejo.radius * 0.3);
-  const rMax = Math.max(rMin + 10, brejo.radius * 0.9);
+  // na moitinha não tem água no meio: as pererecas nascem em qualquer ponto dela
+  const rMin = brejo.moita ? 0 : Math.max(POND_CLEAR_M, brejo.radius * 0.3);
+  const rMax = brejo.moita ? brejo.radius : Math.max(rMin + 10, brejo.radius * 0.9);
   const placed = [];
   const out = [];
   for (let i = 0; i < n; i++) {

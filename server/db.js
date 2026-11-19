@@ -108,6 +108,17 @@ export const SCHEMA = [
     received_at BIGINT NOT NULL,
     UNIQUE (player_id, item)
   )`,
+  `CREATE TABLE IF NOT EXISTS sales (
+    id TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL,
+    capture_id TEXT NOT NULL,
+    species_id TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    sold_at BIGINT NOT NULL,
+    device_id TEXT NOT NULL,
+    received_at BIGINT NOT NULL,
+    UNIQUE (player_id, capture_id)
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_captures_player ON captures (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expeditions_player ON expeditions (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_operations_received ON operations (received_at)`,

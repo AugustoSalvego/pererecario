@@ -94,7 +94,8 @@ def palette(color):
 # ------------------------------------------------------------------ modelos
 # Cada modelo diz o comprimento (lado), a largura (frente), a altura da cabine e extras.
 MODELS = {
-    'hatch': dict(name='Hatch', color='#5bbf55', length=22, width=18, cab=(0.30, 0.95), roof=6, wheel=3, low=0),
+    # hatch: cabine encostada na traseira (porta-malas reto) e capô curto na frente, para a frente ficar clara
+    'hatch': dict(name='Hatch', color='#5bbf55', length=22, width=18, cab=(0.0, 0.68), roof=6, wheel=3, low=0, rake=(1, 4)),
     'sedan': dict(name='Sedã', color='#3d7fd8', length=29, width=20, cab=(0.30, 0.72), roof=5, wheel=3, low=0),
     'pickup': dict(name='Picape', color='#e04a3a', length=30, width=21, cab=(0.42, 0.78), roof=6, wheel=4, low=0, bed=True),
     'jeep': dict(name='Jipe', color='#7d8f4e', length=25, width=20, cab=(0.10, 0.70), roof=7, wheel=4, low=-1, spare=True, boxy=True),
@@ -125,15 +126,17 @@ def side(c, m, bob):
         c.rect('glass', cx0 + 1, roof_top + 1, cx1 - 1, body_top - 1)
         c.rect('body', (cx0 + cx1) // 2, roof_top + 1, (cx0 + cx1) // 2, body_top - 1)
     else:
+        # rake = (inclinação da traseira, inclinação do para-brisa)
+        rr, rf = m.get('rake', (3, 4 if m.get('spoiler') else 2))
         for y in range(roof_top, body_top):
             k = (y - roof_top) / max(1, body_top - roof_top)
-            a = cx0 + int((1 - k) * 3)
-            b = cx1 - int((1 - k) * (4 if m.get('spoiler') else 2))
+            a = cx0 + int((1 - k) * rr)
+            b = cx1 - int((1 - k) * rf)
             c.rect('body', a, y, b, y)
         for y in range(roof_top + 1, body_top):
             k = (y - roof_top) / max(1, body_top - roof_top)
-            a = cx0 + int((1 - k) * 3) + 1
-            b = cx1 - int((1 - k) * (4 if m.get('spoiler') else 2)) - 1
+            a = cx0 + int((1 - k) * rr) + 1
+            b = cx1 - int((1 - k) * rf) - 1
             if b > a:
                 c.rect('glass', a, y, b, y)
         mid = (cx0 + cx1) // 2
