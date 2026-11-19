@@ -43,7 +43,10 @@ async function cleanup() {
 }
 after(async () => { server.close(); if (process.env.TEST_DATABASE_URL) await cleanup(); await db.close(); });
 
+// quem cria conta na tela marca "Li e concordo com os termos"; os testes fazem o mesmo, salvo quando dizem o contrário
+const withTerms = (p, body) => (body && (p === '/api/auth/register' || p === '/api/auth/google') && body.acceptTerms === undefined ? { ...body, acceptTerms: true } : body);
 async function call(method, path, body, headers = {}) {
+  body = withTerms(path, body);
   const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, body: await res.json().catch(() => null) };
 }
@@ -196,4 +199,33 @@ test('chaves do Google são guardadas, não baixadas a cada login', async () => 
   const before = keyFetches;
   for (let i = 0; i < 3; i++) await call('POST', '/api/auth/google', { credential: idToken({ sub: '2001', email: 'joao@gmail.com' }) });
   assert.equal(keyFetches, before);
+});
+
+test('termos: sem marcar "li e concordo" não cria conta; o aceite fica registrado com a versão', async () => {
+  clock += 61_000;
+  const no = await call('POST', '/api/auth/register', { displayName: 'Tina', email: 'tina.termos@gmail.com', password: 'senha123', acceptTerms: false });
+  assert.equal(no.status, 400);
+  assert.match(no.body.error, /Termos de Uso/);
+  assert.equal(await db.one("SELECT id FROM players WHERE email='tina.termos@gmail.com'"), null);
+  const ok = await call('POST', '/api/auth/register', { displayName: 'Tina', email: 'tina.termos@gmail.com', password: 'senha123' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.player.termsAccepted, true);
+  const row = await db.one("SELECT terms_version, terms_at FROM players WHERE email='tina.termos@gmail.com'");
+  assert.ok(row.terms_version && Number(row.terms_at) > 0);
+  // Google: conta nova também precisa do aceite
+  const cred = idToken({ sub: '9911', email: 'ugo.termos@gmail.com', name: 'Ugo' });
+  assert.equal((await call('POST', '/api/auth/google', { credential: cred, displayName: 'Ugo', acceptTerms: false })).status, 400);
+  const g = await call('POST', '/api/auth/google', { credential: cred, displayName: 'Ugo' });
+  assert.equal(g.status, 200);
+  assert.equal(g.body.player.termsAccepted, true);
+  // conta antiga (sem aceite) aceita depois, já logada
+  const old = await call('POST', '/api/auth/register', { username: 'antigo_termos', password: 'senha123', displayName: 'Antigo' });
+  assert.equal(old.body.player.termsAccepted, false);
+  assert.equal((await call('POST', '/api/auth/terms', { accept: false }, bearer(old.body.token))).status, 400);
+  const acc = await call('POST', '/api/auth/terms', { accept: true }, bearer(old.body.token));
+  assert.equal(acc.status, 200);
+  assert.equal(acc.body.player.termsAccepted, true);
+  const snap = await call('POST', '/api/sync', { deviceId: 'cel-t', ops: [] }, bearer(old.body.token));
+  assert.equal(snap.body.state.player.termsAccepted, true);
+  await db.run("DELETE FROM players WHERE email IN ('tina.termos@gmail.com','ugo.termos@gmail.com') OR username='antigo_termos'");
 });

@@ -195,7 +195,7 @@ export function startGame({ firstTime = false } = {}) {
   applySky();
 
   if (!store.settings.tutorialDone) {
-    openTutorial({ first: true, firstTime, onDone: () => { geo.start(); refreshObjects(); renderAll(); } });
+    openTutorial({ first: true, firstTime, onDone: () => { geo.start(); refreshObjects(); renderAll(); setTimeout(askTerms, 800); } });
   } else {
     geo.start();
     if (!sensors.needsPermission()) sensors.request();
@@ -203,6 +203,9 @@ export function startGame({ firstTime = false } = {}) {
   presence.start();
   store.ensureExpedition();
   prefetchTiles();
+  // quem já tinha conta antes dos termos (ou quando os termos mudam) vê o resumo e marca "li e concordo"
+  setTimeout(askTerms, 1500);
+  sync.addEventListener('synced', () => setTimeout(askTerms, 600));
 }
 
 // ---------- telas ----------
@@ -721,6 +724,45 @@ function statusSheet() {
     <div class="row-btns"><button class="btn ghost" data-act="demo">Painel de testes</button><button class="btn" data-act="sync">Sincronizar</button></div>`);
   $('[data-act=sync]', sheet).addEventListener('click', () => { sync.kick(0); closeSheet(); });
   $('[data-act=demo]', sheet).addEventListener('click', () => { closeSheet(true); openDemo(ctx); });
+}
+
+let termsOpen = false;
+function askTerms() {
+  const p = store.view?.player;
+  if (!p || p.termsAccepted !== false || termsOpen || api.isOffline() || document.querySelector('.tutorial')) return;
+  termsOpen = true;
+  const sheet = openSheet(`
+    <h3>📄 Termos de Uso e Privacidade</h3>
+    <p class="lead">Antes de continuar, veja em resumo como o Pererecário usa os seus dados:</p>
+    <ul class="terms-sum">
+      <li>Guardamos o seu apelido, o seu e-mail e o seu progresso, para você jogar em qualquer celular sem perder nada.</li>
+      <li>A sua posição só é guardada na hora de cada captura ou trabalho. Com "Aparecer no mapa dos outros" ligado, quem estiver a até 300 m vê o seu boneco.</li>
+      <li>Nada é vendido, não mandamos propaganda e você pode pedir para apagar a sua conta.</li>
+    </ul>
+    <label class="terms-check"><input type="checkbox" name="terms"><span>Li e concordo com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span></label>
+    <div class="form-error terms-error"></div>
+    <button class="btn block" data-act="ok">Continuar</button>`, { onClose: () => { termsOpen = false; } });
+  const box = $('input[name=terms]', sheet);
+  const btn = $('[data-act=ok]', sheet);
+  btn.addEventListener('click', async () => {
+    const e = $('.terms-error', sheet);
+    if (!box.checked) { e.textContent = 'Marque que você leu e concorda para continuar.'; sfx.error(); return; }
+    btn.disabled = true;
+    btn.textContent = 'Salvando…';
+    try {
+      const r = await api.post('/api/auth/terms', { accept: true }, { timeout: 70000 });
+      if (store.session) store.session = { ...store.session, player: r.player };
+      if (store.snapshot?.player) store.snapshot = { ...store.snapshot, player: { ...store.snapshot.player, termsAccepted: true } };
+      store.recompute();
+      closeSheet();
+      toast('Obrigado! Bom jogo 🐸', 'ok', 'check', 2500);
+      sync.kick(0);
+    } catch (ex) {
+      e.textContent = ex.kind === 'offline' ? 'Sem internet agora. Tente de novo quando conectar.' : ex.message;
+      btn.disabled = false;
+      btn.textContent = 'Continuar';
+    }
+  });
 }
 
 function sensorPermissionSheet() {

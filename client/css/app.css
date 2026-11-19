@@ -1027,7 +1027,7 @@ svg { display: block; }
 
 /* ---------- tela de entrada: altura fixa do cartão e lagoa que se ajusta ao espaço ---------- */
 /* o cartão tem a mesma altura nas abas "Entrar" e "Criar conta" (medida no login.js); o botão fica no pé */
-.login-card { display: flex; flex-direction: column; min-height: var(--card-h, auto); }
+.login-card { display: flex; flex-direction: column; min-height: var(--card-h, auto); flex-shrink: 0; }
 form.login-card > button[type=submit] { margin-top: auto; }
 .login-card:not(form) { justify-content: center; }
 /* a lagoa e as pererecas formam uma caixa só, que encolhe para caber entre o título e o cartão */
@@ -1055,3 +1055,12 @@ form.login-card > button[type=submit] { margin-top: auto; }
   .logo { font-size: clamp(38px, 11vw, 50px); }
   .logo small { margin-top: 8px; }
 }
+/* "Li e concordo com os Termos de Uso e a Política de Privacidade" */
+.terms-check { display: flex; gap: 10px; align-items: flex-start; margin: 6px 2px 2px; font-size: 13.5px; line-height: 1.35; color: var(--ink-soft); cursor: pointer; }
+.terms-check input { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--leaf); cursor: pointer; }
+.terms-check a { color: var(--leaf-dark); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.terms-check.shake { animation: otpShake .38s; }
+.terms-check.shake span { color: #c8432b; }
+.nick-card .terms-check { margin: 0 2px 4px; }
+.terms-sum { margin: 0 0 14px; padding-left: 20px; color: var(--ink-soft); font-size: 14.5px; line-height: 1.45; }
+.terms-sum li { margin: 6px 0; }

@@ -252,6 +252,9 @@ const MIGRATIONS = [
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_players_google ON players (google_sub)',
   // contas da organização (demonstração): não aparecem no ranking dos outros nem contam como jogadores externos
   'ALTER TABLE players ADD COLUMN staff INTEGER NOT NULL DEFAULT 0',
+  // aceite dos Termos de Uso e da Política de Privacidade (qual versão e quando)
+  'ALTER TABLE players ADD COLUMN terms_version TEXT',
+  'ALTER TABLE players ADD COLUMN terms_at BIGINT',
 ];
 
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {

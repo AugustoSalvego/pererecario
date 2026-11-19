@@ -60,7 +60,10 @@ after(async () => {
 // cada teste chega de um "aparelho" diferente (o limite por aparelho tem teste próprio)
 let ipN = 1;
 let ip = '10.0.0.1';
+// quem cria conta na tela marca "Li e concordo com os termos"; os testes fazem o mesmo, salvo quando dizem o contrário
+const withTerms = (p, body) => (body && (p === '/api/auth/register' || p === '/api/auth/google') && body.acceptTerms === undefined ? { ...body, acceptTerms: true } : body);
 async function call(method, path, body, { at = base, headers = {} } = {}) {
+  body = withTerms(path, body);
   const res = await fetch(at + path, { method, headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip, ...headers }, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, body: await res.json().catch(() => null) };
 }

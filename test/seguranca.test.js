@@ -36,7 +36,10 @@ after(async () => {
 });
 
 let ipN = 1;
+// quem cria conta na tela marca "Li e concordo com os termos"; os testes fazem o mesmo, salvo quando dizem o contrário
+const withTerms = (p, body) => (body && (p === '/api/auth/register' || p === '/api/auth/google') && body.acceptTerms === undefined ? { ...body, acceptTerms: true } : body);
 async function call(method, p, body, { at = base, key, token, ip = `10.9.0.${ipN}` } = {}) {
+  body = withTerms(p, body);
   const headers = { 'Content-Type': 'application/json', 'X-Forwarded-For': ip };
   if (key != null) headers['X-Admin-Key'] = key;
   if (token) headers.Authorization = `Bearer ${token}`;

@@ -69,6 +69,14 @@ function pendingNote(accounts) {
   return accounts.map((a) => `<div class="pending-note">${icons.cloudOff}<span>Este aparelho guarda <b>${a.count} ${a.count === 1 ? 'ação' : 'ações'}</b> da conta <b>${esc(a.displayName || '')}</b>${a.email ? ` (${esc(a.email)})` : ''} que ainda não ${a.count === 1 ? 'subiu' : 'subiram'}. Entre com essa conta para ${a.count === 1 ? 'ela ir' : 'elas irem'} para o servidor.</span></div>`).join('');
 }
 
+const TERMS_MSG = 'Para criar a conta, marque a caixinha dos termos.';
+function shakeTerms(card) {
+  const t = $('.terms-check', card);
+  t.classList.remove('shake');
+  void t.offsetWidth;
+  t.classList.add('shake');
+}
+
 function waitingAccounts() {
   const list = [];
   const who = store.snapshot?.player;
@@ -111,6 +119,7 @@ export function renderLogin(onDone, config = {}) {
       <label class="field">${icons.mail}<input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="Seu e-mail (Gmail)" maxlength="254"></label>
       <label class="field pw">${icons.key}<input name="password" type="password" autocomplete="current-password" placeholder="Senha"><button type="button" class="eye" aria-label="Mostrar senha">${icons.eye}</button></label>
       <div class="pw-hint reg-only hidden">Mínimo de 8 caracteres.</div>
+      <label class="terms-check reg-only hidden"><input type="checkbox" name="terms"><span>Li e concordo com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span></label>
       <div class="forgot-row login-only"><button type="button" class="link-btn" data-act="forgot">Esqueci a senha</button></div>
       <div class="form-error"></div>
       <button class="btn block" type="submit">Entrar no brejo</button>
@@ -120,6 +129,7 @@ export function renderLogin(onDone, config = {}) {
       <h3>Quase lá! 🐸</h3>
       <p class="nick-lead">Como você quer ser chamado no jogo? É o nome que aparece no mapa e no ranking.</p>
       <label class="field">${icons.sparkle}<input name="nick" autocomplete="nickname" placeholder="Seu apelido" maxlength="24"></label>
+      <label class="terms-check"><input type="checkbox" name="terms"><span>Li e concordo com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span></label>
       <div class="form-error nick-error"></div>
       <button class="btn block" type="button" data-act="nick-ok">Começar a caçar</button>
       <button class="btn ghost block" type="button" data-act="nick-back" style="margin-top:8px">Voltar</button>
@@ -252,10 +262,11 @@ export function renderLogin(onDone, config = {}) {
     const nick = $('input[name=nick]', nickCard).value.trim();
     const nerr = $('.nick-error', nickCard);
     if (nick.length < 2) { nerr.textContent = 'O apelido precisa de pelo menos 2 letras.'; sfx.error(); return; }
+    if (!$('input[name=terms]', nickCard).checked) { nerr.textContent = TERMS_MSG; shakeTerms(nickCard); sfx.error(); return; }
     btn.disabled = true;
     btn.textContent = 'Um instante…';
     try {
-      const r = await api.post('/api/auth/google', { credential: pendingCredential, displayName: nick }, AUTH_WAIT);
+      const r = await api.post('/api/auth/google', { credential: pendingCredential, displayName: nick, acceptTerms: true }, AUTH_WAIT);
       await enter(r, true);
     } catch (ex) {
       nerr.textContent = ex.status === 401 ? 'O login do Google expirou. Volte e toque em "Continuar com Google" de novo.' : ex.message;
@@ -499,6 +510,7 @@ export function renderLogin(onDone, config = {}) {
       if (displayName.length < 2) { err.textContent = 'Escolha um apelido (pelo menos 2 letras).'; sfx.error(); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = 'Esse e-mail não parece certo.'; sfx.error(); return; }
       if (password.length < 8) { err.textContent = 'A senha precisa de pelo menos 8 caracteres.'; sfx.error(); return; }
+      if (!form.terms.checked) { err.textContent = TERMS_MSG; shakeTerms(form); sfx.error(); return; }
     }
     submit.disabled = true;
     submit.textContent = 'Um instante…';
@@ -513,7 +525,7 @@ export function renderLogin(onDone, config = {}) {
           openCode('signup', { ticket: p.ticket, email: p.email, sentAt: p.sentAt, resendIn: 60 - (Date.now() - p.sentAt) / 1000 }, p.start, key);
           return;
         }
-        const start = () => api.post('/api/auth/register', { displayName, email, password }, AUTH_WAIT);
+        const start = () => api.post('/api/auth/register', { displayName, email, password, acceptTerms: true }, AUTH_WAIT);
         const r = await start();
         // com o e-mail ligado no servidor, a conta só nasce depois do código
         if (r.needsCode) { parked = null; openCode('signup', r, start, key); return; }

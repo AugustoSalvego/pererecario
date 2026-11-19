@@ -8,6 +8,7 @@ import { makeSync } from './sync.js';
 import { exportAll } from './backup.js';
 import { makeGoogleVerifier, GoogleError } from './google.js';
 import { mailerFromEnv, codeEmail } from './mailer.js';
+import { TERMS_VERSION } from './terms.js';
 import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook, carById } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,6 +35,7 @@ const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const NO_PASSWORD = '!sem-senha';                    // conta só com Google: nenhuma senha confere
 const hasPassword = (p) => String(p?.pass_hash || '').startsWith('scrypt$');
 const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ');
+const TERMS_NEEDED = 'Para criar a conta, marque que você leu e concorda com os Termos de Uso e a Política de Privacidade.';
 
 // Código de 6 números por e-mail: vale 15 minutos, 5 tentativas, reenvio depois de 1 minuto
 const CODE_TTL = 15 * 60_000;
@@ -141,6 +143,7 @@ export async function createApp({
     return p && {
       id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar, look: p.look, friendCode: p.friend_code,
       createdAt: p.created_at, email: p.email || null, google: !!p.google_sub, hasPassword: hasPassword(p),
+      termsAccepted: p.terms_version === TERMS_VERSION,
     };
   }
 
@@ -155,15 +158,16 @@ export async function createApp({
     return `j${crypto.randomUUID().slice(0, 12)}`;
   }
 
-  async function createPlayer({ username = null, displayName, passHash, email = null, googleSub = null, emailVerified = 0 }) {
+  async function createPlayer({ username = null, displayName, passHash, email = null, googleSub = null, emailVerified = 0, terms = false }) {
     const id = crypto.randomUUID();
     await db.tx(async (q) => {
       let code;
       do { code = friendCode(); } while (await q.one('SELECT id FROM players WHERE friend_code=$1', [code]));
       const uname = username || (await uniqueUsername(q, email ? email.split('@')[0] : displayName));
       await q.run(
-        `INSERT INTO players (id, username, display_name, pass_hash, avatar, avatar_ts, friend_code, created_at, email, google_sub, email_verified)
-         VALUES ($1,$2,$3,$4,'frog_leaf',0,$5,$6,$7,$8,$9)`, [id, uname, displayName, passHash, code, now(), email, googleSub, emailVerified],
+        `INSERT INTO players (id, username, display_name, pass_hash, avatar, avatar_ts, friend_code, created_at, email, google_sub, email_verified, terms_version, terms_at)
+         VALUES ($1,$2,$3,$4,'frog_leaf',0,$5,$6,$7,$8,$9,$10,$11)`,
+        [id, uname, displayName, passHash, code, now(), email, googleSub, emailVerified, terms ? TERMS_VERSION : null, terms ? now() : null],
       );
     });
     return id;
@@ -294,6 +298,7 @@ export async function createApp({
       if (displayName.length < 2 || displayName.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
       if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, 'Esse e-mail não parece certo');
       if (password.length < 8) throw new HttpError(400, 'A senha precisa de pelo menos 8 caracteres');
+      if (body.acceptTerms !== true) throw new HttpError(400, TERMS_NEEDED);
       const same = await db.one('SELECT * FROM players WHERE email=$1', [email]);
       if (same) {
         throw new HttpError(409, same.google_sub && !hasPassword(same)
@@ -303,13 +308,21 @@ export async function createApp({
       // Com o carteiro ligado, a conta só nasce depois do código que vai para o e-mail
       // (ninguém cria conta com o e-mail de outra pessoa).
       if (mailer) {
-        const out = await startCode(req, { email, purpose: 'signup', displayName, data: { displayName, passHash: await hashPassword(password) } });
+        const out = await startCode(req, { email, purpose: 'signup', displayName, data: { displayName, passHash: await hashPassword(password), terms: true } });
         log(`cadastro esperando o código do e-mail: ${displayName}`);
         return { needsCode: true, ...out };
       }
-      const id = await createPlayer({ displayName, passHash: await hashPassword(password), email });
+      const id = await createPlayer({ displayName, passHash: await hashPassword(password), email, terms: true });
       log(`novo jogador (e-mail): ${displayName}`);
       return session(id);
+    },
+
+    // Aceite dos termos por quem já tinha conta (ou quando a versão dos termos muda)
+    'POST /api/auth/terms': async (req, body) => {
+      const playerId = auth(req);
+      if (body.accept !== true) throw new HttpError(400, TERMS_NEEDED);
+      await db.tx((q) => q.run('UPDATE players SET terms_version=$1, terms_at=$2 WHERE id=$3', [TERMS_VERSION, now(), playerId]));
+      return { player: await playerPublic(playerId) };
     },
 
     // Terminar o cadastro com o código de 6 números
@@ -317,7 +330,7 @@ export async function createApp({
       limit(clientIp(req), 'auth', 30);
       const { row, data } = await useCode({ ticket: body.ticket, code: body.code, purpose: 'signup' });
       if (await db.one('SELECT id FROM players WHERE email=$1', [row.email])) throw new HttpError(409, 'Já existe uma conta com esse e-mail. Entre com ela.');
-      const id = await createPlayer({ displayName: data.displayName, passHash: data.passHash, email: row.email, emailVerified: 1 });
+      const id = await createPlayer({ displayName: data.displayName, passHash: data.passHash, email: row.email, emailVerified: 1, terms: !!data.terms });
       log(`novo jogador (e-mail confirmado): ${data.displayName}`);
       return session(id, { created: true });
     },
@@ -409,7 +422,8 @@ export async function createApp({
       const displayName = cleanName(body.displayName);
       if (!displayName) return { needsNickname: true, suggestion: (g.givenName || g.name || '').slice(0, 24) };
       if (displayName.length < 2 || displayName.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
-      const id = await createPlayer({ displayName, passHash: NO_PASSWORD, email: g.email, googleSub: g.sub, emailVerified: g.email ? 1 : 0 });
+      if (body.acceptTerms !== true) throw new HttpError(400, TERMS_NEEDED);
+      const id = await createPlayer({ displayName, passHash: NO_PASSWORD, email: g.email, googleSub: g.sub, emailVerified: g.email ? 1 : 0, terms: true });
       log(`novo jogador (Google): ${displayName}`);
       return session(id, { created: true });
     },

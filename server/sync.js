@@ -10,6 +10,7 @@
 //    captura mais antiga (caughtAt); empate -> menor deviceId. A regra não depende da
 //    ordem de chegada, então todos os aparelhos convergem para o mesmo estado.
 import crypto from 'node:crypto';
+import { TERMS_VERSION } from './terms.js';
 import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
   distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo, visibleInMode,
@@ -368,6 +369,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
         avatarTs: p.avatar_ts, look: p.look, lookTs: p.look_ts, friendCode: p.friend_code, createdAt: p.created_at,
         vehicle: p.vehicle || null, vehicleTs: Number(p.vehicle_ts) || 0,
         email: p.email || null, google: !!p.google_sub, hasPassword: String(p.pass_hash || '').startsWith('scrypt$'),
+        termsAccepted: p.terms_version === TERMS_VERSION,
       },
       jobs: jobs.map((j) => ({ id: j.id, jobId: j.job_id, type: j.type, pay: j.pay, mode: j.mode, doneAt: Number(j.done_at), deviceId: j.device_id })),
       purchases: buys.map((b) => ({ id: b.id, item: b.item, price: b.price, boughtAt: Number(b.bought_at), deviceId: b.device_id })),
