@@ -63,7 +63,7 @@ O que pode fazer um jogador perder algo, e o que já protege:
    - `ADMIN_KEY`: a mesma do Render;
    - `BACKUP_PASSWORD`: uma senha **só para os backups**. Guarde num lugar seguro (gerenciador de senhas, por exemplo): sem ela, o backup não abre.
 2. Vá em **Actions → backup → Run workflow**. Em 1 ou 2 minutos aparece um ✅ e, dentro da execução, um arquivo `backup-...` em *Artifacts*. A partir daí ele roda sozinho a cada 6 horas.
-3. Os backups são criptografados porque têm nomes de usuário e senhas (guardadas embaralhadas, com scrypt). Mesmo assim, deixe o repositório **privado** se puder.
+3. **Atenção, o repositório é público:** qualquer pessoa logada no GitHub consegue baixar os arquivos de backup. Por isso eles saem criptografados (têm nomes de usuário e as senhas, guardadas embaralhadas com scrypt), e o workflow se recusa a rodar sem `BACKUP_PASSWORD`. Use uma senha **longa** (por exemplo, quatro ou cinco palavras aleatórias) e não a reaproveite em nenhum outro lugar. Se puder deixar o repositório privado depois da avaliação, melhor ainda.
 
 ### 4. Antes do evento (checklist)
 
