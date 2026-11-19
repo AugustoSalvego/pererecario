@@ -33,7 +33,7 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 54 testes: sincronização, idempotência, conflitos, falhas, trabalhos, loja, vendas, backup, contas, código por e-mail e painel protegido
+npm test             # 55 testes: sincronização, idempotência, conflitos, falhas, recuperação depois de perda no banco, trabalhos, loja, vendas, backup, contas, código por e-mail e painel protegido
 ```
 
 Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; hospedado, essa chave não vale: o Render sorteia a `ADMIN_KEY` e, sem uma chave de 12 ou mais caracteres, o painel fica desligado).
@@ -86,6 +86,7 @@ server/                 Node.js (http nativo) + SQLite/PostgreSQL
   mailer.js             envio do código por e-mail (Brevo)
   google.js             conferência do login com o Google
 test/                   testes automatizados (sincronização, contas, código por e-mail, Postgres)
+  navegador/            teste de resistência com dois celulares no Chrome (internet, servidor e banco caindo)
 ```
 
 ## Autor

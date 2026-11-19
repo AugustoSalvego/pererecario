@@ -14,14 +14,14 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 ## Teste 1: partida online com registro no servidor
 
-1. No celular A (online, pílula verde **Online**), mostre o contador "hoje" no canto inferior esquerdo (a caçada do dia é a partida).
+1. No celular A (online, ponto verde **Online** no canto de cima), mostre o contador "hoje" no canto inferior esquerdo (a caçada do dia é a partida).
 2. Ande até a lagoinha, chacoalhe o celular perto de um matinho, chegue a 10 m da perereca e capture.
 3. No projetor (`/admin`): a captura aparece em **Capturas recebidas** e em **Log de operações** (`capture` → `applied`) com o aparelho de origem.
 
 ## Teste 2: perder a conexão durante a partida e continuar jogando
 
 1. Ative o **modo avião** no celular A (ou "Simular modo avião" no painel de demonstração).
-2. A pílula muda para **Offline**. Continue andando e capture outra perereca: ela aparece no Meu Brejo marcada como **pendente** e o contador da pílula sobe.
+2. O indicador muda para o ponto vermelho **Offline**. Continue andando e capture outra perereca: ela aparece no Meu Brejo marcada como **pendente** e o número ao lado de "Offline" (ações guardadas no celular) sobe. Tocando no indicador, o jogo explica que está tudo guardado no celular.
 3. Mostre que o mapa, o Pererecário e o perfil continuam funcionando.
 
 ## Teste 3: fechar e abrir o app sem conexão
@@ -32,7 +32,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 ## Teste 4: restabelecer a conexão e enviar o que foi feito offline
 
 1. Desligue o modo avião.
-2. Em poucos segundos a pílula passa por **Sincronizando** e volta a **Online**; as capturas perdem a marca "pendente".
+2. Em poucos segundos o indicador passa por **Sincronizando…**, mostra **Tudo salvo ✓** e volta a **Online**; as capturas perdem a marca "pendente".
 3. No projetor: as capturas chegam com a coluna **Atraso** mostrando quanto tempo ficaram só no celular.
 
 ## Teste 5: recuperar o progresso em outro aparelho
@@ -44,7 +44,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 **Servidor indisponível**
 1. No `/admin`, clique **Derrubar servidor por 60 s**.
-2. No celular, a pílula fica laranja (**Servidor fora**). Capture uma perereca: ela fica pendente.
+2. No celular, o indicador fica com o ponto laranja (**Servidor fora**). Capture uma perereca: ela fica pendente.
 3. Passados os 60 s (ou "Religar agora"), o app sincroniza sozinho. No celular, Perfil → Painel de demonstração mostra no registro as tentativas com intervalo crescente.
 
 **Operação transmitida mais de uma vez**

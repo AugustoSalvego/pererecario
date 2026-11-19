@@ -255,6 +255,15 @@ export async function createApp({
     return { row, data: JSON.parse(row.data || '{}') };
   }
 
+  async function dbSize() {
+    try {
+      const r = db.kind === 'postgres'
+        ? await db.one('SELECT pg_database_size(current_database()) AS n')
+        : await db.one('SELECT page_count * page_size AS n FROM pragma_page_count(), pragma_page_size()');
+      return Number(r?.n) || null;
+    } catch { return null; }
+  }
+
   const routes = {
     'GET /api/health': async () => ({ ok: true, serverTime: now(), version: VERSION }),
 
@@ -447,8 +456,11 @@ export async function createApp({
       const state = await sync.snapshot(playerId);
       if (!state) throw new HttpError(401, 'Jogador não existe mais. Entre novamente.');
       const b = await brejos();
+      // quantas operações deste aparelho o servidor guarda: se o banco perder algo (restaurado de um
+      // backup, por exemplo), o aparelho percebe e reenvia o que faltar
+      const seen = Number((await db.one('SELECT COUNT(*) AS n FROM operations WHERE player_id=$1 AND device_id=$2', [playerId, deviceId])).n);
       return {
-        results, state, serverTime: now(),
+        results, state, serverTime: now(), seen,
         brejosVersion: b.version,
         brejos: body.brejosVersion === b.version ? undefined : b.brejos,
       };
@@ -511,6 +523,11 @@ export async function createApp({
         db: db.kind,
         outageUntil,
         online: (cleanPresence(), presence.size),
+        health: {
+          backupAutoAt: Number((await db.one("SELECT value FROM settings WHERE key='backup_auto_at'"))?.value) || null,
+          backupManualAt: Number((await db.one("SELECT value FROM settings WHERE key='backup_manual_at'"))?.value) || null,
+          dbBytes: await dbSize(),
+        },
         mail: { enabled: !!mailer, sent: mailStats.sent, failed: mailStats.failed, today: mailStats.today, dailyMax: mailDailyMax, lastError: mailStats.lastError, lastErrorAt: mailStats.lastErrorAt },
         counts: {
           players: players.length,
@@ -573,7 +590,10 @@ export async function createApp({
     'GET /api/admin/backup': async (req) => {
       requireAdmin(req);
       const data = await exportAll(db, { now: now(), version: VERSION });
-      log(`backup exportado: ${Object.entries(data.counts).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+      // anota quando foi o último backup (o painel avisa se o automático parar)
+      const key = req.headers['x-backup-origem'] === 'github' ? 'backup_auto_at' : 'backup_manual_at';
+      await db.tx((q) => q.run('INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = excluded.value', [key, String(now())]));
+      log(`backup exportado (${key === 'backup_auto_at' ? 'automático' : 'manual'}): ${Object.entries(data.counts).map(([k, v]) => `${k}=${v}`).join(' ')}`);
       return data;
     },
 

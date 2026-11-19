@@ -8,11 +8,18 @@
 #   ADMIN_KEY        a mesma chave de administrador configurada no servidor
 #   BACKUP_PASSWORD  uma senha só para os backups (guarde num lugar seguro!)
 # Para restaurar: docs/HOSPEDAGEM.md, seção "Se der problema".
+#
+# Em repositório público, o GitHub desliga agendamentos depois de 60 dias sem commits. O último
+# passo religa este workflow a cada execução, para o backup nunca parar sozinho.
 name: backup
 on:
   schedule:
     - cron: '17 */6 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write   # só para religar o próprio agendamento (último passo)
 
 jobs:
   backup:
@@ -31,7 +38,7 @@ jobs:
         # o servidor gratuito pode estar dormindo: tenta por até ~3 minutos
         run: |
           curl -fsS --retry 8 --retry-delay 20 --retry-all-errors --max-time 120 \
-            -H "X-Admin-Key: $ADMIN_KEY" "${GAME_URL%/}/api/admin/backup" -o backup.json
+            -H "X-Admin-Key: $ADMIN_KEY" -H "X-Backup-Origem: github" "${GAME_URL%/}/api/admin/backup" -o backup.json
           node -e "const d=require('./backup.json'); if (d.app!=='pererecario') { console.error('resposta inesperada'); process.exit(1) } console.log('Backup ok:', JSON.stringify(d.counts))"
       - name: Compactar e criptografar
         run: |
@@ -45,3 +52,9 @@ jobs:
           name: backup-${{ env.STAMP }}
           path: pererecario-*.json.gz.enc
           retention-days: 90
+      - name: Manter o backup automático ligado (o GitHub desliga agendamentos após 60 dias sem commits)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow enable backup.yml

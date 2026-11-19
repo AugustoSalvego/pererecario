@@ -15,7 +15,7 @@ import { openJobTalk, runJobGame, startDelivery, deliveryState, cancelDelivery, 
 import { openShop, carSprite, faceBubble } from './shop.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
-import { $, $$, esc, toast, openSheet, closeSheet, fmtDist } from './common.js';
+import { $, $$, esc, toast, openSheet, closeSheet, fmtDist, ago } from './common.js';
 import { getCatalog, frogImg, species } from '../catalog.js';
 import { store } from '../store.js';
 import { sync } from '../sync.js';
@@ -144,6 +144,7 @@ export function startGame({ firstTime = false } = {}) {
   let lastLevel = store.view.level.level;
   let lastLook = lookOf(store.view.player);
   store.addEventListener('change', () => {
+    if (!store.view.player) return;   // saindo da conta: a tela vai recarregar
     refreshObjects();
     renderAll();
     const lv = store.view.level.level;
@@ -171,6 +172,13 @@ export function startGame({ firstTime = false } = {}) {
     if (op.type === 'frog.sell') return toast(`Venda desfeita: ${esc(result.error)}. A perereca voltou para o brejo.`, 'warn', 'cloudOff', 6000);
     toast(`O servidor recusou uma operação: ${esc(result.error)}`, 'warn', 'cloudOff', 5000);
   });
+  store.addEventListener('resend', (e) => {
+    toast(`O servidor estava sem ${e.detail.count} ${e.detail.count === 1 ? 'ação sua' : 'ações suas'}: este celular está mandando de novo.`, 'warn', 'sync', 5000);
+  });
+  if (store.unparked) {
+    toast(`${store.unparked} ${store.unparked === 1 ? 'ação guardada' : 'ações guardadas'} neste celular ${store.unparked === 1 ? 'voltou' : 'voltaram'} para a fila e já ${store.unparked === 1 ? 'vai' : 'vão'} subir.`, 'ok', 'sync', 4500);
+    store.unparked = 0;
+  }
   sync.addEventListener('auth-expired', async () => {
     toast('Sessão expirada. Entre de novo com a mesma conta: nada do que está no aparelho foi perdido.', 'warn', 'cloudOff', 4000);
     await store.expireSession();
@@ -253,19 +261,46 @@ function renderHud() {
   renderHint();
 }
 
+// Indicador de conexão: ponto verde "Online", ponto vermelho "Offline" (com quantas ações estão
+// guardadas no celular), "Sincronizando…" ao voltar e "Tudo salvo" quando o servidor confirma.
+// O "Sincronizando" fica pelo menos 1,2 s na tela, para dar para ver mesmo quando é rápido.
+const pillState = { view: null, since: 0, timer: null, savedUntil: 0, worth: false };
 function renderStatus() {
   const pill = $('.status-pill');
   if (!pill) return;
   const n = store.outbox.length;
-  const st = sync.status === 'starting' ? (api.isOffline() ? 'offline' : 'syncing') : sync.status;
+  let st = sync.status === 'starting' ? (api.isOffline() ? 'offline' : 'syncing') : sync.status;
+  const t = Date.now();
+  clearTimeout(pillState.timer);
+  if (st === 'syncing') {
+    if (pillState.view !== 'syncing') {
+      // vale mostrar "Tudo salvo" no fim se havia algo para mandar ou se a internet acabou de voltar
+      pillState.worth = n > 0 || pillState.view === 'offline' || pillState.view === 'server-down';
+      pillState.since = t;
+    }
+  } else if (st === 'online' && pillState.view === 'syncing') {
+    const left = pillState.since + 1200 - t;
+    if (left > 0) { pillState.timer = setTimeout(renderStatus, left); st = 'syncing'; }
+    else if (pillState.worth) pillState.savedUntil = t + 2600;
+  }
+  if (st === 'online' && t < pillState.savedUntil) {
+    st = 'saved';
+    pillState.timer = setTimeout(renderStatus, pillState.savedUntil - t + 20);
+  } else if (st !== 'online' && st !== 'saved') pillState.savedUntil = 0;
+  pillState.view = st === 'saved' ? 'online' : st;
   pill.className = `status-pill ${st}`;
-  const count = n ? `<span class="count">${n}</span>` : '';
+  const kept = n ? `<span class="count" title="guardadas no celular">${n}</span>` : '';
   pill.innerHTML = {
-    online: `<span class="dot"></span>Online${count}`,
-    syncing: `${icons.sync}Sincronizando${count}`,
-    offline: `${icons.cloudOff}Offline${count}`,
-    'server-down': `<span class="dot"></span>Servidor fora${count}`,
+    online: '<span class="dot"></span><span class="lbl">Online</span>',
+    saved: `<span class="ok">${icons.check}</span><span class="lbl">Tudo salvo</span>`,
+    syncing: `<span class="spin"></span><span class="lbl">Sincronizando…</span>${kept}`,
+    offline: `<span class="dot"></span><span class="lbl">Offline</span>${kept}`,
+    'server-down': `<span class="dot"></span><span class="lbl">Servidor fora</span>${kept}`,
   }[st] || st;
+  pill.setAttribute('aria-label', {
+    online: 'Online: tudo salvo no servidor', saved: 'Tudo salvo no servidor', syncing: 'Sincronizando com o servidor',
+    offline: `Offline: ${n} ações guardadas no celular`, 'server-down': `Servidor fora do ar: ${n} ações guardadas no celular`,
+  }[st] || st);
 }
 
 function renderGpsChip() {
@@ -671,17 +706,18 @@ function brejoSheet(b) {
 function statusSheet() {
   sfx.tap();
   const n = store.outbox.length;
+  const kept = `${n} ${n === 1 ? 'ação está guardada' : 'ações estão guardadas'} neste celular e ${n === 1 ? 'sobe' : 'sobem'} sozinha${n === 1 ? '' : 's'}`;
   const text = {
-    online: 'Conectado. Tudo o que você faz é enviado ao servidor automaticamente.',
-    syncing: 'Enviando suas capturas para o servidor…',
-    offline: 'Sem internet. Pode continuar jogando: tudo fica salvo no celular e será enviado quando a conexão voltar.',
-    'server-down': 'A internet funciona, mas o servidor não respondeu. O jogo continua normalmente e tentaremos de novo sozinhos.',
+    online: n ? `Conectado. ${kept} em instantes.` : 'Conectado. Tudo o que você faz vai para o servidor na hora: seu progresso está salvo e aparece em qualquer celular em que você entrar.',
+    syncing: 'Enviando o que você fez para o servidor…',
+    offline: `Sem internet, mas pode continuar jogando. ${n ? `${kept} quando a internet voltar.` : 'O que você fizer fica guardado neste celular e sobe sozinho quando a internet voltar.'} Só não limpe os dados do navegador enquanto isso.`,
+    'server-down': `A internet funciona, mas o servidor não respondeu. Pode continuar jogando: ${n ? `${kept} quando ele voltar.` : 'o que você fizer fica guardado neste celular e sobe quando ele voltar.'} O jogo tenta de novo sozinho.`,
     starting: 'Verificando a conexão…',
   }[sync.status];
   const sheet = openSheet(`
-    <h3>${{ online: '🟢 Online', syncing: '🔄 Sincronizando', offline: '⚫ Jogando offline', 'server-down': '🟠 Servidor indisponível', starting: '…' }[sync.status]}</h3>
+    <h3>${{ online: n ? '🟢 Online' : '🟢 Online · tudo salvo', syncing: '🔵 Sincronizando', offline: '🔴 Offline', 'server-down': '🟠 Servidor fora do ar', starting: '…' }[sync.status]}</h3>
     <p class="lead">${text}</p>
-    <div class="kv"><div><span>Na fila para enviar</span><b>${n} operaç${n === 1 ? 'ão' : 'ões'}</b></div><div><span>Próxima tentativa</span><b>${sync.nextAt ? `${Math.max(0, Math.round((sync.nextAt - Date.now()) / 1000))} s` : '-'}</b></div></div>
+    <div class="kv"><div><span>Guardadas no celular, esperando para subir</span><b>${n} ${n === 1 ? 'ação' : 'ações'}</b></div><div><span>Última vez que salvou no servidor</span><b>${sync.lastSyncAt ? ago(sync.lastSyncAt) : '-'}</b></div></div>
     <div class="row-btns"><button class="btn ghost" data-act="demo">Painel de testes</button><button class="btn" data-act="sync">Sincronizar</button></div>`);
   $('[data-act=sync]', sheet).addEventListener('click', () => { sync.kick(0); closeSheet(); });
   $('[data-act=demo]', sheet).addEventListener('click', () => { closeSheet(true); openDemo(ctx); });

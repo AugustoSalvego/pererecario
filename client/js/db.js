@@ -2,8 +2,10 @@
 //  kv     -> sessão, último estado recebido do servidor, brejos, configurações
 //  outbox -> fila de operações ainda não confirmadas pelo servidor (ordem preservada)
 //  log    -> histórico de eventos de sincronização (para a demonstração)
+//  history-> toda operação que o servidor já confirmou, na ordem. Se o servidor um dia perder dados
+//            (banco restaurado de um backup, por exemplo), o celular reenvia o que faltar.
 const DB_NAME = 'pererecario';
-const VERSION = 1;
+const VERSION = 2;
 let dbp;
 
 function open() {
@@ -15,6 +17,9 @@ function open() {
       if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
       if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'seq', autoIncrement: true });
       if (!db.objectStoreNames.contains('log')) db.createObjectStore('log', { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains('history')) {
+        db.createObjectStore('history', { keyPath: 'hseq', autoIncrement: true }).createIndex('player', 'playerId');
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -38,6 +43,21 @@ export async function kvSet(key, value) {
   return done(tx);
 }
 
+export async function kvByPrefix(prefix) {
+  const db = await open();
+  const keys = await reqp(db.transaction('kv').objectStore('kv').getAllKeys());
+  const out = {};
+  for (const k of keys) if (typeof k === 'string' && k.startsWith(prefix)) out[k] = await kvGet(k);
+  return out;
+}
+
+export async function kvDelete(key) {
+  const db = await open();
+  const tx = db.transaction('kv', 'readwrite');
+  tx.objectStore('kv').delete(key);
+  return done(tx);
+}
+
 export async function outboxAll() {
   const db = await open();
   return reqp(db.transaction('outbox').objectStore('outbox').getAll());
@@ -57,12 +77,39 @@ export async function enqueue(op, kvWrites = {}, { replaceSeq } = {}) {
   return seq;
 }
 
-export async function outboxRemove(seqs, kvWrites = {}) {
+// Tira da fila o que o servidor confirmou e guarda no histórico, na MESMA transação
+export async function outboxRemove(seqs, kvWrites = {}, historyOps = []) {
   const db = await open();
-  const tx = db.transaction(['outbox', 'kv'], 'readwrite');
+  const tx = db.transaction(['outbox', 'kv', 'history'], 'readwrite');
   for (const s of seqs) tx.objectStore('outbox').delete(s);
+  for (const op of historyOps) tx.objectStore('history').add(op);
   for (const [k, v] of Object.entries(kvWrites)) tx.objectStore('kv').put(v, k);
   return done(tx);
+}
+
+export async function historyCount(playerId) {
+  const db = await open();
+  return reqp(db.transaction('history').objectStore('history').index('player').count(playerId));
+}
+
+export async function historyAll(playerId) {
+  const db = await open();
+  return reqp(db.transaction('history').objectStore('history').index('player').getAll(playerId));
+}
+
+// Coloca operações na frente da fila (são mais antigas que as que já estão nela), numa transação só.
+// Devolve a fila nova, na ordem.
+export async function outboxPrepend(ops) {
+  const db = await open();
+  const tx = db.transaction('outbox', 'readwrite');
+  const out = tx.objectStore('outbox');
+  const current = await reqp(out.getAll());
+  const known = new Set(current.map((o) => o.opId));
+  out.clear();
+  for (const op of ops) if (!known.has(op.opId)) { known.add(op.opId); out.add(op); }
+  for (const { seq, ...op } of current) out.add(op);
+  await done(tx);
+  return outboxAll();
 }
 
 export async function outboxUpdate(ops) {
@@ -87,10 +134,14 @@ export async function logAll() {
   return reqp(db.transaction('log').objectStore('log').getAll());
 }
 
-export async function wipe({ keep = [] } = {}) {
+// Limpa a sessão do aparelho. Nunca apaga o histórico, nem as filas guardadas de outras contas
+// ("parked:") e as marcas do histórico ("histBase:").
+export async function wipe({ keep = [], keepPrefix = ['parked:', 'histBase:'] } = {}) {
   const db = await open();
   const kept = {};
   for (const k of keep) kept[k] = await kvGet(k);
+  const keys = await reqp(db.transaction('kv').objectStore('kv').getAllKeys());
+  for (const k of keys) if (typeof k === 'string' && keepPrefix.some((p) => k.startsWith(p))) kept[k] = await kvGet(k);
   const tx = db.transaction(['kv', 'outbox', 'log'], 'readwrite');
   tx.objectStore('kv').clear();
   tx.objectStore('outbox').clear();

@@ -484,3 +484,40 @@ test('administrador redefine a senha de quem esqueceu, sem perder o progresso', 
   const st = (await sync({ token: ok.body.token }, 'c2', [])).body.state;
   assert.equal(st.captures.length, 1);
 });
+
+test('banco restaurado de um backup: o aparelho percebe ("seen") e reenvia; o servidor recupera tudo sem duplicar', async () => {
+  clock += 61_000;
+  const p = await newPlayer('rita');
+  const b = await ensureBrejo();
+  const spawns = spawnsFor(b, windowOf(clock), app.catalog, p.id).filter((s) => visibleInMode(s, 'gps')).slice(0, 3);
+  assert.equal(spawns.length, 3);
+  const ops = spawns.map((s) => captureOp(s, clock));
+  const r1 = await sync(p, 'cel-rita', [ops[0]]);
+  assert.equal(r1.body.seen, 1);
+  // backup automático no meio do caminho (e o painel anota a hora)
+  const bk = await call('GET', '/api/admin/backup', null, { 'X-Admin-Key': ADMIN, 'X-Backup-Origem': 'github' });
+  assert.equal(bk.status, 200);
+  const r2 = await sync(p, 'cel-rita', ops.slice(1));
+  assert.deepEqual(r2.body.results.map((r) => r.status), ['applied', 'applied'], JSON.stringify(r2.body.results));
+  assert.equal(r2.body.seen, 3);
+  // desastre: o banco volta para o momento do backup (as 2 últimas capturas somem do servidor)
+  await db.run('DELETE FROM captures WHERE player_id=$1', [p.id]);
+  await db.run('DELETE FROM operations WHERE player_id=$1', [p.id]);
+  await importAll(db, bk.body);
+  const lost = await sync(p, 'cel-rita', []);
+  assert.equal(lost.body.seen, 1, 'o servidor diz que só tem 1 operação deste aparelho');
+  assert.equal(lost.body.state.captures.length, 1);
+  // o aparelho tinha confirmado 3: reenvia o histórico inteiro, e o servidor ignora o que já tem
+  const replay = await sync(p, 'cel-rita', ops);
+  assert.deepEqual(replay.body.results.map((r) => r.status), ['duplicate', 'applied', 'applied']);
+  assert.equal(replay.body.seen, 3);
+  assert.equal(replay.body.state.captures.length, 3);
+  const again = await sync(p, 'cel-rita', ops);
+  assert.deepEqual(again.body.results.map((r) => r.status), ['duplicate', 'duplicate', 'duplicate']);
+  assert.equal(again.body.state.captures.length, 3);
+  // outro aparelho da mesma conta tem a contagem dele
+  assert.equal((await sync(p, 'cel-rita-2', [])).body.seen, 0);
+  const adm = await call('GET', '/api/admin/overview', null, { 'X-Admin-Key': ADMIN });
+  assert.ok(adm.body.health.backupAutoAt > 0);
+  assert.ok(adm.body.health.dbBytes > 0);
+});

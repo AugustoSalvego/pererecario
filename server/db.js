@@ -136,6 +136,7 @@ export const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS idx_captures_player ON captures (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expeditions_player ON expeditions (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_operations_received ON operations (received_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_operations_player_device ON operations (player_id, device_id)`,
 ];
 
 // Fila simples: só uma transação de escrita por vez. Evita intercalar comandos

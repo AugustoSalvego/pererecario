@@ -420,7 +420,7 @@ function openPassword() {
 }
 
 export function renderSyncCard(el) {
-  const label = { online: '🟢 Online', offline: '⚫ Offline', 'server-down': '🟠 Servidor indisponível', syncing: '🔄 Sincronizando', starting: '…' }[sync.status];
+  const label = { online: store.outbox.length ? '🟢 Online' : '🟢 Online · tudo salvo', offline: '🔴 Offline', 'server-down': '🟠 Servidor fora do ar', syncing: '🔵 Sincronizando', starting: '…' }[sync.status];
   $('.sync-card', el).innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div><b>${label}</b><div class="s" style="font-size:13px;color:var(--ink-soft);font-weight:500;margin-top:3px">
@@ -439,12 +439,28 @@ function fmtDay(day) {
   return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 }
 
+// Sair da conta: antes tenta mandar o que falta. O que não subir NÃO é apagado: fica guardado neste
+// celular e volta para a fila quando a mesma conta entrar de novo aqui.
 function confirmLogout() {
-  const n = store.outbox.length;
   const sheet = openSheet(`
     <h3>Sair da conta?</h3>
-    <p class="lead">${n ? `⚠️ Existem <b>${n} operações</b> que ainda não chegaram ao servidor. Se sair agora, elas serão perdidas. Conecte-se e espere sincronizar.` : 'Tudo sincronizado. Você pode entrar de novo em qualquer aparelho e continuar de onde parou.'}</p>
+    <p class="lead logout-lead"></p>
     <div class="row-btns"><button class="btn ghost" data-act="no">Ficar</button><button class="btn coral" data-act="yes">Sair</button></div>`);
+  const lead = $('.logout-lead', sheet);
+  const yes = $('[data-act=yes]', sheet);
+  const paint = () => {
+    const n = store.outbox.length;
+    lead.innerHTML = n
+      ? `☁️ <b>${n} ${n === 1 ? 'ação ainda não chegou' : 'ações ainda não chegaram'}</b> ao servidor${api.isOffline() ? ' (sem internet agora)' : ''}. Se sair, ${n === 1 ? 'ela fica guardada' : 'elas ficam guardadas'} <b>neste celular</b> e ${n === 1 ? 'sobe' : 'sobem'} sozinha${n === 1 ? '' : 's'} quando você entrar de novo com esta conta aqui. Em outro celular, ${n === 1 ? 'ela só aparece' : 'elas só aparecem'} depois disso.`
+      : '✅ Tudo salvo no servidor. Você pode entrar de novo em qualquer aparelho e continuar de onde parou.';
+    yes.textContent = n ? 'Sair mesmo assim' : 'Sair';
+  };
+  paint();
+  if (store.outbox.length && !api.isOffline()) {
+    lead.innerHTML = '🔄 Salvando suas últimas ações no servidor…';
+    yes.disabled = true;
+    sync.flush().catch(() => {}).finally(() => { yes.disabled = false; paint(); });
+  }
   $('[data-act=no]', sheet).addEventListener('click', () => closeSheet());
-  $('[data-act=yes]', sheet).addEventListener('click', async () => { closeSheet(true); await store.logout(); location.reload(); });
+  yes.addEventListener('click', async () => { closeSheet(true); await store.logout(); location.reload(); });
 }

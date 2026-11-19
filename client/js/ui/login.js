@@ -63,11 +63,17 @@ async function googleClientId(config) {
 }
 
 // A sessão expirou com coisas ainda na fila: avisa para entrar com a mesma conta (assim nada se perde)
-function pendingNote() {
-  const n = store.outbox.length;
+// Ações que ainda não subiram (sessão expirada, ou alguém saiu sem internet): avisa para entrar com a
+// mesma conta. Elas nunca são apagadas; entrando com outra conta, continuam guardadas aqui.
+function pendingNote(accounts) {
+  return accounts.map((a) => `<div class="pending-note">${icons.cloudOff}<span>Este aparelho guarda <b>${a.count} ${a.count === 1 ? 'ação' : 'ações'}</b> da conta <b>${esc(a.displayName || '')}</b>${a.email ? ` (${esc(a.email)})` : ''} que ainda não ${a.count === 1 ? 'subiu' : 'subiram'}. Entre com essa conta para ${a.count === 1 ? 'ela ir' : 'elas irem'} para o servidor.</span></div>`).join('');
+}
+
+function waitingAccounts() {
+  const list = [];
   const who = store.snapshot?.player;
-  if (!n || !who) return '';
-  return `<div class="pending-note">${icons.cloudOff}<span>Este aparelho tem <b>${n} ${n === 1 ? 'ação' : 'ações'}</b> da conta <b>${esc(who.displayName || '')}</b>${who.email ? ` (${esc(who.email)})` : ''} esperando para subir. Entre com essa mesma conta para não perder nada.</span></div>`;
+  if (store.outbox.length && who) list.push({ ...who, count: store.outbox.length });
+  return store.parkedAccounts().then((parked) => [...list, ...parked.filter((p) => p.id !== who?.id)]).catch(() => list);
 }
 
 export function renderLogin(onDone, config = {}) {
@@ -95,7 +101,7 @@ export function renderLogin(onDone, config = {}) {
       <div class="lily-frog" style="right:22%;bottom:30%">${frogImg('frog_honey', 46)}${img('lilypad.png', 52, 'pad-img')}</div>
     </div>
     <form class="login-card" novalidate>
-      ${pendingNote()}
+      <div class="pending-slot"></div>
       <div class="offline-banner hidden">${icons.cloudOff}<span>Você está sem internet. Para entrar pela primeira vez é preciso estar online.</span></div>
       <div class="google-area hidden"><div class="g-slot"></div><div class="or"><span>ou com e-mail</span></div></div>
       <div class="segmented"><button type="button" data-mode="login" class="on">Entrar</button><button type="button" data-mode="register">Criar conta</button></div>
@@ -140,6 +146,7 @@ export function renderLogin(onDone, config = {}) {
   root.appendChild(el);
 
   const form = $('form', el);
+  waitingAccounts().then((list) => { $('.pending-slot', el).innerHTML = pendingNote(list); });
   const err = $('.form-error', form);
   const submit = $('button[type=submit]', el);
   const banner = $('.offline-banner', el);

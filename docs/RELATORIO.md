@@ -111,6 +111,9 @@ O IndexedDB tem três "tabelas" (`client/js/db.js`):
 - **`kv`**: sessão (token e jogador), `snapshot` (último estado confirmado pelo servidor), brejos e versão, diferença de relógio com o servidor, configurações, pererecas reveladas, distância percorrida na caçada do dia, e o identificador do aparelho (`deviceId`).
 - **`outbox`**: a **fila de operações** ainda não confirmadas, em ordem (chave autoincremental). Cada operação tem `opId` (UUID gerado no aparelho), tipo, dados, horário e número de tentativas.
 - **`log`**: os últimos 150 eventos de sincronização, exibidos no painel de demonstração.
+- **`history`**: todas as operações que o servidor já confirmou, em ordem, marcadas com o jogador. É a "réplica" do aparelho usada na recuperação depois de uma perda de dados no servidor (seção 7).
+
+**Nada da fila é apagado ao sair ou trocar de conta:** as operações pendentes vão para `kv` como `parked:<jogador>` e voltam para a fila (na frente, por serem mais antigas) quando essa conta entrar de novo no aparelho. A tela de entrada mostra de qual conta são.
 
 **O que o jogador vê = snapshot do servidor + operações pendentes reaplicadas por cima** (`store.recompute()`). Assim:
 
@@ -209,6 +212,22 @@ A posição dos outros jogadores segue uma regra diferente do resto do jogo. Cap
 | **Operação inválida** (perereca que não existe, horário fora da janela, longe demais) | O servidor recalcula o encontro e responde `rejected` com o motivo; a operação sai da fila e o jogador é avisado. |
 | **Sessão expirada** | Resposta 401: o app avisa e pede novo login **sem apagar a fila**; a tela de entrada mostra quantas ações daquela conta estão esperando, e entrando com a mesma conta elas sobem normalmente. O botão "Sair" alerta se ainda houver operações não sincronizadas. |
 | **Servidor "dormindo" (Render gratuito)** | Mesmo comportamento de servidor indisponível; o jogador nem precisa perceber. |
+| **O banco do servidor perde dados** (restaurado de um backup, voltado no tempo) | **Anti-entropia:** a cada sincronização o servidor informa `seen`, quantas operações daquele aparelho ele guarda. O aparelho compara com o próprio histórico (descontando as operações de antes desta versão, anotadas na primeira sincronização). Se o servidor tiver menos, o aparelho põe o histórico de volta na frente da fila e reenvia: pela idempotência, o que o servidor já tem volta como `duplicate` e só o que faltava é aplicado. Os aparelhos funcionam como réplicas que reconstroem o servidor. |
+
+**Indicador para o jogador:** ponto verde **Online**; ponto vermelho **Offline** com o número de ações guardadas no celular; **Sincronizando…** (fica pelo menos 1,2 s visível) quando a internet volta ou há algo para mandar; **Tudo salvo** com um ✓ quando o servidor confirma; ponto laranja **Servidor fora**. Tocando, aparece a explicação em palavras.
+
+**Teste de resistência no navegador** (`test/navegador/resistencia.py` com `test/navegador/servidor_teste.mjs`): dois celulares (Chrome automatizado) na mesma conta fazem de 80 a 120 ações sorteadas: capturar, cortar e devolver a internet, derrubar o servidor por alguns segundos, fechar e reabrir o app, perder a resposta da sincronização depois que o servidor já aplicou e "desastres" em que o banco apaga o que recebeu nos últimos 10 a 90 segundos. No fim, cada captura feita tem de estar no servidor exatamente uma vez e os dois celulares têm de mostrar o mesmo que o servidor.
+
+| Rodada (semente) | Ações | Desastres no banco | Capturas feitas | Faltando | Duplicadas | Celulares iguais ao servidor |
+|---|---|---|---|---|---|---|
+| 4242 | 90 | 2 | 52 | 0 | 0 | sim |
+| 7 | 120 | 5 | 70 | 0 | 0 | sim |
+| 2026 | 120 | 3 | 58 | 0 | 0 | sim |
+| 31 | 80 | 8 | 37 | 0 | 0 | sim |
+| 707 **sem a anti-entropia** | 120 | 6 | 60 | **27** | 0 | sim (iguais ao servidor, mas sem as 27) |
+| 707 com a anti-entropia | 120 | 6 | 64 | 0 | 0 | sim |
+
+A rodada sem a anti-entropia mostra que o teste pega a perda quando ela existe, e que o problema é silencioso: os celulares "concordam" com o servidor e as capturas somem sem aviso.
 
 Para a apresentação, o painel de demonstração (Perfil → Painel de demonstração) e o painel do servidor (`/admin`) permitem **simular** cada uma dessas falhas: modo avião simulado, derrubar o servidor por 60 s (o servidor responde 503 e volta sozinho), perder a resposta da próxima sincronização e reenviar uma operação confirmada. Há também o registro de eventos com cada etapa.
 
@@ -297,4 +316,6 @@ Os fluxos completos (login, cadastro com o código do e-mail, esqueci a senha, m
 - A presença fica só na memória do servidor: se o servidor reiniciar, os jogadores somem do mapa por alguns segundos, até o próximo envio (a cada 4 s).
 - O mapa offline mostra apenas a região já vista ou baixada antecipadamente ao redor dos brejos; fora disso aparece o gramado do jogo.
 - No iPhone, o sensor de movimento só pode ser liberado após um toque do usuário (o app pede na primeira abertura).
+- Limpar os dados do navegador apaga o que ainda não subiu (o que já subiu está no servidor). No iPhone, o Safari apaga dados de sites não abertos por 7 dias, a menos que o jogo esteja na Tela de Início; por isso o jogo deve ser instalado.
+- A anti-entropia recupera operações que algum aparelho ainda tem no histórico. Um jogador criado depois do último backup e que perdeu o banco ainda não existe no backup restaurado; ele precisaria criar a conta de novo (as lagoinhas dependem do id do jogador, então o histórico antigo não vale para a conta nova).
 - O relógio do aparelho é corrigido a cada sincronização; se o celular nunca ficou online depois de ter o relógio muito alterado, uma captura pode cair fora da janela e ser rejeitada.

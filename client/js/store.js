@@ -63,9 +63,36 @@ class Store extends EventTarget {
   }
 
   // ---------- sessão ----------
+  // Nada da fila é apagado ao sair ou trocar de conta: as ações que ainda não subiram ficam guardadas
+  // neste aparelho ("parked") e voltam para a fila quando essa conta entrar de novo aqui.
+  async parkOutbox() {
+    const who = this.snapshot.player || this.session?.player;
+    if (!who?.id || !this.outbox.length) return 0;
+    const prev = (await db.kvGet(`parked:${who.id}`))?.ops || [];
+    const known = new Set(prev.map((o) => o.opId));
+    const ops = [...prev, ...this.outbox.filter((o) => !known.has(o.opId)).map(({ seq, ...o }) => o)];
+    await db.kvSet(`parked:${who.id}`, { who: { id: who.id, displayName: who.displayName || '', email: who.email || '' }, ops });
+    return this.outbox.length;
+  }
+
+  // contas com ações guardadas neste aparelho (para avisar na tela de entrada)
+  async parkedAccounts() {
+    return Object.values(await db.kvByPrefix('parked:')).filter((p) => p?.ops?.length).map((p) => ({ ...p.who, count: p.ops.length }));
+  }
+
+  async unparkOutbox(pid) {
+    const ops = (await db.kvGet(`parked:${pid}`))?.ops;
+    if (!ops?.length) return 0;
+    this.outbox = await db.outboxPrepend(ops);
+    await db.kvDelete(`parked:${pid}`);
+    this.log('info', `${ops.length} ${ops.length === 1 ? 'ação guardada' : 'ações guardadas'} neste aparelho ${ops.length === 1 ? 'voltou' : 'voltaram'} para a fila`);
+    return ops.length;
+  }
+
   async login({ token, player, serverTime }) {
     const sameAccount = this.snapshot.player?.id === player.id;
     if (!sameAccount) {
+      await this.parkOutbox();
       await db.wipe({ keep: ['deviceId', 'settings'] });
       this.snapshot = { ...EMPTY, player };
       this.outbox = [];
@@ -77,15 +104,19 @@ class Store extends EventTarget {
     await db.kvSet('session', this.session);
     await db.kvSet('clockOffset', this.clockOffset);
     await db.kvSet('snapshot', this.snapshot);
+    this.unparked = await this.unparkOutbox(player.id);
     this.recompute();
   }
 
+  // Devolve quantas ações ficaram guardadas no aparelho (sobem quando a conta entrar de novo aqui)
   async logout() {
+    const parked = await this.parkOutbox();
     await db.wipe({ keep: ['deviceId', 'settings'] });
     this.session = null; api.token = null;
     this.snapshot = EMPTY; this.outbox = []; this.brejos = []; this.brejosVersion = null;
     this.activity = {}; this.myMeters = {}; this.revealed = {}; this.currentExpeditionId = null;
     this.recompute();
+    return parked;
   }
 
   // O servidor não aceitou mais a sessão (por exemplo, a chave das sessões do servidor mudou).
@@ -144,12 +175,45 @@ class Store extends EventTarget {
       this.session = { ...this.session, player: resp.state.player };
       kv.session = this.session;
     }
-    await db.outboxRemove(acked, kv);
+    // o que o servidor confirmou vai para o histórico do aparelho (o reenvio de recuperação não entra de novo)
+    const pid = resp.state?.player?.id || this.session?.player?.id;
+    const history = events.filter(({ op }) => !op.replay).map(({ op, result }) => {
+      const { seq, coalesceKey, attempts, ...rest } = op;
+      return { ...rest, playerId: pid, status: result.status, ackedAt: Date.now() };
+    });
+    await db.outboxRemove(acked, kv, history);
     const ackedSet = new Set(acked);
     this.outbox = this.outbox.filter((o) => !ackedSet.has(o.seq));
     this.recompute();
     if (resp.brejos) this.emit('brejos', this.brejos);
+    await this.checkServerMemory(pid, resp.seen);
     return events;
+  }
+
+  // Anti-entropia: o servidor conta quantas operações deste aparelho ele guarda ("seen"). Se for menos
+  // do que o aparelho sabe que já foram confirmadas, o banco perdeu algo (restaurado de um backup ou
+  // voltado no tempo). O aparelho reenvia o histórico; o servidor ignora as repetidas (idempotência)
+  // e recupera só o que faltava.
+  async checkServerMemory(pid, seen) {
+    if (!pid || typeof seen !== 'number') return;
+    const total = await db.historyCount(pid);
+    const key = `histBase:${pid}`;
+    const mark = await db.kvGet(key);
+    // primeira vez, ou fim de um reenvio: anota quantas operações o servidor tem além do histórico
+    // (as de antes desta versão do jogo, que o aparelho não guardou)
+    if (!mark || (mark.rebase && !this.outbox.some((o) => o.replay))) {
+      await db.kvSet(key, { base: seen - total, rebase: false });
+      return;
+    }
+    if (this.outbox.some((o) => o.replay)) return;      // reenvio em andamento
+    if (seen >= mark.base + total) return;              // o servidor tem tudo
+    const hist = await db.historyAll(pid);
+    const ops = hist.map(({ hseq, playerId, status, ackedAt, ...op }) => ({ ...op, attempts: 0, replay: true }));
+    this.outbox = await db.outboxPrepend(ops);
+    await db.kvSet(key, { ...mark, rebase: true });
+    this.recompute();
+    this.log('warn', `O servidor tem menos dados deste aparelho do que deveria (${seen} de ${mark.base + total}). Reenviando o histórico (${ops.length} operações) para ele recuperar o que faltou.`);
+    this.emit('resend', { count: seen - mark.base >= 0 ? mark.base + total - seen : ops.length });
   }
 
   async setBrejos(brejos, version) {

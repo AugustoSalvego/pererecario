@@ -89,10 +89,10 @@ class Sync extends EventTarget {
     while (rounds++ < 10) {
       const batch = store.outbox.slice(0, BATCH);
       const wire = batch.map(({ opId, type, payload, ts }) => ({ opId, type, payload, ts }));
-      if (batch.length) {
-        this.setStatus('syncing');
-        store.log('send', `Enviando ${batch.length} operaç${batch.length > 1 ? 'ões' : 'ão'} ao servidor`);
-      }
+      // voltando da falta de internet, mostra "Sincronizando" mesmo sem nada na fila:
+      // é a hora em que o celular confere com o servidor
+      if (batch.length || this.status === 'offline') this.setStatus('syncing');
+      if (batch.length) store.log('send', `Enviando ${batch.length} operaç${batch.length > 1 ? 'ões' : 'ão'} ao servidor`);
       const sentAt = Date.now();
       let resp;
       try {

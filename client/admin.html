@@ -57,6 +57,7 @@
     </section>
     <section style="margin-bottom:16px">
       <h2>Dados dos jogadores</h2>
+      <p id="health" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px"></p>
       <p class="muted">O backup automático roda no GitHub a cada 6 horas (ver docs/HOSPEDAGEM.md). Aqui você baixa um na hora, por exemplo antes de mexer em algo no servidor.</p>
       <div class="row" style="margin-bottom:12px">
         <button id="bkdown">Baixar backup agora</button>
@@ -166,6 +167,18 @@ async function load() {
     const m = d.mail || {};
     const mail = m.enabled ? `E-mail (Brevo): ligado, ${m.today}/${m.dailyMax} hoje${m.failed ? ` · ${m.failed} falha(s), última: ${m.lastError}` : ''}` : 'E-mail (Brevo): desligado, cadastro sem código';
     $('#msg').textContent = `Banco: ${d.db} · ${mail} · atualizado ${t(d.serverTime)}`;
+    const hl = d.health || {};
+    const autoAge = hl.backupAutoAt ? d.serverTime - hl.backupAutoAt : null;
+    const mb = hl.dbBytes ? hl.dbBytes / 1048576 : null;
+    $('#health').innerHTML = [
+      autoAge == null
+        ? '<span class="tag rejected">⚠️ Backup automático: nunca rodou. Configure o GitHub (docs/HOSPEDAGEM.md, passo 3)</span>'
+        : autoAge < 8 * 3600000
+          ? `<span class="tag applied">✓ Último backup automático: há ${dur(autoAge) || 'instantes'}</span>`
+          : `<span class="tag rejected">⚠️ Último backup automático: há ${dur(autoAge)}. Confira a aba Actions do GitHub</span>`,
+      hl.backupManualAt ? `<span class="tag duplicate">Último backup baixado aqui: ${t(hl.backupManualAt)}</span>` : '',
+      mb != null ? `<span class="tag ${mb > 800 ? 'rejected' : 'applied'}">Banco: ${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB usados${d.db === 'postgres' ? ' de 1024 MB (Neon grátis)' : ''}</span>` : '',
+    ].join(' ');
     $('#content').hidden = false;
     const c = d.counts;
     $('#cards').innerHTML = [['Jogando agora', d.online ?? 0], ['Jogadores externos', c.external ?? c.players], ['Externos ativos nas últimas 24 h', c.activeExternal ?? c.activeToday], ['Contas da organização', c.staff ?? 0], ['Capturas', c.captures], ['Operações recebidas', c.operations], ['Reenvios ignorados', c.resends], ['Conflitos resolvidos', c.conflicts], ['Operações rejeitadas', c.rejected]]

@@ -21,9 +21,14 @@ O Firebase faria a sincronização sozinho, por dentro, e esconderia justamente 
 
 ## Onde ficam os dados de um jogador
 
-1. **No celular (IndexedDB):** tudo o que ele fez e ainda não chegou ao servidor. O jogo pede ao navegador armazenamento permanente, para não ser apagado quando falta espaço. A fila só sai do celular quando o servidor confirma o recebimento; se a internet cair no meio, ela é reenviada sem duplicar nada.
+1. **No celular, na fila (IndexedDB):** tudo o que ele fez e ainda não chegou ao servidor. O jogo pede ao navegador armazenamento permanente, para não ser apagado quando falta espaço. A fila só sai do celular quando o servidor confirma o recebimento; se a internet cair no meio, ela é reenviada sem duplicar nada. Sair da conta ou entrar com outra **não apaga** a fila: ela fica guardada no aparelho e volta quando a conta entrar de novo ali.
 2. **No servidor (Neon):** a cópia oficial. Entrando em qualquer celular, o jogador recebe tudo de volta.
 3. **Nos backups (GitHub):** uma cópia do banco inteiro a cada 6 horas, guardada por 90 dias, fora do servidor e fora do banco.
+4. **No celular, no histórico:** o celular também guarda tudo o que o servidor já confirmou. A cada sincronização o servidor diz quantas ações daquele celular ele tem; se for menos do que o celular sabe que mandou (o banco foi restaurado de um backup, ou voltado no tempo), o celular reenvia o histórico e o servidor recupera só o que faltava, sem duplicar. Assim, mesmo num desastre, o que foi feito depois do último backup volta assim que os jogadores abrirem o jogo.
+
+Para o jogador, o estado aparece no canto de cima: **ponto verde "Online"**, **ponto vermelho "Offline"** com quantas ações estão guardadas no celular, **"Sincronizando…"** quando a internet volta e **"Tudo salvo"** quando o servidor confirma. Tocando ali, o jogo explica em palavras.
+
+**Teste de resistência** (`test/navegador/resistencia.py`): dois celulares na mesma conta fazem centenas de ações enquanto a internet cai e volta, o servidor cai, o app é fechado e reaberto, respostas se perdem no meio do caminho e o banco "volta no tempo" várias vezes. Em todas as rodadas, nenhuma captura faltou nem duplicou, e os dois celulares terminaram iguais ao servidor. Com a recuperação pelo histórico desligada, a mesma bateria perdeu 27 de 60 capturas, o que mostra que o teste pega o problema quando ele existe.
 
 O que pode fazer um jogador perder algo, e o que já protege:
 
@@ -37,11 +42,14 @@ O que pode fazer um jogador perder algo, e o que já protege:
 | Jogador esquecer a senha | Quem usa "Continuar com Google" não tem senha para esquecer. Para quem usa e-mail e senha, o próprio jogo resolve: "Esqueci a senha" → código no e-mail → senha nova (passo 7). Sem o Brevo, o organizador define uma senha nova no `/admin`. O progresso continua todo lá |
 | Alguém criar conta com o e-mail de outra pessoa | Com o passo 7 feito, a conta só nasce depois do código que chega no e-mail. E o dono de verdade sempre recupera a conta pelo "Esqueci a senha" |
 | Jogador trocar de celular ou perder o celular | É só entrar com e-mail e senha (ou com o Google) no outro aparelho |
-| Sair da conta com ações não enviadas | O jogo avisa quantas operações ainda não chegaram e pede para esperar sincronizar |
+| Sair da conta (ou entrar com outra) com ações não enviadas | O jogo tenta mandar antes de sair. O que não subir **não é apagado**: fica guardado no celular, a tela de entrada mostra de qual conta é, e volta para a fila quando essa conta entrar de novo ali |
+| O banco perder dados (restaurado de um backup ou voltado no tempo) | Os celulares percebem e reenviam o que o servidor perdeu (ver item 4 acima). Testado: sem isso, 27 de 60 capturas sumiam; com isso, nenhuma |
+| O backup automático parar sozinho | Em repositório público, o GitHub desliga agendamentos depois de 60 dias sem commits; o próprio backup se religa a cada execução. O `/admin` mostra a hora do último backup automático e fica vermelho se passar de 8 horas |
 | A sessão do jogador deixar de valer no servidor (por exemplo, se a `TOKEN_SECRET` do Render mudar) | O jogo pede para entrar de novo **sem apagar nada** do celular e mostra quantas ações estão esperando; entrando com a mesma conta, elas sobem (testado no navegador) |
 | Alguém de fora entrar no painel `/admin` | A chave é sorteada pelo Render (longa e aleatória) e só você a vê. Sem uma chave de 12 ou mais caracteres, o painel fica desligado. Errou a chave 20 vezes em 10 minutos, aquele aparelho fica bloqueado |
 | Acabar a cota grátis do Neon no mês | São 100 CU-horas por mês, umas 400 horas com o banco acordado; ele dorme depois de 5 minutos sem uso, e o servidor só acorda o banco quando alguém joga. Mesmo ligado o dia inteiro, do dia 20 ao fim de novembro dá menos de 300 horas. O uso aparece no painel do Neon (**Monitoring**) |
-| Limpar os dados do navegador antes de sincronizar | Esse é o único caso sem proteção: o que estava só na fila do celular se perde. Oriente os jogadores a não limpar o navegador durante o evento |
+| Limpar os dados do navegador antes de sincronizar | Esse é o único caso sem proteção: o que estava só na fila do celular se perde (o que já subiu está salvo). Com internet, a fila sobe em segundos, então o risco é só de quem jogou offline e apagou os dados antes de conectar |
+| iPhone: o Safari apaga dados de sites que ficam 7 dias sem ser abertos | Afeta só o que ainda não subiu e quem não instalou o jogo. Peça para os jogadores **adicionarem à Tela de Início** (Compartilhar → Adicionar à Tela de Início): aí o iPhone não apaga |
 
 ## Passo a passo
 
