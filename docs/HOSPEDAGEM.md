@@ -1,7 +1,7 @@
 # Hospedagem e segurança dos dados
 
 Este guia coloca o Pererecário no ar de graça e garante que os jogadores não percam o progresso.
-São três peças, cada uma num serviço diferente:
+São três peças, cada uma num serviço diferente (mais o login com o Google, opcional, no passo 4):
 
 | Peça | Serviço | Para quê | Custo |
 |---|---|---|---|
@@ -32,7 +32,7 @@ O que pode fazer um jogador perder algo, e o que já protege:
 | O banco reiniciar ou dormir com o servidor ligado | O servidor reabre a conexão sozinho (testado no GitHub contra um Postgres de verdade) |
 | Alguém apagar dados por engano | Neon volta o banco para qualquer momento das últimas 6 horas; além disso, há os backups |
 | Jogador sem internet | O jogo continua; a fila sincroniza quando a conexão voltar |
-| Jogador esquecer a senha (não há e-mail) | No `/admin`, o organizador define uma senha nova; o progresso continua todo lá |
+| Jogador esquecer a senha | Quem usa "Continuar com Google" não tem senha para esquecer. Para quem usa e-mail e senha, o organizador define uma senha nova no `/admin` (pelo e-mail); o progresso continua todo lá |
 | Jogador trocar de celular ou perder o celular | É só entrar com usuário e senha no outro aparelho |
 | Sair da conta com ações não enviadas | O jogo avisa quantas operações ainda não chegaram e pede para esperar sincronizar |
 | Limpar os dados do navegador antes de sincronizar | Esse é o único caso sem proteção: o que estava só na fila do celular se perde. Oriente os jogadores a não limpar o navegador durante o evento |
@@ -65,7 +65,26 @@ O que pode fazer um jogador perder algo, e o que já protege:
 2. Vá em **Actions → backup → Run workflow**. Em 1 ou 2 minutos aparece um ✅ e, dentro da execução, um arquivo `backup-...` em *Artifacts*. A partir daí ele roda sozinho a cada 6 horas.
 3. **Atenção, o repositório é público:** qualquer pessoa logada no GitHub consegue baixar os arquivos de backup. Por isso eles saem criptografados (têm nomes de usuário e as senhas, guardadas embaralhadas com scrypt), e o workflow se recusa a rodar sem `BACKUP_PASSWORD`. Use uma senha **longa** (por exemplo, quatro ou cinco palavras aleatórias) e não a reaproveite em nenhum outro lugar. Se puder deixar o repositório privado depois da avaliação, melhor ainda.
 
-### 4. Antes do evento (checklist)
+### 4. Login com o Google (Google Cloud, grátis, 10 min)
+
+O botão "Continuar com Google" só aparece depois deste passo; até lá o jogo funciona só com e-mail e senha. Não tem custo e não precisa de cartão.
+
+1. Entre em [console.cloud.google.com](https://console.cloud.google.com) com a sua conta Google e crie um projeto chamado `Pererecario` (no seletor de projetos, no topo → **Novo projeto**).
+2. No menu, abra **APIs e serviços → Tela de permissão OAuth** (em algumas contas aparece como **Google Auth Platform**) e clique em **Começar**:
+   - nome do app: `Pererecário`; e-mail de suporte: o seu;
+   - público: **Externo**;
+   - e-mail de contato: o seu; aceite os termos e conclua.
+3. Em **Clientes** (ou **Credenciais → Criar credenciais → ID do cliente OAuth**): tipo **Aplicativo da Web**, nome `Pererecario web`. Em **Origens JavaScript autorizadas**, adicione:
+   - `https://pererecario-xxxx.onrender.com` (o endereço exato do jogo, sem barra no fim);
+   - `http://localhost:8080` (para testar no computador).
+   Não precisa de "URIs de redirecionamento". Clique em **Criar** e copie o **ID do cliente** (termina em `.apps.googleusercontent.com`). Ele não é segredo: aparece na página do jogo. A "chave secreta do cliente" não é usada.
+4. Em **Público** (ou na própria Tela de permissão), clique em **Publicar app** e confirme. O jogo só pede nome, e-mail e foto do perfil, e para isso o Google não exige verificação. Sem publicar, qualquer pessoa ainda consegue entrar, mas o Google mostra um aviso de "app em teste".
+5. No Render, abra o serviço → **Environment** → **Add Environment Variable**: `GOOGLE_CLIENT_ID` = o ID copiado → **Save**. O servidor reinicia sozinho.
+6. Abra o jogo: o botão "Continuar com Google" aparece em cima de "ou com e-mail". Entre com uma conta Google de teste.
+
+Se um dia o endereço do jogo mudar (outro nome no Render ou um domínio próprio), adicione o endereço novo nas **Origens JavaScript autorizadas**; senão o botão do Google mostra um erro.
+
+### 5. Antes do evento (checklist)
 
 - [ ] `/healthz` responde `ok` e os logs dizem `banco: postgres`.
 - [ ] Uma conta de teste no celular: capturar, fechar o app, abrir de novo, conferir que continua lá.
@@ -73,6 +92,7 @@ O que pode fazer um jogador perder algo, e o que já protege:
 - [ ] Rodar o backup na mão (Actions → backup → Run workflow) e ver o ✅.
 - [ ] Baixar um backup também pelo `/admin` ("Baixar backup agora") e guardar no computador.
 - [ ] Testar a redefinição de senha no `/admin` com a conta de teste.
+- [ ] Criar uma conta pelo **Continuar com Google** num Android e num iPhone, e outra com e-mail e senha.
 - [ ] Gerar o QR code da URL para o público.
 
 ## No dia do evento
@@ -98,6 +118,6 @@ O que pode fazer um jogador perder algo, e o que já protege:
 
 Para conferir um backup sem mexer no banco de verdade, rode o mesmo comando **sem** `DATABASE_URL`: ele restaura num arquivo local (`data/pererecario.db`).
 
-**Um jogador esqueceu a senha:** `/admin` → "Redefinir senha" → usuário dele e uma senha nova.
+**Um jogador esqueceu a senha:** se a conta é Gmail, ele pode simplesmente entrar com "Continuar com Google". Senão, `/admin` → "Redefinir senha" → e-mail dele e uma senha nova (mínimo 8).
 
 **Um jogador diz que perdeu capturas:** peça para ele abrir o jogo com internet e esperar a nuvem do topo ficar verde. Se ele tiver saído da conta ou limpado o navegador antes de sincronizar, o que estava só no celular não chegou ao servidor. No `/admin`, a tabela de operações mostra tudo o que chegou de cada aparelho.

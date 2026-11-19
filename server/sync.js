@@ -367,6 +367,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
         id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar,
         avatarTs: p.avatar_ts, look: p.look, lookTs: p.look_ts, friendCode: p.friend_code, createdAt: p.created_at,
         vehicle: p.vehicle || null, vehicleTs: Number(p.vehicle_ts) || 0,
+        email: p.email || null, google: !!p.google_sub, hasPassword: String(p.pass_hash || '').startsWith('scrypt$'),
       },
       jobs: jobs.map((j) => ({ id: j.id, jobId: j.job_id, type: j.type, pay: j.pay, mode: j.mode, doneAt: Number(j.done_at), deviceId: j.device_id })),
       purchases: buys.map((b) => ({ id: b.id, item: b.item, price: b.price, boughtAt: Number(b.bought_at), deviceId: b.device_id })),

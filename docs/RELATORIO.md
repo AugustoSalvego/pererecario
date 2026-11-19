@@ -30,7 +30,7 @@ Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro
 
 | Requisito do enunciado | No jogo |
 |---|---|
-| Identificação do jogador | Conta com usuário e senha; token assinado guardado no aparelho |
+| Identificação do jogador | Conta com apelido + e-mail + senha, ou "Continuar com Google" (o servidor confere o token do Google); token próprio assinado guardado no aparelho |
 | Estado e progresso das partidas | **Caçada do dia** = a partida: criada automaticamente no primeiro movimento ou captura do dia; acumula capturas, XP e distância. O identificador é fixo por jogador e por dia (`dia:<jogador>:<dia>`), então dois aparelhos no mesmo dia jogam **a mesma partida** |
 | Pontuações e resultados | XP por captura (10/25/60/150 + 50 por espécie nova), nível, ranking geral, saldo de Brejais |
 | Histórico das partidas | No servidor, cada partida fica registrada com jogador, dia, pererecas, distância e quantos aparelhos jogaram nela (visível no painel `/admin`). No app, o **Diário de campo** mostra as últimas capturas e o Perfil mostra a caçada de hoje |
@@ -92,7 +92,8 @@ Rotas principais:
 
 | Rota | Função |
 |---|---|
-| `POST /api/auth/register`, `POST /api/auth/login` | Cria conta / entra; devolve token, jogador e hora do servidor |
+| `POST /api/auth/register`, `POST /api/auth/login` | Cria conta (apelido, e-mail, senha) / entra (e-mail e senha); devolve token, jogador e hora do servidor |
+| `POST /api/auth/google`, `POST /api/auth/google/link`, `POST /api/auth/password` | Entra ou cria conta com o Google; liga o Google a uma conta existente; cria ou troca a senha |
 | `POST /api/sync` | Envia até 100 operações e recebe o resultado de cada uma, o estado canônico do jogador e os brejos (se mudaram) |
 | `GET /api/brejos` | Lista de brejos e a versão da lista |
 | `GET /api/ranking` | Ranking geral |
@@ -240,7 +241,9 @@ O jogo muda conforme o ambiente físico do jogador:
 - Trabalhos: o servidor recalcula o morador a partir do id (tipo, lugar e janela de 15 min), confere o horário, a distância até o morador (ou até o ponto de entrega, no caso do carteiro) e que ele ainda não foi ajudado. O pagamento gravado é o calculado pelo servidor (`jobPay`), não o enviado pelo aparelho.
 - Venda: o servidor confere que a captura existe, é do jogador, não foi vendida e não é favorita, e calcula o preço ele mesmo (`frogPrice`), sem usar o valor que o aparelho mandou.
 - Loja: o preço vem do catálogo do servidor; a compra só é aplicada se o saldo do servidor cobrir o preço. O carro só pode ser escolhido se o jogador tiver comprado.
-- Senhas com scrypt; tokens com HMAC-SHA256; limite de tentativas de login por IP; rotas de administração protegidas por chave.
+- Senhas com scrypt (mínimo de 8 caracteres); tokens com HMAC-SHA256; limite de tentativas de login por IP e por conta; rotas de administração protegidas por chave.
+- "Continuar com Google": o servidor confere o ID token do Google sem biblioteca externa (`server/google.js`): assinatura RS256 com as chaves públicas do Google (guardadas pelo tempo que o Google indica), emissor `accounts.google.com`, aplicativo (`aud` = nosso Client ID) e validade. A conta é identificada pelo `sub` do Google, não pelo e-mail.
+- Mesmo e-mail nos dois jeitos: entrar com o Google num Gmail que já tem conta com senha liga as duas. Como o e-mail do cadastro com senha não é confirmado, essa senha é desativada nessa hora (quem a criou podia não ser o dono do Gmail) e a pessoa pode criar outra no Perfil. Para e-mails que não são Gmail, o Google não é "dono" do endereço, então a ligação só acontece pelo Perfil, já logado.
 
 ## 10. Testes automatizados
 
@@ -271,6 +274,8 @@ O jogo muda conforme o ambiente físico do jogador:
 23. venda: paga uma vez só, com o preço do servidor; favorita e captura que perdeu o conflito não vendem.
 24. backup completo e restauração num banco novo, sem duplicar ao restaurar de novo;
 25. redefinição de senha pelo administrador sem perder o progresso.
+
+Em `test/contas.test.js`, outros 10 testes cobrem as contas: cadastro e login por e-mail, conta nova pelo Google pedindo o apelido, tokens do Google falsificados, de outro aplicativo, de outro emissor, vencidos ou alterados depois de assinados (todos recusados), ligação pelo mesmo Gmail com a senha antiga desativada, e-mail que não é Gmail não ligando sozinho, a mesma conta Google não ligando em dois jogadores, troca de senha e limite de tentativas por conta. O Google é simulado com uma chave RSA de teste.
 
 No GitHub, os mesmos testes rodam também contra um PostgreSQL de verdade, com um teste a mais: derrubar todas as conexões do banco (como quando ele reinicia ou "dorme") não derruba o servidor.
 

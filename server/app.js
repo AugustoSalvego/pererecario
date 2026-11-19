@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, makeTokens, friendCode } from './auth.js';
 import { makeSync } from './sync.js';
 import { exportAll } from './backup.js';
+import { makeGoogleVerifier, GoogleError } from './google.js';
 import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook, carById } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,7 +27,19 @@ export function loadCatalog() {
   return JSON.parse(fs.readFileSync(path.join(CLIENT_DIR, 'assets', 'species.json'), 'utf8'));
 }
 
-export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo-admin', tokenSecret = process.env.TOKEN_SECRET, now = () => Date.now(), quiet = false } = {}) {
+// Contas: apelido + e-mail + senha, ou "Continuar com Google". O usuário antigo (username) continua
+// valendo por dentro, para contas que já existiam.
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+const NO_PASSWORD = '!sem-senha';                    // conta só com Google: nenhuma senha confere
+const hasPassword = (p) => String(p?.pass_hash || '').startsWith('scrypt$');
+const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ');
+
+export async function createApp({
+  db, adminKey = process.env.ADMIN_KEY || 'brejo-admin', tokenSecret = process.env.TOKEN_SECRET, now = () => Date.now(), quiet = false,
+  googleClientId = process.env.GOOGLE_CLIENT_ID || null, googleKeys = undefined,
+} = {}) {
+  // "Continuar com Google" só aparece se o servidor tiver o Client ID (docs/HOSPEDAGEM.md)
+  const google = googleClientId ? makeGoogleVerifier({ clientId: googleClientId, now, ...(googleKeys ? { fetchKeys: googleKeys } : {}) }) : null;
   const catalog = loadCatalog();
   const log = (...a) => { if (!quiet) console.log(new Date().toISOString().slice(11, 19), ...a); };
 
@@ -104,44 +117,158 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
 
   async function playerPublic(id) {
     const p = await db.one('SELECT * FROM players WHERE id=$1', [id]);
-    return p && { id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar, look: p.look, friendCode: p.friend_code, createdAt: p.created_at };
+    return p && {
+      id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar, look: p.look, friendCode: p.friend_code,
+      createdAt: p.created_at, email: p.email || null, google: !!p.google_sub, hasPassword: hasPassword(p),
+    };
+  }
+
+  // usuário interno a partir do e-mail ou do apelido (único; ninguém precisa decorar)
+  async function uniqueUsername(q, base) {
+    let b = String(base || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9_.]/g, '').slice(0, 14);
+    if (b.length < 3) b = 'jogador';
+    for (let i = 0; i < 50; i++) {
+      const u = i === 0 ? b : `${b}${crypto.randomInt(10, 99999)}`;
+      if (!(await q.one('SELECT id FROM players WHERE username=$1', [u]))) return u;
+    }
+    return `j${crypto.randomUUID().slice(0, 12)}`;
+  }
+
+  async function createPlayer({ username = null, displayName, passHash, email = null, googleSub = null, emailVerified = 0 }) {
+    const id = crypto.randomUUID();
+    await db.tx(async (q) => {
+      let code;
+      do { code = friendCode(); } while (await q.one('SELECT id FROM players WHERE friend_code=$1', [code]));
+      const uname = username || (await uniqueUsername(q, email ? email.split('@')[0] : displayName));
+      await q.run(
+        `INSERT INTO players (id, username, display_name, pass_hash, avatar, avatar_ts, friend_code, created_at, email, google_sub, email_verified)
+         VALUES ($1,$2,$3,$4,'frog_leaf',0,$5,$6,$7,$8,$9)`, [id, uname, displayName, passHash, code, now(), email, googleSub, emailVerified],
+      );
+    });
+    return id;
+  }
+
+  const session = async (id, extra = {}) => ({ token: tokens.issue(id), player: await playerPublic(id), serverTime: now(), ...extra });
+
+  async function verifyGoogle(credential) {
+    if (!google) throw new HttpError(404, 'O login com Google ainda não foi configurado no servidor');
+    try { return await google(credential); } catch (e) {
+      throw new HttpError(401, e instanceof GoogleError ? e.message : 'Não foi possível confirmar o login com o Google. Tente de novo.');
+    }
   }
 
   const routes = {
     'GET /api/health': async () => ({ ok: true, serverTime: now(), version: VERSION }),
 
     // configuração pública do app (chave gratuita do mapa CARTO, se houver)
-    'GET /api/config': async () => ({ cartoKey: process.env.CARTO_KEY || null }),
+    'GET /api/config': async () => ({ cartoKey: process.env.CARTO_KEY || null, googleClientId: googleClientId || null }),
 
+    // Criar conta: apelido + e-mail + senha (8 ou mais). Sem e-mail, vale o formato antigo com usuário.
     'POST /api/auth/register': async (req, body) => {
       limit(clientIp(req), 'auth', 30);
-      const username = String(body.username || '').trim().toLowerCase();
-      const displayName = String(body.displayName || '').trim().replace(/\s+/g, ' ');
+      const displayName = cleanName(body.displayName);
       const password = String(body.password || '');
-      if (!/^[a-z0-9_.]{3,20}$/.test(username)) throw new HttpError(400, 'Usuário deve ter 3 a 20 letras, números, ponto ou _');
-      if (displayName.length < 2 || displayName.length > 24) throw new HttpError(400, 'Nome deve ter de 2 a 24 caracteres');
-      if (password.length < 6) throw new HttpError(400, 'A senha precisa de pelo menos 6 caracteres');
-      if (await db.one('SELECT id FROM players WHERE username=$1', [username])) throw new HttpError(409, 'Esse usuário já existe');
-      const id = crypto.randomUUID();
-      const passHash = await hashPassword(password);
-      await db.tx(async (q) => {
-        let code;
-        do { code = friendCode(); } while (await q.one('SELECT id FROM players WHERE friend_code=$1', [code]));
-        await q.run(
-          `INSERT INTO players (id, username, display_name, pass_hash, avatar, avatar_ts, friend_code, created_at)
-           VALUES ($1,$2,$3,$4,'frog_leaf',0,$5,$6)`, [id, username, displayName, passHash, code, now()],
-        );
-      });
-      log(`novo jogador: ${username}`);
-      return { token: tokens.issue(id), player: await playerPublic(id), serverTime: now() };
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!email && body.username) {
+        const username = String(body.username || '').trim().toLowerCase();
+        if (!/^[a-z0-9_.]{3,20}$/.test(username)) throw new HttpError(400, 'Usuário deve ter 3 a 20 letras, números, ponto ou _');
+        const name = displayName || username;
+        if (name.length < 2 || name.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
+        if (password.length < 8) throw new HttpError(400, 'A senha precisa de pelo menos 8 caracteres');
+        if (await db.one('SELECT id FROM players WHERE username=$1', [username])) throw new HttpError(409, 'Esse usuário já existe');
+        const id = await createPlayer({ username, displayName: name, passHash: await hashPassword(password) });
+        log(`novo jogador: ${username}`);
+        return session(id);
+      }
+      if (displayName.length < 2 || displayName.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
+      if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, 'Esse e-mail não parece certo');
+      if (password.length < 8) throw new HttpError(400, 'A senha precisa de pelo menos 8 caracteres');
+      const same = await db.one('SELECT * FROM players WHERE email=$1', [email]);
+      if (same) {
+        throw new HttpError(409, same.google_sub && !hasPassword(same)
+          ? 'Esse e-mail já entra com o Google: use "Continuar com Google"'
+          : 'Já existe uma conta com esse e-mail. Entre com ela.');
+      }
+      const id = await createPlayer({ displayName, passHash: await hashPassword(password), email });
+      log(`novo jogador (e-mail): ${displayName}`);
+      return session(id);
     },
 
+    // Entrar: e-mail (ou o usuário antigo) + senha. Além do limite por aparelho, 10 tentativas por minuto por conta.
     'POST /api/auth/login': async (req, body) => {
       limit(clientIp(req), 'auth', 30);
-      const username = String(body.username || '').trim().toLowerCase();
-      const p = await db.one('SELECT * FROM players WHERE username=$1', [username]);
-      if (!p || !(await verifyPassword(String(body.password || ''), p.pass_hash))) throw new HttpError(401, 'Usuário ou senha incorretos');
-      return { token: tokens.issue(p.id), player: await playerPublic(p.id), serverTime: now() };
+      const ident = String(body.email ?? body.username ?? '').trim().toLowerCase();
+      limit(ident, 'login-conta', 10);
+      const p = ident.includes('@')
+        ? await db.one('SELECT * FROM players WHERE email=$1', [ident])
+        : await db.one('SELECT * FROM players WHERE username=$1', [ident]);
+      if (p && p.google_sub && !hasPassword(p)) throw new HttpError(401, 'Essa conta entra com o Google: use "Continuar com Google" (ou crie uma senha no Perfil)');
+      if (!p || !(await verifyPassword(String(body.password || ''), p.pass_hash))) throw new HttpError(401, 'E-mail ou senha incorretos');
+      return session(p.id);
+    },
+
+    // "Continuar com Google": entra, liga a uma conta com o mesmo Gmail ou cria uma conta nova.
+    // Conta nova: a primeira resposta pede o apelido (needsNickname) e o celular manda de novo com ele.
+    'POST /api/auth/google': async (req, body) => {
+      limit(clientIp(req), 'auth', 30);
+      const g = await verifyGoogle(body.credential);
+      let p = await db.one('SELECT * FROM players WHERE google_sub=$1', [g.sub]);
+      if (p) return session(p.id);
+      if (g.email) {
+        const same = await db.one('SELECT * FROM players WHERE email=$1', [g.email]);
+        if (same) {
+          // O Google só é "dono" de endereços @gmail.com e de contas Google Workspace (com hd).
+          // Fora disso, não liga sozinho: a pessoa entra com a senha e liga o Google pelo Perfil.
+          if (!g.email.endsWith('@gmail.com') && !g.hd) {
+            throw new HttpError(409, 'Já existe uma conta com esse e-mail. Entre com e-mail e senha e ligue o Google pelo Perfil.');
+          }
+          if (same.google_sub) throw new HttpError(409, 'Esse e-mail já está ligado a outra conta Google');
+          // O Google confirmou que o e-mail é desta pessoa. Se o e-mail da conta nunca tinha sido
+          // confirmado, a senha antiga é desativada: quem a criou podia não ser o dono do e-mail.
+          const resetPass = !same.email_verified && hasPassword(same);
+          await db.tx((q) => q.run('UPDATE players SET google_sub=$1, email_verified=1, pass_hash=$2 WHERE id=$3',
+            [g.sub, resetPass ? NO_PASSWORD : same.pass_hash, same.id]));
+          log(`conta ligada ao Google: ${same.username}`);
+          return session(same.id, { linked: true, passwordReset: resetPass });
+        }
+      }
+      const displayName = cleanName(body.displayName);
+      if (!displayName) return { needsNickname: true, suggestion: (g.givenName || g.name || '').slice(0, 24) };
+      if (displayName.length < 2 || displayName.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
+      const id = await createPlayer({ displayName, passHash: NO_PASSWORD, email: g.email, googleSub: g.sub, emailVerified: g.email ? 1 : 0 });
+      log(`novo jogador (Google): ${displayName}`);
+      return session(id, { created: true });
+    },
+
+    // Ligar a conta atual a uma conta Google (pelo Perfil)
+    'POST /api/auth/google/link': async (req, body) => {
+      const playerId = auth(req);
+      const g = await verifyGoogle(body.credential);
+      const me = await db.one('SELECT * FROM players WHERE id=$1', [playerId]);
+      if (!me) throw new HttpError(401, 'Sessão inválida. Entre novamente.');
+      const owner = await db.one('SELECT id FROM players WHERE google_sub=$1', [g.sub]);
+      if (owner && owner.id !== playerId) throw new HttpError(409, 'Essa conta Google já está ligada a outro jogador');
+      if (me.google_sub && me.google_sub !== g.sub) throw new HttpError(409, 'Sua conta já está ligada a outra conta Google');
+      let email = me.email, verified = me.email_verified;
+      if (g.email && (!me.email || me.email === g.email)) {
+        const taken = await db.one('SELECT id FROM players WHERE email=$1 AND id<>$2', [g.email, playerId]);
+        if (!taken) { email = g.email; verified = 1; }
+      }
+      await db.tx((q) => q.run('UPDATE players SET google_sub=$1, email=$2, email_verified=$3 WHERE id=$4', [g.sub, email, verified, playerId]));
+      return { player: await playerPublic(playerId) };
+    },
+
+    // Criar ou trocar a senha (logado). Trocar pede a senha atual.
+    'POST /api/auth/password': async (req, body) => {
+      const playerId = auth(req);
+      limit(playerId, 'troca-senha', 10);
+      const me = await db.one('SELECT * FROM players WHERE id=$1', [playerId]);
+      if (!me) throw new HttpError(401, 'Sessão inválida. Entre novamente.');
+      const password = String(body.password || '');
+      if (password.length < 8) throw new HttpError(400, 'A senha precisa de pelo menos 8 caracteres');
+      if (hasPassword(me) && !(await verifyPassword(String(body.current || ''), me.pass_hash))) throw new HttpError(401, 'A senha atual não confere');
+      await db.tx(async (q) => q.run('UPDATE players SET pass_hash=$1 WHERE id=$2', [await hashPassword(password), playerId]));
+      return { player: await playerPublic(playerId) };
     },
 
     'GET /api/brejos': async () => brejos(),
@@ -214,7 +341,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     // ----- administração / demonstração -----
     'GET /api/admin/overview': async (req) => {
       requireAdmin(req);
-      const players = await db.query('SELECT id, username, display_name, created_at FROM players ORDER BY created_at DESC');
+      const players = await db.query('SELECT id, username, display_name, email, google_sub, created_at FROM players ORDER BY created_at DESC');
       const ranking = await sync.ranking();
       const xpBy = new Map(ranking.map((r) => [r.id, r]));
       const t = now();
@@ -232,7 +359,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
           conflicts: Number((await db.one('SELECT COUNT(*) AS n FROM conflicts')).n),
           activeToday: Number((await db.one('SELECT COUNT(DISTINCT player_id) AS n FROM operations WHERE received_at > $1', [t - 86400000])).n),
         },
-        players: players.map((p) => ({ ...p, xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
+        players: players.map(({ google_sub, ...p }) => ({ ...p, google: !!google_sub, xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
         captures: await db.query(
           `SELECT c.id, c.spawn_id, c.species_id, c.kind, c.mode, c.caught_at, c.received_at, c.device_id, p.username
            FROM captures c JOIN players p ON p.id = c.player_id ORDER BY c.received_at DESC LIMIT 40`),
@@ -289,11 +416,11 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     // e o progresso continua todo lá.
     'POST /api/admin/reset-password': async (req, body) => {
       requireAdmin(req);
-      const username = String(body.username || '').trim().toLowerCase();
+      const username = String(body.user ?? body.username ?? '').trim().toLowerCase();
       const password = String(body.password || '');
-      if (password.length < 6) throw new HttpError(400, 'A senha nova precisa de pelo menos 6 caracteres');
-      const p = await db.one('SELECT id, display_name FROM players WHERE username=$1', [username]);
-      if (!p) throw new HttpError(404, 'Nenhum jogador com esse usuário');
+      if (password.length < 8) throw new HttpError(400, 'A senha nova precisa de pelo menos 8 caracteres');
+      const p = await db.one('SELECT id, display_name FROM players WHERE username=$1 OR email=$1', [username]);
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse e-mail ou usuário');
       const passHash = await hashPassword(password);
       await db.tx((q) => q.run('UPDATE players SET pass_hash=$1 WHERE id=$2', [passHash, p.id]));
       log(`senha redefinida pelo administrador: ${username}`);

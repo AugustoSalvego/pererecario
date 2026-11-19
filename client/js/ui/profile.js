@@ -12,6 +12,7 @@ import { geo } from '../geo.js';
 import { dayOf, findBrejo } from '../shared/game.js';
 import { $, $$, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
 import { sfx } from '../audio.js';
+import { renderGoogleButton } from './login.js';
 
 let ctx = null;
 let ranking = null;
@@ -30,6 +31,8 @@ export function mountProfile(el, context) {
       <div class="list history"></div>
       <div class="section-title">Sincronização</div>
       <div class="card sync-card" style="padding:14px"></div>
+      <div class="section-title">Conta</div>
+      <div class="list settings-list account-list"></div>
       <div class="section-title">Opções</div>
       <div class="list settings-list">
         <div class="card list-item tog" data-act="visible">${icons.people}<div class="grow"><div class="t">Aparecer no mapa dos outros</div><div class="s">Quem estiver a até 300 m vê o seu boneco e o seu nome</div></div><div class="switch ${store.settings.hidePresence ? '' : 'on'}"></div></div>
@@ -48,6 +51,8 @@ export function mountProfile(el, context) {
     if (act === 'look') openWardrobe();
     if (act === 'diary') openDiary();
     if (act === 'ranking') openRanking();
+    if (act === 'google-link') openGoogleLink();
+    if (act === 'password') openPassword();
     if (act === 'visible') {
       await store.saveSettings({ hidePresence: !store.settings.hidePresence });
       e.target.closest('[data-act]').querySelector('.switch').classList.toggle('on', !store.settings.hidePresence);
@@ -152,7 +157,7 @@ export function renderProfile(el) {
   $('.hero-slot', el).innerHTML = `<div class="profile-hero">
       <div class="ph-info">
         <h2 class="${v.player.displayName.length > 14 ? 'long' : ''}">${esc(v.player.displayName)}</h2>
-        <p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p>
+        <p>código de amigo ${esc(v.player.friendCode || '')}</p>
         <div class="ph-level"><span class="ph-lv">Nível ${lv.level}</span><span>${lv.into}/${lv.need} XP</span></div>
         <div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div>
       </div>
@@ -185,6 +190,7 @@ export function renderProfile(el) {
     : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>';
 
   renderSyncCard(el);
+  renderAccount(el);
   if (ranking) renderRanking(el);
 }
 
@@ -340,6 +346,77 @@ function openDiary() {
   });
   render();
   showDay();
+}
+
+// ---------- conta: e-mail, Google e senha ----------
+function renderAccount(el) {
+  const p = store.view.player;
+  const box = $('.account-list', el);
+  if (!p || !box) return;
+  const how = p.google && p.hasPassword !== false ? 'Entra com Google ou com e-mail e senha'
+    : p.google ? 'Entra com o Google' : 'Entra com e-mail e senha';
+  const sig = `${p.email}|${p.google}|${p.hasPassword}|${p.username}`;
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.innerHTML = `
+    <div class="card list-item">${icons.mail}<div class="grow"><div class="t">${esc(p.email || `@${p.username}`)}</div><div class="s">${how}</div></div>${p.google ? '<span class="g-badge">G</span>' : ''}</div>
+    ${p.google ? '' : `<div class="card list-item" data-act="google-link">${icons.user}<div class="grow"><div class="t">Ligar ao Google</div><div class="s">Entre também com "Continuar com Google"</div></div></div>`}
+    <div class="card list-item" data-act="password">${icons.key}<div class="grow"><div class="t">${p.hasPassword === false ? 'Criar uma senha' : 'Trocar a senha'}</div><div class="s">${p.hasPassword === false ? 'Para entrar também com e-mail e senha' : 'Mínimo de 8 caracteres'}</div></div></div>`;
+}
+
+async function openGoogleLink() {
+  const sheet = openSheet(`
+    <h3>Ligar ao Google</h3>
+    <p class="lead">Depois de ligar, você entra com o botão do Google em qualquer celular, sem precisar da senha.</p>
+    <div class="g-slot" style="margin:14px 0 8px"></div>
+    <div class="form-error"></div>`);
+  const errBox = $('.form-error', sheet);
+  try {
+    const config = (await db.kvGet('config')) || (await api.get('/api/config', { timeout: 30000 }));
+    if (!config?.googleClientId) { errBox.textContent = 'O login com Google ainda não foi configurado no servidor.'; return; }
+    await renderGoogleButton($('.g-slot', sheet), config.googleClientId, async (credential) => {
+      errBox.textContent = '';
+      try {
+        await api.post('/api/auth/google/link', { credential }, { timeout: 60000 });
+        closeSheet();
+        sfx.win();
+        toast('Pronto! Agora você também entra com o Google.', 'ok', 'check', 3500);
+        sync.kick(0);
+      } catch (e) { errBox.textContent = e.message; sfx.error(); }
+    });
+  } catch (e) { errBox.textContent = api.isOffline() ? 'Sem internet. Conecte-se para ligar ao Google.' : e.message; }
+}
+
+function openPassword() {
+  const p = store.view.player;
+  const has = p?.hasPassword !== false;
+  const sheet = openSheet(`
+    <h3>${has ? 'Trocar a senha' : 'Criar uma senha'}</h3>
+    <p class="lead">${has ? 'Digite a senha atual e a nova.' : 'Com uma senha, você entra também com o seu e-mail, sem o botão do Google.'}</p>
+    ${has ? `<label class="field">${icons.key}<input name="current" type="password" autocomplete="current-password" placeholder="Senha atual"></label>` : ''}
+    <label class="field">${icons.key}<input name="password" type="password" autocomplete="new-password" placeholder="Senha nova (mínimo 8)"></label>
+    <label class="field">${icons.key}<input name="again" type="password" autocomplete="new-password" placeholder="Repita a senha nova"></label>
+    <div class="form-error"></div>
+    <button class="btn block" data-act="save-pw">Salvar senha</button>`);
+  const errBox = $('.form-error', sheet);
+  $('[data-act=save-pw]', sheet).addEventListener('click', async (e) => {
+    const current = $('input[name=current]', sheet)?.value || '';
+    const password = $('input[name=password]', sheet).value;
+    if (password.length < 8) { errBox.textContent = 'A senha nova precisa de pelo menos 8 caracteres.'; sfx.error(); return; }
+    if (password !== $('input[name=again]', sheet).value) { errBox.textContent = 'As duas senhas novas não são iguais.'; sfx.error(); return; }
+    e.currentTarget.disabled = true;
+    try {
+      await api.post('/api/auth/password', { current, password }, { timeout: 60000 });
+      closeSheet();
+      sfx.win();
+      toast('Senha salva!', 'ok', 'check', 2500);
+      sync.kick(0);
+    } catch (ex) {
+      errBox.textContent = api.isOffline() ? 'Sem internet. Conecte-se para salvar a senha.' : ex.message;
+      sfx.error();
+      e.currentTarget.disabled = false;
+    }
+  });
 }
 
 export function renderSyncCard(el) {

@@ -40,7 +40,7 @@ async function boot() {
     renderLogin((isNew) => {
       startGame({ firstTime: isNew });
       sync.start();
-    });
+    }, config || {});
   }
 }
 

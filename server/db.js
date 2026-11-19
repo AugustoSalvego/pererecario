@@ -229,6 +229,12 @@ const MIGRATIONS = [
   "ALTER TABLE captures ADD COLUMN mode TEXT NOT NULL DEFAULT 'gps'",
   'ALTER TABLE players ADD COLUMN vehicle TEXT',
   'ALTER TABLE players ADD COLUMN vehicle_ts BIGINT NOT NULL DEFAULT 0',
+  // contas por e-mail e "Continuar com Google" (o usuário antigo continua valendo por dentro)
+  'ALTER TABLE players ADD COLUMN email TEXT',
+  'ALTER TABLE players ADD COLUMN google_sub TEXT',
+  'ALTER TABLE players ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_players_email ON players (email)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_players_google ON players (google_sub)',
 ];
 
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {

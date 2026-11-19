@@ -20,5 +20,7 @@ services:
         generateValue: true
       - key: ADMIN_KEY
         sync: false # o Render pede o valor na criação: é a senha do painel /admin e do backup
+      - key: GOOGLE_CLIENT_ID
+        sync: false # opcional: o "Client ID" do Google para o botão "Continuar com Google" (docs/HOSPEDAGEM.md, passo 4); vazio = só e-mail e senha
       - key: CARTO_KEY
         sync: false # opcional: chave gratuita do mapa CARTO (carto.com/basemaps/apikey); vazio = OpenStreetMap

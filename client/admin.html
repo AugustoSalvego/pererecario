@@ -64,8 +64,8 @@
       </div>
       <p class="muted" style="margin-top:6px">Jogador esqueceu a senha? Defina uma nova (o progresso dele continua todo lá) e passe para ele.</p>
       <div class="row">
-        <input id="rpuser" placeholder="usuário do jogador" autocomplete="off" style="min-width:160px">
-        <input id="rppass" placeholder="senha nova (mín. 6)" autocomplete="off" style="min-width:160px">
+        <input id="rpuser" placeholder="e-mail (ou usuário antigo)" autocomplete="off" style="min-width:200px">
+        <input id="rppass" placeholder="senha nova (mín. 8)" autocomplete="off" style="min-width:160px">
         <button class="alt" id="rpgo">Redefinir senha</button>
         <span id="rpmsg" class="muted"></span>
       </div>
@@ -116,10 +116,10 @@ $('#bkdown').addEventListener('click', async () => {
   } catch (e) { $('#bkmsg').textContent = `Erro: ${e.message}`; }
 });
 $('#rpgo').addEventListener('click', async () => {
-  const username = $('#rpuser').value.trim(), password = $('#rppass').value;
-  if (!username || password.length < 6) { $('#rpmsg').textContent = 'Informe o usuário e uma senha com pelo menos 6 caracteres.'; return; }
+  const user = $('#rpuser').value.trim(), password = $('#rppass').value;
+  if (!user || password.length < 8) { $('#rpmsg').textContent = 'Informe o e-mail e uma senha com pelo menos 8 caracteres.'; return; }
   try {
-    const d = await call('POST', '/api/admin/reset-password', { username, password });
+    const d = await call('POST', '/api/admin/reset-password', { user, password });
     $('#rpmsg').textContent = `Pronto: ${d.displayName} já pode entrar com a senha nova.`;
     $('#rppass').value = '';
   } catch (e) { $('#rpmsg').textContent = `Erro: ${e.message}`; }
@@ -136,7 +136,7 @@ async function load() {
     $('#cards').innerHTML = [['Jogando agora', d.online ?? 0], ['Jogadores', c.players], ['Ativos nas últimas 24 h', c.activeToday], ['Capturas', c.captures], ['Operações recebidas', c.operations], ['Reenvios ignorados', c.resends], ['Conflitos resolvidos', c.conflicts], ['Operações rejeitadas', c.rejected]]
       .map(([k, v]) => `<div class="card"><b>${v}</b><span>${k}</span></div>`).join('');
     $('#outage').textContent = d.outageUntil > d.serverTime ? `Servidor "fora do ar" por mais ${Math.round((d.outageUntil - d.serverTime) / 1000)} s` : 'Servidor no ar';
-    table($('#players'), [['#', (r) => r.i], ['Usuário', (r) => esc(r.username)], ['Nome', (r) => esc(r.display_name)], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
+    table($('#players'), [['#', (r) => r.i], ['Apelido', (r) => esc(r.display_name)], ['E-mail', (r) => esc(r.email || `@${r.username}`) + (r.google ? ' <span class="tag applied">Google</span>' : '')], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
       [...d.players].sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, i: i + 1 })));
     table($('#captures'), [['Jogador', (r) => esc(r.username)], ['Espécie', (r) => esc(r.species_id.replace('frog_', ''))], ['Tipo', (r) => r.kind], ['Modo', (r) => (r.mode === 'controle' ? '🎮 controle' : r.mode === 'presente' ? '🎁 presente' : '📍 GPS')], ['Aparelho', (r) => esc(r.device_id)], ['Capturada', (r) => t(r.caught_at)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.caught_at)}</span>`]], d.captures);
     table($('#ops'), [['Recebida', (r) => t(r.received_at)], ['Jogador', (r) => esc(r.username)], ['Tipo', (r) => r.type], ['Resultado', (r) => `<span class="tag ${r.status}">${r.status}</span>`], ['Aparelho', (r) => esc(r.device_id)], ['op_id', (r) => r.op_id.slice(0, 8)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.client_ts)}</span>`]], d.operations);

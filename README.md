@@ -13,7 +13,7 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 
 ## Como jogar
 
-1. Abra o link do jogo no celular (Chrome no Android ou Safari no iPhone), crie a conta e permita **localização** e **sensores de movimento**.
+1. Abra o link do jogo no celular (Chrome no Android ou Safari no iPhone) e crie a conta: **apelido, e-mail e senha**, ou **Continuar com Google**. Depois permita **localização** e **sensores de movimento**.
 2. Na primeira vez, um tutorial curto explica o jogo e você escolhe o seu boneco: são **18 estilos** (Capuz de Sapo, Explorador, Ninja, Samurai, Cavaleiro, Pirata, Mágica, Piloto de Robô e outros), masculino ou feminino, em 3 tons de pele.
 3. Escolha como andar no botão do mapa: **GPS** (anda de verdade; aparecem todas as pererecas) ou **Controle** (joystick na tela; aparecem menos raras). Ande até uma **lagoinha** (a setinha no topo aponta a mais próxima). As pererecas comuns ficam à vista, pulando em volta dela; as mais raras se escondem nos **matinhos com "?"**.
 4. Chegou a 20 m de um matinho? **Toque nele** ou **chacoalhe o celular** (revela todos por perto) para a perereca sair.
