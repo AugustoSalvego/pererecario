@@ -5,10 +5,12 @@ import { sync } from '../sync.js';
 import { api } from '../api.js';
 import * as db from '../db.js';
 import { icons } from './icons.js';
-import { headHtml, charHtml, lookOf, lookName } from './sprites.js';
+import { charHtml, lookOf, lookName } from './sprites.js';
 import { openWardrobe } from './wardrobe.js';
+import { isNightAt } from './daynight.js';
+import { geo } from '../geo.js';
 import { dayOf, findBrejo } from '../shared/game.js';
-import { $, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
+import { $, $$, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
 import { sfx } from '../audio.js';
 
 let ctx = null;
@@ -82,11 +84,18 @@ export function renderProfile(el) {
   const cat = getCatalog();
   const lv = v.level;
   $('.hero-slot', el).innerHTML = `<div class="profile-hero">
-      <button class="avatar-wrap" data-act="look" aria-label="Trocar visual"><div class="avatar">${headHtml(lookOf(v.player), 4)}</div><span class="lvl">${lv.level}</span></button>
-      <div class="grow"><h2>${esc(v.player.displayName)}</h2><p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p>
-        <button class="look-btn" data-act="look">${icons.shirt}Trocar visual <small>${esc(lookName(lookOf(v.player)))}</small></button></div>
-    </div>
-    <div class="xpline">Nível ${lv.level} · ${lv.into}/${lv.need} XP para o próximo<div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div></div>`;
+      <div class="ph-info">
+        <h2>${esc(v.player.displayName)}</h2>
+        <p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p>
+        <div class="ph-level"><span class="ph-lv">Nível ${lv.level}</span><span>${lv.into}/${lv.need} XP</span></div>
+        <div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div>
+      </div>
+      <button class="ph-char" data-act="look" aria-label="Trocar visual (${esc(lookName(lookOf(v.player)))})">
+        <span class="ph-stage">${charHtml(lookOf(v.player), { dir: 'down', scale: 2.9 })}</span>
+        <span class="ph-edit">${icons.shirt}</span>
+        <span class="ph-cap">Trocar visual</span>
+      </button>
+    </div>`;
 
   const huntDays = new Set(v.captures.map((c) => dayOf(c.caughtAt))).size;
   $('.stats', el).innerHTML = [
@@ -106,7 +115,7 @@ export function renderProfile(el) {
   const recent = v.captures.slice(0, DIARY_SHOWN);
   $('.history', el).innerHTML = recent.length
     ? recent.map((c) => diaryRow(c)).join('') + (v.captures.length > DIARY_SHOWN
-      ? `<button class="btn ghost block see-all" data-act="diary">Ver todas as ${v.captures.length} capturas</button>` : '')
+      ? `<button class="btn ghost block see-all" data-act="diary">Ver todas as capturas</button>` : '')
     : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>';
 
   renderSyncCard(el);
@@ -115,40 +124,60 @@ export function renderProfile(el) {
 
 const DIARY_SHOWN = 5;
 
+// Linha do diário, sempre no mesmo formato: perereca | nome + hora e lugar | raridade + XP
 function diaryRow(c, withDay = true) {
   const sp = species(c.speciesId);
+  const tier = getCatalog().tiers[sp.tier];
   const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
   const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha');
-  return `<div class="card list-item diary">
-    <div class="avatar" style="width:46px;height:46px">${frogImg(c.speciesId, 36)}</div>
-    <div class="grow"><div class="t">${esc(sp.name)} ${rarityBadge(c.speciesId)}</div>
-    <div class="s">${withDay ? `${fmtDay(dayOf(c.caughtAt))} às ` : ''}${fmtTime(c.caughtAt)} · ${where}${c.pending ? ' · ☁️ pendente' : ''}</div></div>
-    <span class="pill-xp">+${store.view.perCapture.get(c.id)?.xp || 0} XP</span></div>`;
+  const night = isNightAt(c.caughtAt, brejo || geo.pos);
+  return `<div class="card diary-row">
+    <div class="d-frog" style="--tier:${tier.color}">${frogImg(c.speciesId, 36)}</div>
+    <div class="d-main"><div class="d-name">${esc(sp.name)}</div>
+      <div class="d-meta"><span class="d-sky" title="${night ? 'Noite' : 'Dia'}">${night ? icons.moon : icons.sun}</span>${withDay ? `${fmtDay(dayOf(c.caughtAt))}, ` : ''}${fmtTime(c.caughtAt)} · ${where}${c.pending ? ' · ☁️ pendente' : ''}</div></div>
+    <div class="d-side">${rarityBadge(c.speciesId)}<span class="pill-xp">+${store.view.perCapture.get(c.id)?.xp || 0} XP</span></div>
+  </div>`;
 }
 
-// diário completo, separado por dia, carregando aos poucos (40 por vez)
+// diário completo: escolhe o dia numa fileira de "páginas"
 function openDiary() {
   const all = store.view.captures;
-  let shown = 0;
-  openSheet(`<h3>Diário de campo</h3><p class="lead">${all.length} capturas, da mais recente para a mais antiga.</p><div class="list diary-all"></div>
-    <button class="btn ghost block more hidden" style="margin-top:10px">Mostrar mais</button>`, { cls: 'diary-sheet' });
-  const sheet = $('.diary-sheet');
-  const box = $('.diary-all', sheet), more = $('.more', sheet);
-  let lastDay = null;
-  function page() {
-    const chunk = all.slice(shown, shown + 40);
-    let html = '';
-    for (const c of chunk) {
-      const d = dayOf(c.caughtAt);
-      if (d !== lastDay) { html += `<div class="section-title diary-day">${fmtDay(d)}</div>`; lastDay = d; }
-      html += diaryRow(c, false);
-    }
-    box.insertAdjacentHTML('beforeend', html);
-    shown += chunk.length;
-    more.classList.toggle('hidden', shown >= all.length);
+  const byDay = new Map();
+  for (const c of all) {
+    const d = dayOf(c.caughtAt);
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(c);
   }
-  more.addEventListener('click', page);
-  page();
+  const days = [...byDay.keys()].sort((a, b) => b - a);
+  let sel = days[0];
+  openSheet(`<h3>Diário de campo</h3><p class="lead">Escolha o dia para ver as capturas.</p>
+    <div class="day-tabs">${days.map((d) => `<button data-day="${d}">${fmtDayShort(d)}<small>${byDay.get(d).length} 🐸</small></button>`).join('')}</div>
+    <div class="day-sum"></div><div class="list diary-all"></div>`, { cls: 'diary-sheet' });
+  const sheet = $('.diary-sheet');
+  function show() {
+    $$('.day-tabs button', sheet).forEach((b) => b.classList.toggle('on', Number(b.dataset.day) === sel));
+    const list = byDay.get(sel) || [];
+    const xp = list.reduce((t, c) => t + (store.view.perCapture.get(c.id)?.xp || 0), 0);
+    const kinds = new Set(list.map((c) => c.speciesId)).size;
+    $('.day-sum', sheet).innerHTML = `<div><b>${list.length}</b><span>${list.length === 1 ? 'perereca' : 'pererecas'}</span></div><div><b>${kinds}</b><span>${kinds === 1 ? 'espécie' : 'espécies'}</span></div><div><b>${xp}</b><span>XP</span></div>`;
+    $('.diary-all', sheet).innerHTML = list.map((c) => diaryRow(c, false)).join('');
+  }
+  $('.day-tabs', sheet).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-day]');
+    if (!b) return;
+    sel = Number(b.dataset.day);
+    sfx.tap();
+    show();
+  });
+  show();
+}
+
+function fmtDayShort(day) {
+  const today = dayOf(store.now());
+  if (day === today) return 'Hoje';
+  if (day === today - 1) return 'Ontem';
+  const d = new Date(day * 86400000 + 12 * 3600000);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 }
 
 export function renderSyncCard(el) {

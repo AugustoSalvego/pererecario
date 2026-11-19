@@ -52,7 +52,7 @@ export function startGame({ firstTime = false } = {}) {
   root.innerHTML = `
     <div class="map-host"></div>
     <div class="hud-top">
-      <div class="left-col"><button class="player-chip" data-nav="profile" aria-label="Perfil"><div class="avatar-wrap"><div class="avatar"></div><span class="lvl"></span></div><div class="who"><div class="name"></div><div class="xpbar"><i></i></div></div></button><div class="nearby-chip hidden"></div></div>
+      <div class="left-col"><button class="player-chip" data-nav="profile" aria-label="Perfil"><div class="avatar-wrap"><div class="avatar"></div><span class="lvl"></span></div><div class="who"><div class="name-row"><span class="name"></span><span class="sky-ico"></span></div><div class="xpbar"><i></i></div></div></button><div class="nearby-chip hidden"></div></div>
       <div class="status-col"><button class="status-pill" aria-label="Estado da conexão"></button><button class="mode-btn" aria-label="Modo de andar"></button><div class="gps-chip"></div></div>
     </div>
     <div class="hint-bubble hidden"></div>
@@ -261,6 +261,8 @@ function applySky() {
   skyNow = phase;
   map.el.classList.toggle('night', phase === 'night');
   document.documentElement.dataset.sky = phase;
+  const ico = $('.player-chip .sky-ico');
+  if (ico) { ico.innerHTML = phase === 'night' ? icons.moon : icons.sun; ico.title = phase === 'night' ? 'Noite' : 'Dia'; }
   if (!first && phase === 'night') toast('🌙 Anoiteceu no brejo. Os vaga-lumes saíram!', '', null, 3000);
   if (!first && phase === 'day') toast('☀️ Amanheceu no brejo!', 'ok', null, 3000);
 }

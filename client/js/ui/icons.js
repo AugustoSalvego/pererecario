@@ -1,7 +1,11 @@
 // Ícones desenhados para o jogo (SVG embutido).
 const s = (body, vb = '0 0 24 24') => `<svg viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
+const f = (body) => `<svg viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+
 export const icons = {
+  sun: f('<g stroke="#f5a623" stroke-width="2.2" stroke-linecap="round"><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></g><circle cx="12" cy="12" r="4.6" fill="#ffc83d" stroke="#f5a623" stroke-width="1.4"/>'),
+  moon: f('<path d="M15.5 3.2a8.8 8.8 0 1 0 5.3 13.4A7.2 7.2 0 0 1 15.5 3.2Z" fill="#ffe9a6" stroke="#d9b54a" stroke-width="1.4" stroke-linejoin="round"/><circle cx="10" cy="13" r="1.1" fill="#e8cf7e"/><circle cx="13.5" cy="17" r=".8" fill="#e8cf7e"/>'),
   map: s('<path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4Z"/><path d="M9 4v13M15 6.5v13"/>'),
   book: s('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><circle cx="12" cy="10" r="3"/>'),
   pond: s('<path d="M3 15c2 0 2-1.5 4.5-1.5S10 15 12 15s2-1.5 4.5-1.5S19 15 21 15"/><path d="M3 19c2 0 2-1.5 4.5-1.5S10 19 12 19s2-1.5 4.5-1.5S19 19 21 19"/><path d="M8 11c0-3 1.8-6 4-6s4 3 4 6"/><circle cx="10.5" cy="8" r=".6" fill="currentColor"/><circle cx="13.5" cy="8" r=".6" fill="currentColor"/>'),

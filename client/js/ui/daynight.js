@@ -21,6 +21,13 @@ export function sunElevation(date, lat, lng) {
   return Math.asin(Math.sin(lat * RAD) * Math.sin(dec * RAD) + Math.cos(lat * RAD) * Math.cos(dec * RAD) * Math.cos(ha * RAD)) / RAD;
 }
 
+// era dia ou noite naquele momento e lugar? (sem lugar, usa a hora local)
+export function isNightAt(ts, pos) {
+  const d = new Date(ts);
+  if (!pos) { const h = d.getHours(); return h >= 19 || h < 5; }
+  return sunElevation(d, pos.lat, pos.lng) <= -4;
+}
+
 export function skyPhase(date, pos) {
   const forced = store.settings.sky;
   if (forced === 'dia') return 'day';
