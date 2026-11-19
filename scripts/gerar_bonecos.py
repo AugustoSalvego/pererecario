@@ -1,12 +1,17 @@
 """Gera os bonecos do Pererecário (client/assets/sprites/char-<modelo>-<gênero>-<tom>.png).
 
 Cada arquivo é uma folha de 3 colunas (parado, passo 1, passo 2) x 4 linhas
-(frente, esquerda, direita, costas), com quadros de 24 x 32 pixels.
+(frente, esquerda, direita, costas), com quadros de 26 x 35 pixels (a figura tem 24 x 32; o resto é folga para nada ser cortado).
 Uso: python3 scripts/gerar_bonecos.py   (requer Pillow)
 """
 from PIL import Image
 
-W, H = 24, 32
+W, H = 24, 32       # área de desenho (coordenadas usadas pelas funções de desenho)
+TOP = 2             # folga acima da linha 0: chapéu alto e o pulinho do passo não são cortados
+BOTTOM = 1          # folga embaixo: o contorno da bota não é cortado
+SIDE = 1            # folga dos lados: a aba dos chapéus largos não é cortada
+FH = TOP + H + BOTTOM  # altura real do quadro no PNG
+FW = SIDE + W + SIDE   # largura real do quadro no PNG (26 x 35)
 
 
 def hx(h, a=255):
@@ -14,13 +19,34 @@ def hx(h, a=255):
     return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), a)
 
 
+class _Row:
+    """uma linha do desenho, aceitando x de -SIDE até W+SIDE-1"""
+    def __init__(self):
+        self.cells = [None] * FW
+
+    def __getitem__(self, x):
+        return self.cells[x + SIDE]
+
+    def __setitem__(self, x, v):
+        self.cells[x + SIDE] = v
+
+
+class _Rows:
+    """linhas do desenho, aceitando y de -TOP até H-1 (a folga de cima)"""
+    def __init__(self):
+        self.rows = [_Row() for _ in range(TOP + H)]
+
+    def __getitem__(self, y):
+        return self.rows[y + TOP]
+
+
 class Canvas:
     def __init__(self):
-        self.p = [[None] * W for _ in range(H)]
+        self.p = _Rows()
         self.detail = {}
 
     def put(self, part, x, y):
-        if 0 <= x < W and 0 <= y < H:
+        if -SIDE <= x < W + SIDE and -TOP <= y < H:
             self.p[y][x] = part
 
     def rect(self, part, x0, y0, x1, y1):
@@ -29,7 +55,7 @@ class Canvas:
                 self.put(part, x, y)
 
     def ellipse(self, part, cx, cy, rx, ry, only=None, ymax=None):
-        for y in range(H):
+        for y in range(-TOP, H):
             if ymax is not None and y > ymax:
                 continue
             for x in range(W):
@@ -38,23 +64,23 @@ class Canvas:
                         self.put(part, x, y)
 
     def dot(self, color, x, y):
-        if 0 <= x < W and 0 <= y < H:
+        if -SIDE <= x < W + SIDE and -TOP <= y < H:
             self.detail[(x, y)] = color
 
     def render(self, pal, outline, edged=()):
-        im = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        im = Image.new('RGBA', (FW, FH), (0, 0, 0, 0))
         px = im.load()
         P = self.p
-        for y in range(H):
-            for x in range(W):
+        for y in range(-TOP, H):
+            for x in range(-SIDE, W + SIDE):
                 part = P[y][x]
                 if part is None:
                     continue
                 base, shade, light = pal[part]
                 c = base
                 below = P[y + 1][x] if y + 1 < H else None
-                above = P[y - 1][x] if y > 0 else None
-                right = P[y][x + 1] if x + 1 < W else None
+                above = P[y - 1][x] if y > -TOP else None
+                right = P[y][x + 1] if x + 1 < W + SIDE else None
                 if below != part or right != part and x > W // 2:
                     c = shade
                 elif above != part and light:
@@ -62,23 +88,23 @@ class Canvas:
                 if part in edged:
                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                         nx, ny = x + dx, y + dy
-                        if 0 <= nx < W and 0 <= ny < H and P[ny][nx] not in (None, part) and (part, P[ny][nx]) not in NO_EDGE:
+                        if -SIDE <= nx < W + SIDE and -TOP <= ny < H and P[ny][nx] not in (None, part) and (part, P[ny][nx]) not in NO_EDGE:
                             if dy >= 0:
                                 c = outline
                             break
-                px[x, y] = c
+                px[x + SIDE, y + TOP] = c
         for (x, y), c in self.detail.items():
-            px[x, y] = c
+            px[x + SIDE, y + TOP] = c
         # contorno externo
         out = im.copy()
         op = out.load()
-        for y in range(H):
-            for x in range(W):
+        for y in range(FH):
+            for x in range(FW):
                 if px[x, y][3]:
                     continue
                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                     nx, ny = x + dx, y + dy
-                    if 0 <= nx < W and 0 <= ny < H and px[nx, ny][3]:
+                    if 0 <= nx < FW and 0 <= ny < FH and px[nx, ny][3]:
                         op[x, y] = outline
                         break
         return out
@@ -882,7 +908,7 @@ def frame_img(model, gender, skin, view, frame):
              'helm', 'bow', 'cup')
     im = c.render(pal, hx(cfg['outline']), edged)
     if frame:
-        bob = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        bob = Image.new('RGBA', (FW, FH), (0, 0, 0, 0))
         bob.alpha_composite(im, (0, -1 if frame else 0))
         im = bob
     if view == 'left':
@@ -894,10 +920,10 @@ DIRS = ('down', 'left', 'right', 'up')
 
 
 def sheet(model, gender, skin):
-    s = Image.new('RGBA', (W * 3, H * 4), (0, 0, 0, 0))
+    s = Image.new('RGBA', (FW * 3, FH * 4), (0, 0, 0, 0))
     for r, d in enumerate(DIRS):
         for f in range(3):
-            s.alpha_composite(frame_img(model, gender, skin, d, f), (f * W, r * H))
+            s.alpha_composite(frame_img(model, gender, skin, d, f), (f * FW, r * FH))
     return s
 
 
@@ -918,19 +944,15 @@ def main():
 def preview(path):
     """folha de conferência: todos os estilos, de frente, de lado e de costas"""
     cols = []
-    for npc in NPCS:
-        for gender in ('masculino', 'feminino'):
-            for skin in SKIN:
-                sheet(npc, gender, skin).save(os.path.join(out, f'npc-{npc}-{gender}-{skin}.png'))
-    for model in MODEL_ORDER:
+    for model in list(MODEL_ORDER) + list(NPCS):
         for gender, skin in (('masculino', 'clara'), ('feminino', 'escura')):
             cols.append((model, gender, skin))
     sc = 4
-    im = Image.new('RGBA', ((len(cols) // 2) * (W * 3 + 8) + 8, 2 * (H + 4) * 2 + 12), (124, 196, 112, 255))
+    im = Image.new('RGBA', ((len(cols) // 2) * (FW * 3 + 8) + 8, 2 * (FH + 4) * 2 + 12), (124, 196, 112, 255))
     for k, (model, gender, skin) in enumerate(cols):
         col, row = k // 2, k % 2
         for j, d in enumerate(('down', 'right', 'up')):
-            im.alpha_composite(frame_img(model, gender, skin, d, 0), (8 + col * (W * 3 + 8) + j * W, 6 + row * (H * 2 + 8)))
+            im.alpha_composite(frame_img(model, gender, skin, d, 0), (8 + col * (FW * 3 + 8) + j * FW, 6 + row * (FH * 2 + 8)))
     im.resize((im.width * sc, im.height * sc), Image.NEAREST).save(path)
 
 

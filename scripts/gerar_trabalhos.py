@@ -1,9 +1,17 @@
 """Cenários e alvos dos minijogos de trabalho (client/assets/sprites/job-*.png).
 
 Cada trabalho tem 3 rodadas e uma tela final. Cada cenário tem 96 x 72 pixels (ampliado no jogo);
-os alvos (o que se toca) são sprites de 12 x 12 desenhados por cima.
+os marcadores (o que se toca) são sprites pequenos desenhados por cima.
+
+O progresso é gradual: cada toque muda um pedaço da cena de vez.
+- rodada "reveal": cada toque revela um pedaço da imagem seguinte (o tijolo sobe, o telhado aparece,
+  a tinta cobre a parede, a fumaça some, o barro sai, a terra fica molhada). Os pedaços são
+  calculados aqui, comparando as duas imagens, e gravados em client/js/ui/jobcells.js.
+- rodada "items": cada toque tira um objeto da cena (porca, mato, tomate).
+
 Uso: python3 scripts/gerar_trabalhos.py [--previa arquivo.png]   (requer Pillow)
 """
+import json
 import os
 import random
 import sys
@@ -156,9 +164,9 @@ def house_scenes():
     p = Pix(SW, SH); sky_ground(p); tree(p, 2, 30)
     house_walls(p); roof_frame(p); scaffold(p)
     out['casa-2'] = p
-    # rodada 3: pintar (reboco cinza, telhado pronto)
+    # rodada 3: pintar (paredes de tijolo, telhado pronto): é exatamente como a casa fica no fim da rodada 2
     p = Pix(SW, SH); sky_ground(p); tree(p, 2, 30)
-    house_walls(p, plaster='#b9bec6'); roof_frame(p, tiles=True); door_window(p, '#8a8f99')
+    house_walls(p); roof_frame(p); scaffold(p); roof_frame(p, tiles=True)
     out['casa-3'] = p
     # pronta
     p = Pix(SW, SH); sky_ground(p); tree(p, 2, 30)
@@ -194,11 +202,84 @@ def big_car(state):
     if state == 'hood':      # capô aberto
         car.rect(44, 18, 62, 20, hx('3e9a3a'))
         car.rect(46, 21, 58, 27, hx('5a5f6a')); car.rect(48, 22, 56, 26, hx('7a808c'))
-    if state == 'dirty':     # barro
-        rnd = random.Random(3)
-        for _ in range(7):
-            car.ellipse(rnd.randint(10, 52), rnd.randint(28, 40), rnd.uniform(2, 4), rnd.uniform(1.5, 2.5), hx('7a5a3a'))
+    if state == 'dirty':     # barro: 6 manchas separadas (cada toque limpa uma)
+        for (x, y) in DIRT:
+            car.ellipse(x - 18, y - 10, 3.2, 2.2, hx('7a5a3a'))
+            car.put(x - 19, y - 11, hx('9a7a50'))
     return car
+
+
+DIRT = [(31, 47), (41, 50), (51, 47), (61, 50), (70, 47), (48, 38)]   # manchas de barro (na cena)
+ENGINE_BOLTS = [(32, 25), (48, 25), (64, 25), (38, 45), (58, 45)]     # parafusos do motor (cena de perto)
+WHEEL = (54, 36)          # centro da roda na cena de perto
+NUT_R = 11                # raio onde ficam as 5 porcas
+NUTS = [(round(WHEEL[0] + NUT_R * __import__('math').cos(__import__('math').radians(a))),
+         round(WHEEL[1] + NUT_R * __import__('math').sin(__import__('math').radians(a)))) for a in (-90, -18, 54, 126, 198)]
+
+
+def wheel_scene():
+    """Rodada 1 do carro: a roda furada vista de perto (as porcas são marcadores, por cima)."""
+    p = Pix(SW, SH); workshop(p)
+    cx, cy = WHEEL
+    body, body_d = hx('5fbf4a'), hx('3e9a3a')
+    p.rect(22, 0, SW - 1, 9, body); p.rect(22, 10, SW - 1, 11, body_d)       # lataria em cima
+    p.ellipse(cx, cy - 4, 30, 26, hx('1c1f27'))                               # caixa de roda
+    p.rect(0, 0, 21, 0, hx('6f8aa6'))
+    tire, tread = hx('2b2b33'), hx('3d3d48')
+    p.ellipse(cx, cy, 25, 25, tire)
+    p.rect(cx - 27, cy + 18, cx + 27, cy + 24, tire)                          # pneu murcho: achatado embaixo
+    p.rect(cx - 28, cy + 21, cx + 28, cy + 24, tire)
+    for y in range(cy + 25, SH):
+        p.rect(cx - 30, y, cx + 30, y, hx('a9b0ba'))                          # chão por baixo
+    p.rect(cx - 28, cy + 25, cx + 28, cy + 25, hx('8a929c'))                  # sombra
+    for a in range(0, 360, 20):                                               # ranhuras
+        import math
+        x = cx + 22 * math.cos(math.radians(a)); y = cy + 22 * math.sin(math.radians(a))
+        if y < cy + 18:
+            p.put(round(x), round(y), tread)
+    p.ellipse(cx, cy, 17, 17, hx('a3a9b3'))
+    p.ellipse(cx, cy, 15, 15, hx('c9ced6'))
+    p.ellipse(cx - 4, cy - 5, 5, 3, hx('e3e7ec'))
+    p.ellipse(cx, cy, 5, 5, hx('8a9099'))
+    p.ellipse(cx, cy, 2, 2, hx('5a5f6a'))
+    for (x, y) in NUTS:                                                       # pinos que ficam sem a porca
+        p.rect(x - 1, y - 1, x, y, hx('6a707a'))
+    p.rect(8, 52, 20, 60, hx('d9473a')); p.rect(12, 46, 16, 52, hx('d9473a'))   # macaco
+    p.rect(10, 44, 18, 45, hx('8a9099'))
+    return p
+
+
+def engine_scene():
+    """Rodada 2 do carro: o motor visto de perto, de cima, com o capô aberto. Os parafusos soltos são
+    marcadores; aqui ficam só as cabeças já apertadas, que aparecem quando o marcador sai."""
+    p = Pix(SW, SH)
+    p.rect(0, 0, SW - 1, SH - 1, hx('3a3f48'))                                  # cofre do motor
+    p.rect(0, 0, SW - 1, 8, hx('5fbf4a')); p.rect(0, 9, SW - 1, 10, hx('2e7a2c'))   # capô levantado
+    p.rect(0, 11, 5, SH - 1, hx('5fbf4a')); p.rect(SW - 6, 11, SW - 1, SH - 1, hx('5fbf4a'))
+    p.rect(6, 11, 6, SH - 1, hx('2e7a2c')); p.rect(SW - 7, 11, SW - 7, SH - 1, hx('2e7a2c'))
+    for y in range(62, 70, 3):                                                   # grade da frente
+        p.rect(10, y, SW - 11, y + 1, hx('8a9099'))
+    p.rect(26, 18, 70, 54, hx('8a9099')); p.rect(26, 18, 70, 19, hx('a9b0ba'))  # bloco
+    p.rect(28, 20, 68, 30, hx('5a6270'))                                         # tampa de válvulas
+    for x in range(31, 67, 4):
+        p.rect(x, 21, x + 1, 29, hx('6a7380'))
+    p.rect(30, 36, 66, 52, hx('7a808c'))
+    p.ellipse(48, 41, 6, 3, hx('2b2b33')); p.ellipse(48, 41, 4, 2, hx('d9a520'))   # tampa do óleo
+    p.rect(9, 28, 21, 46, hx('2b2b33')); p.rect(11, 25, 13, 27, hx('d9473a')); p.rect(17, 25, 19, 27, hx('1c1f27'))  # bateria
+    p.rect(9, 28, 21, 29, hx('454a55'))
+    p.rect(75, 24, 87, 40, hx('e0c060')); p.rect(75, 24, 87, 26, hx('f2d888')); p.rect(79, 21, 83, 23, hx('3a3f48'))  # reservatório
+    for (x, y) in ENGINE_BOLTS:                                                   # cabeças já apertadas
+        p.rect(x - 1, y - 1, x + 1, y + 1, hx('c3ccd6')); p.put(x, y, hx('8a9099'))
+    return p
+
+
+def engine_smoke():
+    """Fumaça por cima do motor (camada separada: vai sumindo a cada parafuso apertado)."""
+    p = Pix(SW, SH)
+    for (x, y, rx, ry) in ((44, 15, 6, 4), (54, 11, 5, 3.6), (40, 7, 4.5, 3.2), (60, 5, 4, 3), (50, 3, 3.5, 2.6), (34, 13, 3.5, 2.8)):
+        p.ellipse(x, y, rx, ry, hx('e6e9ec', 215))
+        p.ellipse(x - 1, y - 1, rx * .5, ry * .5, hx('ffffff', 235))
+    return p
 
 
 def car_scenes():
@@ -219,6 +300,8 @@ def car_scenes():
                 p.put(sx, sy, hx('ffffff')); p.put(sx - 1, sy, hx('fff3a8')); p.put(sx + 1, sy, hx('fff3a8'))
                 p.put(sx, sy - 1, hx('fff3a8')); p.put(sx, sy + 1, hx('fff3a8'))
         out[f'carro-{i}'] = p
+    out['carro-1'] = wheel_scene()
+    out['carro-2'] = engine_scene()
     return out
 
 
@@ -262,44 +345,115 @@ def targets():
     for y in range(3, 9):
         if y % 2: p.put(1, y, hx('ffffff')); p.put(10, y, hx('ffffff'))
     t['vaga'] = p
-    p = Pix(12, 12); p.rect(2, 4, 9, 7, BRICK); p.rect(2, 7, 9, 7, BRICK_D); p.outline(); t['tijolo'] = p
     p = Pix(12, 12); p.ellipse(5.5, 3.5, 3, 1.6, hx('c3ccd6')); p.rect(5, 4, 6, 10, hx('9aa1ab')); p.outline(); t['prego'] = p
-    p = Pix(12, 12); p.ellipse(5.5, 5.5, 4.5, 3.8, hx('9aa0a8')); p.ellipse(4, 4, 1.5, 1, hx('c3c8ce')); t['reboco'] = p
     p = Pix(12, 12); p.ellipse(5.5, 5.5, 4.5, 3.8, hx('ffd76a')); p.ellipse(4, 4, 1.5, 1, hx('ffeaa0')); t['tinta'] = p
     p = Pix(12, 12)  # parafuso sextavado
     p.rect(3, 3, 8, 8, hx('c3ccd6')); p.put(3, 3, (0, 0, 0, 0)); p.put(8, 3, (0, 0, 0, 0)); p.put(3, 8, (0, 0, 0, 0)); p.put(8, 8, (0, 0, 0, 0))
     p.rect(5, 4, 6, 7, hx('8a9099')); p.outline(); t['parafuso'] = p
-    p = Pix(12, 12); p.ellipse(5.5, 6, 4.5, 3.4, hx('7a5a3a')); p.ellipse(4, 5, 1.6, 1.2, hx('9a7a50')); t['lama'] = p
     p = Pix(12, 12)  # bolhas de sabão
     p.ellipse(4, 6, 2.6, 2.6, hx('e6f6ff')); p.ellipse(8, 4, 2, 2, hx('e6f6ff')); p.put(3, 5, hx('ffffff')); p.outline(hx('9fd8f2')); t['bolha'] = p
     p = Pix(12, 12)  # mato
     for x, h in ((3, 6), (5, 8), (7, 7), (9, 5)):
         p.rect(x, 11 - h, x, 10, hx('3f7a2e')); p.put(x - 1, 11 - h + 1, hx('3f7a2e'))
     p.outline(); t['mato'] = p
-    p = Pix(12, 12); p.ellipse(5.5, 6.5, 5, 3.4, hx('d9b77a'))  # terra seca rachada
-    p.put(3, 6, hx('a8875a')); p.put(4, 7, hx('a8875a')); p.put(7, 5, hx('a8875a')); p.put(8, 6, hx('a8875a')); t['seca'] = p
-    p = Pix(12, 12); p.ellipse(5.5, 6.5, 5, 3.4, hx('553a24')); p.put(4, 5, hx('7fc8ff')); t['molhada'] = p
     p = Pix(12, 12); p.ellipse(5.5, 6.5, 3.8, 3.6, hx('e8463a')); p.ellipse(4.2, 5.2, 1, .9, hx('ff9a8a'))  # tomate
     p.rect(5, 2, 6, 3, hx('3f7a2e')); p.put(4, 3, hx('3f7a2e')); p.put(7, 3, hx('3f7a2e')); p.outline(); t['tomate'] = p
+    p = Pix(8, 8)  # porca sextavada da roda
+    p.rect(1, 1, 6, 6, hx('d6dbe2')); p.put(1, 1, (0, 0, 0, 0)); p.put(6, 1, (0, 0, 0, 0)); p.put(1, 6, (0, 0, 0, 0)); p.put(6, 6, (0, 0, 0, 0))
+    p.rect(3, 3, 4, 4, hx('8a9099')); p.put(2, 2, hx('ffffff')); p.outline(); t['porca'] = p
+    p = Pix(12, 12)  # gota d'água (onde regar)
+    p.put(5, 1, hx('3f8fd8')); p.put(6, 1, hx('3f8fd8')); p.rect(4, 2, 7, 3, hx('3f8fd8')); p.rect(3, 4, 8, 6, hx('3f8fd8'))
+    p.rect(3, 7, 8, 8, hx('2c74b8')); p.rect(4, 9, 7, 9, hx('2c74b8')); p.put(4, 4, hx('bfe6ff')); p.put(4, 5, hx('bfe6ff'))
+    p.outline(); t['gota'] = p
     p = Pix(12, 12)  # caixa da entrega
     p.rect(1, 3, 10, 10, hx('c99a5a')); p.rect(1, 3, 10, 4, hx('e0b878')); p.rect(5, 3, 6, 10, hx('e8dcc0')); p.outline(); t['caixa'] = p
     return t
 
 
-# onde ficam os alvos em cada rodada (posições no cenário, em pixels do cenário)
-SLOTS = {
-    'casa-1': [(26, 38), (32, 38), (38, 38), (44, 38), (50, 38), (56, 38), (62, 38), (29, 32), (41, 32), (53, 32), (65, 32)],
-    'casa-2': [(30, 20), (38, 17), (46, 13), (54, 17), (62, 20), (26, 23), (68, 23), (42, 21), (50, 21)],
-    'casa-3': [(28, 30), (40, 30), (52, 30), (62, 30), (30, 46), (56, 46), (64, 48), (36, 50)],
-    'carro-1': [(60, 52), (66, 52), (63, 48), (63, 56)],
-    'carro-2': [(62, 30), (70, 30), (66, 34), (62, 36), (72, 36)],
-    'carro-3': [(28, 36), (38, 34), (48, 40), (58, 38), (66, 42), (34, 44), (52, 46)],
-    'horta-1': [(14, 30), (32, 30), (52, 42), (70, 42), (20, 54), (44, 54), (78, 54)],
-    'horta-2': [(10, 33), (34, 33), (58, 45), (82, 45), (22, 57), (70, 57)],
-    'horta-3': [(8, 30), (32, 30), (56, 42), (80, 42), (20, 54), (44, 54), (68, 54)],
+# Como cada rodada progride. reveal: cada toque revela um pedaço de `to` dentro de `roi`
+# (x0, y0, x1, y1), em pedaços de uma grade (grid = colunas, linhas) ou um por mancha (blobs).
+# items: cada toque tira o objeto que está em cada posição de `slots`.
+ROUNDS = {
+    'casa-1': dict(kind='reveal', to='casa-2', roi=(26, 28, 69, 43), mode='grid', grid=(4, 2)),
+    'casa-2': dict(kind='reveal', to='casa-3', roi=(0, 0, 95, 27), mode='grid', grid=(4, 2)),
+    'casa-3': dict(kind='reveal', to='casa-4', roi=(24, 28, 71, 58), mode='grid', grid=(4, 2)),
+    'carro-1': dict(kind='items', slots=NUTS),
+    'carro-2': dict(kind='items', slots=ENGINE_BOLTS, fade='carro-2-fumaca'),
+    'carro-3': dict(kind='reveal', to='carro-4', roi=(22, 32, 78, 56), mode='blobs', n=len(DIRT)),
+    'horta-1': dict(kind='items', slots=[(16, 35), (40, 35), (76, 35), (28, 47), (64, 47), (16, 59), (52, 59)]),
+    'horta-2': dict(kind='reveal', to='horta-3', roi=(0, 33, 95, 67), mode='grid', grid=(2, 3)),
+    'horta-3': dict(kind='items', slots=[(22, 34), (58, 34), (10, 46), (46, 46), (82, 46), (34, 58), (70, 58)]),
 }
-TARGET_OF = {'casa-1': 'vaga', 'casa-2': 'prego', 'casa-3': 'reboco', 'carro-1': 'parafuso', 'carro-2': 'parafuso',
-             'carro-3': 'lama', 'horta-1': 'mato', 'horta-2': 'seca', 'horta-3': 'tomate'}
+MARKER_OF = {'casa-1': 'vaga', 'casa-2': 'prego', 'casa-3': 'tinta', 'carro-1': 'porca', 'carro-2': 'parafuso',
+             'carro-3': None, 'horta-1': 'mato', 'horta-2': 'gota', 'horta-3': 'tomate'}
+
+
+def diff_mask(a, b, roi):
+    pa, pb = a.im.load(), b.im.load()
+    x0, y0, x1, y1 = roi
+    return {(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1) if pa[x, y] != pb[x, y]}
+
+
+def bbox(pts):
+    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def cells_grid(mask, cols, rows):
+    x0, y0, x1, y1 = bbox(mask)
+    out = []
+    for r in range(rows):
+        for c in range(cols):
+            cx0 = x0 + (x1 - x0 + 1) * c // cols; cx1 = x0 + (x1 - x0 + 1) * (c + 1) // cols - 1
+            cy0 = y0 + (y1 - y0 + 1) * r // rows; cy1 = y0 + (y1 - y0 + 1) * (r + 1) // rows - 1
+            pts = [p for p in mask if cx0 <= p[0] <= cx1 and cy0 <= p[1] <= cy1]
+            if pts:
+                out.append((cx0, cy0, cx1, cy1, pts))
+    return out
+
+
+def cells_blobs(mask, n):
+    left, groups = set(mask), []
+    while left:
+        stack = [left.pop()]; g = set(stack)
+        while stack:
+            x, y = stack.pop()
+            for dx in (-2, -1, 0, 1, 2):
+                for dy in (-2, -1, 0, 1, 2):
+                    q = (x + dx, y + dy)
+                    if q in left:
+                        left.discard(q); g.add(q); stack.append(q)
+        groups.append(g)
+    while len(groups) > n:   # junta as duas manchas mais próximas
+        best = None
+        for i in range(len(groups)):
+            for j in range(i + 1, len(groups)):
+                bi, bj = bbox(groups[i]), bbox(groups[j])
+                d = abs((bi[0] + bi[2]) - (bj[0] + bj[2])) + abs((bi[1] + bi[3]) - (bj[1] + bj[3]))
+                if best is None or d < best[0]:
+                    best = (d, i, j)
+        _, i, j = best
+        groups[i] |= groups.pop(j)
+    return [(*bbox(g), sorted(g)) for g in groups]
+
+
+def round_cells():
+    """{cena: [ {r: [x0, y0, x1, y1], t: [x, y]} ]} para reveal; {cena: [ {t: [x, y]} ]} para items"""
+    scenes = all_scenes()
+    out = {}
+    for name, spec in ROUNDS.items():
+        if spec['kind'] == 'items':
+            out[name] = [{'t': list(t)} for t in spec['slots']]
+            continue
+        mask = diff_mask(scenes[name], scenes[spec['to']], spec['roi'])
+        cells = cells_grid(mask, *spec['grid']) if spec['mode'] == 'grid' else cells_blobs(mask, spec['n'])
+        lst = []
+        for (cx0, cy0, cx1, cy1, pts) in cells:
+            bx0, by0, bx1, by1 = bbox(pts)   # só a parte que muda dentro do pedaço
+            lst.append({'r': [bx0, by0, bx1 + 1, by1 + 1], 't': [round((bx0 + bx1) / 2), round((by0 + by1) / 2)]})
+        lst.sort(key=lambda c: (c['t'][1], c['t'][0]))
+        out[name] = lst
+    return out
 
 
 def all_scenes():
@@ -313,41 +467,62 @@ def save():
         p.im.save(os.path.join(OUT, f'job-{k}.png'))
     for k, p in targets().items():
         p.im.save(os.path.join(OUT, f'job-alvo-{k}.png'))
+    engine_smoke().im.save(os.path.join(OUT, 'job-carro-2-fumaca.png'))
+    cells = round_cells()
+    js = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'client', 'js', 'ui', 'jobcells.js')
+    with open(js, 'w') as f:
+        f.write('// Gerado por scripts/gerar_trabalhos.py: não edite à mão.\n')
+        f.write('// Pedaços de cada rodada (pixels do cenário 96 x 72). r = área que muda com o toque; t = onde tocar.\n')
+        f.write('export const CELLS = {\n')
+        for k, v in cells.items():
+            f.write(f"  '{k}': {json.dumps(v, separators=(',', ':'))},\n")
+        f.write('};\n')
+    for k, v in cells.items():
+        pts = [c['t'] for c in v]
+        close = min((abs(a[0] - b[0]) ** 2 + abs(a[1] - b[1]) ** 2) ** .5 for i, a in enumerate(pts) for b in pts[i + 1:]) if len(pts) > 1 else 99
+        print(f'  {k}: {len(v)} toques, menor distância entre marcadores {close:.1f} px')
     print('cenários dos trabalhos gerados em', OUT)
 
 
 def preview(path):
+    """cada rodada no começo (com os marcadores), no meio (metade dos toques) e no fim"""
     sc = 3
-    scenes, tg = all_scenes(), targets()
-    jobs = [('casa', 'Construir casinha', ['Assentar tijolos', 'Martelar o telhado', 'Pintar', 'Pronta!']),
-            ('carro', 'Consertar carro', ['Soltar o pneu', 'Apertar o motor', 'Lavar', 'Pronto!']),
-            ('horta', 'Ajudar na horta', ['Arrancar o mato', 'Regar', 'Colher', 'Pronto!'])]
+    scenes, tg, cells = all_scenes(), targets(), round_cells()
     from PIL import ImageDraw, ImageFont
-    f1 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 26)
     f2 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 18)
     pw, ph = SW * sc, SH * sc
-    img = Image.new('RGB', (4 * (pw + 16) + 16, len(jobs) * (ph + 80) + 10), (206, 232, 190))
+    names = list(ROUNDS)
+    img = Image.new('RGB', (3 * (pw + 16) + 16, len(names) * (ph + 34) + 10), (206, 232, 190))
     d = ImageDraw.Draw(img)
-    for r, (key, title, labels) in enumerate(jobs):
-        y = 10 + r * (ph + 80)
-        d.text((16, y), title, font=f1, fill=(40, 70, 40))
-        for i in range(4):
-            sk = f'{key}-{i + 1}'
-            scene = scenes[sk].im.copy()
-            for (x, yy) in SLOTS.get(sk, []):
-                tgt = tg[TARGET_OF[sk]].im
-                ring = Image.new('RGBA', (14, 14), (0, 0, 0, 0))
-                rp = ring.load()
-                for a in range(14):
-                    for b in range(14):
-                        if 5.2 <= ((a - 6.5) ** 2 + (b - 6.5) ** 2) ** .5 <= 6.6:
-                            rp[a, b] = (255, 255, 255, 230)
-                scene.alpha_composite(tgt, (x - 6, yy - 6))
-                scene.alpha_composite(ring, (x - 7, yy - 7))
-            big = scene.resize((pw, ph), Image.NEAREST)
-            px0 = 16 + i * (pw + 16)
-            img.paste(big, (px0, y + 36))
-            d.text((px0 + 4, y + 36 + ph + 4), f'{i + 1 if i < 3 else "✓"}. {labels[i]}' if i < 3 else labels[i], font=f2, fill=(40, 70, 40))
+
+    def state(name, done):
+        spec, cl = ROUNDS[name], cells[name]
+        im = scenes[name].im.copy()
+        if spec.get('fade'):
+            smoke = engine_smoke().im.copy()
+            a = smoke.split()[3].point(lambda v: int(v * (1 - done / len(cl))))
+            smoke.putalpha(a); im.alpha_composite(smoke)
+        for i, c in enumerate(cl):
+            if i < done:
+                if spec['kind'] == 'reveal':
+                    x0, y0, x1, y1 = c['r']
+                    im.paste(scenes[spec['to']].im.crop((x0, y0, x1, y1)), (x0, y0))
+                continue
+            m = MARKER_OF[name]
+            if m:
+                t = tg[m].im
+                im.alpha_composite(t, (c['t'][0] - t.width // 2, c['t'][1] - t.height // 2))
+            else:
+                ImageDraw.Draw(im).ellipse((c['t'][0] - 5, c['t'][1] - 5, c['t'][0] + 5, c['t'][1] + 5), outline=(255, 255, 255, 255))
+        return im
+
+    for r, name in enumerate(names):
+        y = 10 + r * (ph + 34)
+        n = len(cells[name])
+        for j, (done, lab) in enumerate(((0, 'começo'), (n // 2, f'{n // 2} de {n}'), (n, 'fim'))):
+            big = state(name, done).resize((pw, ph), Image.NEAREST)
+            img.paste(big, (16 + j * (pw + 16), y))
+            d.text((16 + j * (pw + 16) + 4, y + ph + 4), f'{name} · {lab}', font=f2, fill=(40, 70, 40))
     img.save(path)
 
 

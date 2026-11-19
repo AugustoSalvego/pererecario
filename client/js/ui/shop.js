@@ -17,7 +17,7 @@ export function carSprite(id, { dir = 'right', scale = 2.1667, moving = false } 
 
 // balãozinho com o rosto (e o nome, nos outros jogadores) em cima de quem está de carro
 export function faceBubble(look, name = '') {
-  return `<div class="face-bubble"><div class="fb-face">${headHtml(look, 1.7)}</div>${name ? `<span class="oname">${esc(name)}</span>` : ''}</div>`;
+  return `<div class="face-bubble"><div class="fb-face">${headHtml(look, 1.5)}</div>${name ? `<span class="oname">${esc(name)}</span>` : ''}</div>`;
 }
 
 export function openShop() {

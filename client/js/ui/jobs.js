@@ -1,22 +1,25 @@
 // Trabalhos: conversa com o NPC, minijogo de 3 etapas, pagamento ("Coletar") e entregas.
 import { JOBS, SCENE_W, SCENE_H } from './jobdata.js';
+import { CELLS } from './jobcells.js';
 import { JOB_TYPES, jobPay, distanceM, BALANCO } from '../shared/game.js';
 import { store } from '../store.js';
 import { geo } from '../geo.js';
 import { icons } from './icons.js';
+import { CHAR } from './sprites.js';
 import { $, $$, h, esc, openSheet, closeSheet, toast, fmtDist } from './common.js';
 import { sfx, vibrate } from '../audio.js';
 
 const SPR = 'assets/sprites/';
 const ROUND_S = 20;   // segundos por etapa (acabou o tempo, a etapa recomeça sem perder nada)
-const HOLD_MS = 650;  // quanto tempo segurar no parafuso / no barro
+const MARKER_SIZE = { porca: 8 };   // marcadores com tamanho diferente de 12 x 12
+const BASKET = [84, 16];            // para onde voam os tomates colhidos
 
 export const npcFile = (job) => `${SPR}npc-${JOB_TYPES[job.type].npc}-${job.gender}-${job.skin}.png`;
 
 // NPC parado, de frente (primeiro quadro da folha 3 x 4 de 24 x 32)
 export function npcSprite(job, scale = 2.3) {
-  const w = 24 * scale, hgt = 32 * scale;
-  return `<div class="npc-sprite" style="width:${w}px;height:${hgt}px;background-image:url(${npcFile(job)});background-size:${72 * scale}px ${128 * scale}px"></div>`;
+  const w = CHAR.fw * scale, hgt = CHAR.fh * scale;
+  return `<div class="npc-sprite" style="width:${w}px;height:${hgt}px;background-image:url(${npcFile(job)});background-size:${CHAR.fw * 3 * scale}px ${CHAR.fh * 4 * scale}px"></div>`;
 }
 
 const coin = (n) => `<span class="bcoin">B$</span>&nbsp;${n}`;
@@ -41,8 +44,9 @@ export function openJobTalk(job, { onAccept } = {}) {
     <div class="job-chips">
       <span class="chip2"><img class="px" src="${SPR}bubble-job-${job.type}.png" alt="">${esc(T.title)}</span>
       <span class="chip2">⏱ ${isDelivery ? `${BALANCO.entregaMin} min` : '~1 min'}</span>
-      <span class="chip2 gold">${coin(pay)}${mode === 'gps' ? ' · bônus do GPS' : ` · no GPS ${coin(gpsPay)}`}</span>
     </div>
+    <div class="job-reward"><span>Recompensa</span>${mode === 'gps' ? `<em>+${Math.round((BALANCO.bonusNoGps - 1) * 100)}% do GPS</em>` : ''}<b>${coin(pay)}</b></div>
+    ${mode === 'gps' ? '' : `<p class="job-reward-note">No modo GPS, este trabalho paga ${coin(gpsPay)}.</p>`}
     <div class="job-steps">${steps.map((t, i) => `<div><b>${i + 1}</b>${t}</div>`).join('')}</div>
     <div class="row2"><button class="btn ghost" data-act="no">Agora não</button><button class="btn" data-act="yes">${isDelivery ? 'Bora entregar!' : 'Bora ajudar!'}</button></div>`,
   { cls: 'job-sheet' });
@@ -55,13 +59,25 @@ export function openJobTalk(job, { onAccept } = {}) {
 }
 
 // ---------- minijogo ----------
+// Cada toque muda um pedaço da cena de vez (ver scripts/gerar_trabalhos.py):
+// - reveal: o pedaço da imagem seguinte é desenhado por cima (o tijolo sobe, a tinta cobre a parede...)
+// - items: o objeto tocado sai da cena (porca, parafuso, mato, tomate)
+// Todos os pontos que faltam ficam marcados desde o começo, então dá para ver quanto falta.
+const imgCache = new Map();
+function loadImg(name) {
+  if (!imgCache.has(name)) {
+    imgCache.set(name, new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = `${SPR}job-${name}.png`; }));
+  }
+  return imgCache.get(name);
+}
+
 export function runJobGame(job, { mode, pay, onClose }) {
   const def = JOBS[job.type];
   const T = JOB_TYPES[job.type];
   const app = $('#app');
-  const W = Math.min(app.clientWidth - 16, 440);
-  const k = W / SCENE_W;
-  const H = SCENE_H * k;
+  // escala em meios-pixels inteiros: a arte fica nítida e os pedaços encaixam sem emenda
+  const k = Math.max(2.5, Math.floor(((Math.min(app.clientWidth - 16, 440)) * 2) / SCENE_W) / 2);
+  const W = SCENE_W * k, H = SCENE_H * k;
   const el = h(`<div class="jobgame">
     <div class="jg-top">
       <button class="icon-btn" data-act="close" aria-label="Sair">${icons.close}</button>
@@ -70,95 +86,115 @@ export function runJobGame(job, { mode, pay, onClose }) {
     </div>
     <div class="jg-timer"><i></i></div>
     <div class="jg-stage" style="width:${W}px;height:${H}px">
-      <img class="jg-scene px" alt="" draggable="false" style="width:${W}px;height:${H}px">
-      <div class="jg-deco"></div><div class="jg-targets"></div>
+      <canvas class="jg-scene" width="${SCENE_W}" height="${SCENE_H}" style="width:${W}px;height:${H}px"></canvas>
+      <img class="jg-fade px hidden" alt="" draggable="false" style="width:${W}px;height:${H}px">
+      <div class="jg-fx"></div><div class="jg-targets"></div>
       <div class="jg-banner hidden"></div>
     </div>
     <div class="jg-count"><b></b><small></small></div>
     <div class="jg-npc">${npcSprite(job, 3)}<div class="speech"></div></div>
   </div>`);
   app.appendChild(el);
-  const stage = $('.jg-stage', el), targets = $('.jg-targets', el), deco = $('.jg-deco', el);
+  const stage = $('.jg-stage', el), targets = $('.jg-targets', el), fx = $('.jg-fx', el);
+  const canvas = $('.jg-scene', el), ctx = canvas.getContext('2d');
+  const fade = $('.jg-fade', el);
   const speech = $('.jg-npc .speech', el);
-  let round = 0, hits = 0, done = new Set(), active = new Map(), t0 = 0, raf = 0, spawnTimer = 0, paused = false, finished = false;
+  let round = 0, hits = 0, done = new Set(), t0 = 0, raf = 0, paused = false, finished = false, cells = [], toImg = null, token = 0;
 
   const say = (t) => { speech.innerHTML = t; };
-  const place = (node, [x, y], size = 12) => {
-    const s = size * k * 1.15;
-    node.style.cssText += `;left:${x * k}px;top:${y * k}px;width:${s}px;height:${s}px`;
-  };
+  const at = (node, x, y, w, hgt) => { node.style.cssText += `;left:${x * k}px;top:${y * k}px;width:${w * k}px;height:${hgt * k}px`; };
 
-  function startRound() {
+  async function startRound() {
     const r = def.rounds[round];
-    hits = 0; done = new Set(); active.forEach((a) => clearTimeout(a.timer)); active.clear();
-    targets.innerHTML = ''; deco.innerHTML = '';
-    $('.jg-scene', el).src = `${SPR}job-${r.scene}.png`;
+    const my = ++token;
+    cells = CELLS[r.scene] || [];
+    hits = 0; done = new Set();
+    targets.innerHTML = ''; fx.innerHTML = '';
+    paused = true;
     $('.jg-step', el).textContent = `Etapa ${round + 1} de ${def.rounds.length} · ${r.label}`;
     $$('.jg-dots i', el).forEach((d, i) => { d.className = i < round ? 'done' : i === round ? 'now' : ''; });
     say(r.help);
     updateCount();
+    const [scene, to] = await Promise.all([loadImg(r.scene), r.to ? loadImg(r.to) : null]);
+    if (my !== token || finished) return;
+    toImg = to;
+    ctx.clearRect(0, 0, SCENE_W, SCENE_H);
+    if (scene) ctx.drawImage(scene, 0, 0);
+    fade.classList.toggle('hidden', !r.fade);
+    if (r.fade) { fade.src = `${SPR}job-${r.fade}.png`; fade.style.opacity = 1; }
+    cells.forEach((c, i) => showMarker(i));
     t0 = performance.now();
     paused = false;
-    if (def.gesture === 'tap') { clearInterval(spawnTimer); spawnTimer = setInterval(spawnTap, 520); spawnTap(); }
-    else if (def.gesture === 'hold') showTarget(0, Infinity);
-    else r.slots.forEach((_, i) => showTarget(i, Infinity));
   }
 
   function updateCount() {
     const r = def.rounds[round];
-    $('.jg-count b', el).textContent = `${Math.min(hits, r.need)} de ${r.need} ${r.unit}`;
-    $('.jg-count small', el).textContent = def.gesture === 'tap' ? 'toque rápido antes que sumam' : def.gesture === 'hold' ? 'segure o dedo até o círculo encher' : 'arraste o dedo por cima';
+    const need = (CELLS[r.scene] || []).length;
+    $('.jg-count b', el).textContent = `${Math.min(hits, need)} de ${need} ${r.unit}`;
+    $('.jg-count small', el).textContent = 'toque em cada ponto marcado';
   }
 
-  function showTarget(i, lifeMs) {
+  // marcador do que falta: o sprite (tijolo pontilhado, prego, porca...) ou só um círculo (barro)
+  function showMarker(i) {
     const r = def.rounds[round];
-    const t = h(`<div class="jg-t ${def.gesture}" data-i="${i}"><img class="px" src="${SPR}job-alvo-${r.target}.png" alt="" draggable="false"><i class="ring"></i></div>`);
-    place(t, r.slots[i]);
+    const c = cells[i];
+    const t = h(`<button class="jg-t ${r.marker ? '' : 'ring-only'}" data-i="${i}" aria-label="${esc(r.unit)}" style="animation-delay:${(i % 4) * 0.18}s">${r.marker ? `<img class="px" src="${SPR}job-alvo-${r.marker}.png" alt="" draggable="false">` : ''}</button>`);
+    if (r.marker) {
+      const size = MARKER_SIZE[r.marker] || 12;
+      at(t, c.t[0] - size / 2, c.t[1] - size / 2, size, size);
+    } else {
+      const [x0, y0, x1, y1] = c.r;
+      at(t, x0 - 1, y0 - 1, x1 - x0 + 2, y1 - y0 + 2);
+    }
     targets.appendChild(t);
-    const a = { el: t, timer: 0 };
-    if (Number.isFinite(lifeMs)) a.timer = setTimeout(() => { t.classList.add('gone'); setTimeout(() => t.remove(), 200); active.delete(i); }, lifeMs);
-    active.set(i, a);
   }
 
-  function spawnTap() {
-    if (paused) return;
-    const r = def.rounds[round];
-    if (active.size >= (r.max || 2)) return;
-    const free = r.slots.map((_, i) => i).filter((i) => !done.has(i) && !active.has(i));
-    if (!free.length) return;
-    showTarget(free[Math.floor(Math.random() * free.length)], 1500);
-  }
-
-  function hit(i) {
+  function hit(i, markerEl) {
     if (paused || done.has(i)) return;
     const r = def.rounds[round];
-    const a = active.get(i);
-    if (!a) return;
-    clearTimeout(a.timer);
-    active.delete(i);
+    const c = cells[i];
     done.add(i);
-    a.el.remove();
-    if (r.hit) {
-      const d = h(`<img class="jg-hit px" src="${SPR}job-alvo-${r.hit}.png" alt="">`);
-      place(d, r.slots[i]);
-      deco.appendChild(d);
-      if (r.hit === 'bolha') setTimeout(() => d.classList.add('fade'), 500);
+    hits++;
+    if (r.kind === 'reveal') {
+      const [x0, y0, x1, y1] = c.r;
+      if (toImg) ctx.drawImage(toImg, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+      const flash = h('<i class="jg-flash"></i>');
+      at(flash, x0, y0, x1 - x0, y1 - y0);
+      fx.appendChild(flash);
+      setTimeout(() => flash.remove(), 450);
+      if (r.fx === 'bolha') puff('bolha', c.t);
+      markerEl.classList.add('used');
+    } else {
+      markerEl.classList.add(`fx-${r.fx || 'pop'}`);
+      if (r.fx === 'basket') {
+        markerEl.style.setProperty('--dx', `${(BASKET[0] - c.t[0]) * k}px`);
+        markerEl.style.setProperty('--dy', `${(BASKET[1] - c.t[1]) * k}px`);
+      }
+      if (r.fx === 'fly') {
+        const a = Math.atan2(c.t[1] - 36, c.t[0] - 54);
+        markerEl.style.setProperty('--dx', `${Math.cos(a) * 40 * k}px`);
+        markerEl.style.setProperty('--dy', `${Math.sin(a) * 40 * k}px`);
+      }
     }
+    setTimeout(() => markerEl.remove(), 650);
+    if (r.fade) fade.style.opacity = String(Math.max(0, 1 - hits / cells.length));
     const pop = h('<div class="jg-pop">+1</div>');
-    pop.style.left = `${r.slots[i][0] * k}px`;
-    pop.style.top = `${r.slots[i][1] * k - 10}px`;
+    pop.style.left = `${c.t[0] * k}px`;
+    pop.style.top = `${c.t[1] * k - 10}px`;
     stage.appendChild(pop);
     setTimeout(() => pop.remove(), 700);
     ({ casa: sfx.hit, carro: sfx.pop, horta: sfx.rustle }[job.type] || sfx.hit)();
     vibrate(25);
-    hits++;
     updateCount();
-    if (hits < r.need && Math.random() < 0.45) say(r.cheer[Math.floor(Math.random() * r.cheer.length)]);
-    if (hits >= r.need) return roundDone();
-    if (def.gesture === 'hold') {
-      const next = r.slots.findIndex((_, j) => !done.has(j));
-      if (next >= 0) setTimeout(() => { if (!paused && !active.has(next)) showTarget(next, Infinity); }, 180);
-    }
+    if (hits < cells.length && Math.random() < 0.45) say(r.cheer[Math.floor(Math.random() * r.cheer.length)]);
+    if (hits >= cells.length) roundDone();
+  }
+
+  function puff(sprite, [x, y]) {
+    const d = h(`<img class="jg-puff px" src="${SPR}job-alvo-${sprite}.png" alt="">`);
+    at(d, x - 6, y - 6, 12, 12);
+    fx.appendChild(d);
+    setTimeout(() => d.remove(), 700);
   }
 
   function banner(text, ms) {
@@ -170,18 +206,14 @@ export function runJobGame(job, { mode, pay, onClose }) {
 
   function roundDone() {
     paused = true;
-    clearInterval(spawnTimer);
-    active.forEach((a) => { clearTimeout(a.timer); a.el.remove(); });
-    active.clear();
     sfx.splash();
-    if (round + 1 >= def.rounds.length) { setTimeout(finish, 700); banner('Etapa concluída!', 700); return; }
-    banner('Etapa concluída!', 900);
-    setTimeout(() => { round++; startRound(); }, 950);
+    if (round + 1 >= def.rounds.length) { setTimeout(finish, 800); banner('Etapa concluída!', 800); return; }
+    banner('Etapa concluída!', 1000);
+    setTimeout(() => { round++; startRound(); }, 1050);
   }
 
   function timeUp() {
     paused = true;
-    clearInterval(spawnTimer);
     say('Quase! Bora de novo, sem pressa.');
     sfx.error();
     banner('O tempo acabou: a etapa recomeça', 1200);
@@ -196,48 +228,19 @@ export function runJobGame(job, { mode, pay, onClose }) {
       $('.jg-timer', el).classList.toggle('low', left < 0.25);
       if (left <= 0) timeUp();
     }
-    // segurar: enche o círculo do alvo apertado
-    if (holding && !paused) {
-      const p = Math.min(1, (t - holding.t) / HOLD_MS);
-      holding.el.style.setProperty('--p', p);
-      if (p >= 1) { const i = holding.i; holding = null; hit(i); }
-    }
     raf = requestAnimationFrame(loop);
   }
 
-  // gestos
-  let holding = null, dragging = false;
-  const targetAt = (e) => e.target.closest?.('.jg-t') || document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.jg-t');
   stage.addEventListener('pointerdown', (e) => {
-    const t = targetAt(e);
-    if (def.gesture === 'drag') { dragging = true; stage.setPointerCapture(e.pointerId); }
+    const t = e.target.closest?.('.jg-t:not(.used)');
     if (!t) return;
-    const i = Number(t.dataset.i);
-    if (def.gesture === 'tap' || def.gesture === 'drag') hit(i);
-    if (def.gesture === 'hold') { holding = { i, el: t, t: performance.now() }; t.classList.add('pressing'); stage.setPointerCapture(e.pointerId); }
     e.preventDefault();
+    hit(Number(t.dataset.i), t);
   });
-  stage.addEventListener('pointermove', (e) => {
-    if (def.gesture === 'drag' && dragging) {
-      const t = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.jg-t');
-      if (t) hit(Number(t.dataset.i));
-    }
-    if (def.gesture === 'hold' && holding) {
-      const t = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.jg-t');
-      if (t !== holding.el) { holding.el.classList.remove('pressing'); holding.el.style.setProperty('--p', 0); holding = null; }
-    }
-  });
-  const release = () => {
-    dragging = false;
-    if (holding) { holding.el.classList.remove('pressing'); holding.el.style.setProperty('--p', 0); holding = null; }
-  };
-  stage.addEventListener('pointerup', release);
-  stage.addEventListener('pointercancel', release);
 
   function close() {
     finished = true;
     cancelAnimationFrame(raf);
-    clearInterval(spawnTimer);
     el.classList.add('closing');
     setTimeout(() => el.remove(), 220);
   }

@@ -6,8 +6,10 @@ export const SPR = new URL('assets/sprites/', document.baseURI).href;
 export const DIR_ROW = { down: 0, left: 1, right: 2, up: 3 };
 
 // Tamanho de UM quadro do boneco, em pixels do PNG (folha = 3 colunas x 4 linhas).
+// A figura tem 24 x 32; o quadro tem folga (2 px em cima, 1 embaixo e 1 de cada lado) para
+// chapéus altos, abas largas e o pulinho do passo não serem cortados.
 // Trocou a arte por outra de tamanho diferente? Ajuste só aqui. Ver docs/ARTES.md.
-export const CHAR = { fw: 24, fh: 32, head: 19 };
+export const CHAR = { fw: 26, fh: 35, head: 21, art: 24 };
 const charVars = `--fw:${CHAR.fw};--fh:${CHAR.fh};--hh:${CHAR.head}`;
 
 export const lookOf = (player) => normalizeLook(player?.look);
@@ -30,13 +32,13 @@ export function lookName(look) {
 // Boneco inteiro (20x27 pixels de arte), escalado sem borrar.
 export function charHtml(look, { dir = 'down', scale = 3, walking = false, cls = '' } = {}) {
   const l = normalizeLook(look);
-  return `<div class="char ${walking ? 'walking' : ''} ${cls}" data-dir="${dir}" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.fw};--row:${DIR_ROW[dir] ?? 0};${charVars}"></div>`;
+  return `<div class="char ${walking ? 'walking' : ''} ${cls}" data-dir="${dir}" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.art};--row:${DIR_ROW[dir] ?? 0};${charVars}"></div>`;
 }
 
 // Só a cabeça (para avatar, navegação e perfil).
 export function headHtml(look, scale = 2) {
   const l = normalizeLook(look);
-  return `<div class="char-head" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.fw};${charVars}"></div>`;
+  return `<div class="char-head" style="--sheet:url(${SPR}char-${l}.png);--s:${(scale * 20) / CHAR.art};${charVars}"></div>`;
 }
 
 // Artes desenhadas em alta resolução (matinho, balão "?") são reduzidas suavemente;

@@ -29,12 +29,13 @@ linha 2     parado        passo 1       passo 2      ← virado para a direita
 linha 3     parado        passo 1       passo 2      ← de costas (andando para cima)
 ```
 
-- Hoje cada quadro tem **24 × 32 pixels** (folha de 72 × 128).
-- **Quer outro tamanho** (por exemplo 32 × 32)? Mude uma linha em `client/js/ui/sprites.js`:
+- Hoje cada quadro tem **26 × 35 pixels** (folha de 78 × 140). O desenho do boneco ocupa 24 × 32; o resto é **folga**: 2 px em cima, 1 embaixo e 1 de cada lado. A folga existe para nada ser cortado: chapéu alto, pluma e ponta do chapéu de bruxa (que sobem 1 px no passo), aba larga de chapéu e o contorno da bota.
+- **Quer outro tamanho**? Mude uma linha em `client/js/ui/sprites.js`:
   ```js
-  export const CHAR = { fw: 24, fh: 32, head: 19 };
+  export const CHAR = { fw: 26, fh: 35, head: 21, art: 24 };
   ```
-  `fw`/`fh` são a largura e a altura de **um quadro**, e `head` é quantas linhas de pixel, de cima para baixo, formam a "cabeça" usada no avatar do topo, na barra de navegação e no perfil.
+  `fw`/`fh` são a largura e a altura de **um quadro**; `head` é quantas linhas de pixel, de cima para baixo, formam a "cabeça" usada no avatar do topo, na barra de navegação, no balão do carro e no perfil; `art` é a largura do desenho sem a folga (define o tamanho do pixel na tela).
+- Ao desenhar um boneco novo, **deixe a folga vazia**: nada encostando nas bordas do quadro, a não ser a linha de contorno. Para conferir, rode `python3 scripts/gerar_bonecos.py --previa previa.png` e olhe a prévia.
 - O pé do boneco deve encostar na **borda de baixo** do quadro: é esse ponto que fica sobre a posição do GPS.
 - A animação de andar segue a ordem passo 1 → parado → passo 2 → parado.
 
@@ -44,13 +45,21 @@ Quer outro estilo ou mais tons de pele? Além do script, é preciso acrescentar 
 
 | Arquivos | Script | Formato |
 |---|---|---|
-| `npc-<serviço>-<gênero>-<tom>.png` (24 arquivos: pedreiro, mecanico, agricultor, carteiro) | `scripts/gerar_bonecos.py` (dicionário `NPCS`) | Mesmo formato dos bonecos: 72 × 128, 3 colunas × 4 linhas (quadros de 24 × 32) |
+| `npc-<serviço>-<gênero>-<tom>.png` (24 arquivos: pedreiro, mecanico, agricultor, carteiro) | `scripts/gerar_bonecos.py` (dicionário `NPCS`) | Mesmo formato dos bonecos: 78 × 140, 3 colunas × 4 linhas (quadros de 26 × 35) |
 | `car-<modelo>.png` (hatch, sedan, pickup, jeep, super) | `scripts/gerar_carros.py` | 64 × 112: **2 colunas × 4 linhas** de quadros de 32 × 28 (linhas: para baixo, esquerda, direita, para cima; as 2 colunas são o balanço da roda) |
-| `bubble-job-<serviço>.png` | `scripts/gerar_carros.py` (`ICONS`) | 16 × 18, balãozinho com o ícone do serviço em cima do morador |
+| `bubble-job-<serviço>.png` | `scripts/gerar_carros.py` (`ICONS`) | 18 × 19, balãozinho com contorno e o ícone do serviço em cima do morador |
 | `job-<casa\|carro\|horta>-<1..4>.png` | `scripts/gerar_trabalhos.py` | 96 × 72, a cena de cada etapa do minijogo (a 4 é a cena pronta, mostrada no pagamento) |
-| `job-alvo-<nome>.png` (13 arquivos) | `scripts/gerar_trabalhos.py` | 12 × 12, os alvos do minijogo (tijolo, prego, tinta, parafuso, lama, mato, tomate...) |
+| `job-alvo-<nome>.png` (10 arquivos) | `scripts/gerar_trabalhos.py` | os marcadores do que falta fazer (vaga de tijolo, prego, tinta, porca, parafuso, mato, gota, tomate; a porca tem 8 × 8, os outros 12 × 12) |
+| `job-carro-2-fumaca.png` | `scripts/gerar_trabalhos.py` | camada de fumaça do motor, que vai sumindo a cada parafuso apertado |
+| `client/js/ui/jobcells.js` | `scripts/gerar_trabalhos.py` | **gerado**: onde tocar e que pedaço da cena muda em cada toque (ver abaixo) |
 
-O sedã é desenhado pixel por pixel num bloco de texto (`SEDAN` em `gerar_carros.py`): cada letra é uma cor. Para conferir as cenas: `python3 scripts/gerar_trabalhos.py --previa previa.png`. Ao acrescentar ou renomear algum desses arquivos, atualize também a lista do `client/sw.js`.
+O sedã é desenhado pixel por pixel num bloco de texto (`SEDAN` em `gerar_carros.py`): cada letra é uma cor. Ao acrescentar ou renomear algum desses arquivos, atualize também a lista do `client/sw.js`.
+
+**Como o minijogo fica gradual.** Cada toque muda um pedaço da cena de vez, e todos os pontos que faltam ficam marcados desde o começo. Há dois tipos de etapa, definidos em `ROUNDS` no `gerar_trabalhos.py`:
+- `reveal`: o script compara a cena da etapa com a imagem seguinte (`to`), dentro de uma área (`roi`), e divide o que muda em pedaços (uma grade, ou uma mancha por pedaço). Cada toque desenha um pedaço da imagem seguinte por cima: a parede sobe, o telhado fecha, a tinta cobre a parede, o barro sai, a terra fica molhada.
+- `items`: cada toque tira um objeto da cena (porca da roda, parafuso do motor, mato, tomate).
+
+Os pedaços são gravados em `client/js/ui/jobcells.js`; os textos, marcadores e efeitos de cada etapa ficam em `client/js/ui/jobdata.js`. Mudou uma cena? Rode o script de novo: ele recalcula os pedaços e mostra a menor distância entre marcadores (abaixo de ~10 px eles se encostam). Para conferir cada etapa no começo, no meio e no fim: `python3 scripts/gerar_trabalhos.py --previa previa.png`.
 
 ## Cenário e efeitos
 

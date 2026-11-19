@@ -464,33 +464,35 @@ ICON_PAL_BOX = {'O': hx('1c1f27'), 'B': hx('c99a5a'), 'L': hx('e0b878'), 'T': hx
 
 
 def bubble(icon):
-    """Balãozinho branco com o ícone do trabalho (16 x 18)."""
-    im = Image.new('RGBA', (16, 18), (0, 0, 0, 0))
+    """Balãozinho branco com o ícone do trabalho (18 x 19): corpo 16 x 15 com cantos
+    arredondados, rabinho embaixo e 1 px de folga em volta para o contorno não ser cortado."""
+    BW, BH = 18, 19
+    im = Image.new('RGBA', (BW, BH), (0, 0, 0, 0))
     px = im.load()
-    for y in range(15):
-        for x in range(16):
-            corner = (x in (0, 15) and y in (0, 14)) or (x in (0, 15) and y in (1, 13)) or (y in (0, 14) and x in (1, 14))
+    for y in range(1, 16):
+        for x in range(1, 17):
+            corner = (x in (1, 16) and y in (1, 2, 14, 15)) or (y in (1, 15) and x in (2, 15))
             if not corner:
                 px[x, y] = hx('ffffff')
-    for (x, y) in ((6, 15), (7, 15), (8, 15), (7, 16)):
+    for (x, y) in ((7, 16), (8, 16), (9, 16), (8, 17)):
         px[x, y] = hx('ffffff')
     # contorno
     out = im.copy()
     op = out.load()
-    for y in range(18):
-        for x in range(16):
+    for y in range(BH):
+        for x in range(BW):
             if px[x, y][3]:
                 continue
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 nx, ny = x + dx, y + dy
-                if 0 <= nx < 16 and 0 <= ny < 18 and px[nx, ny][3]:
+                if 0 <= nx < BW and 0 <= ny < BH and px[nx, ny][3]:
                     op[x, y] = hx('1c1f27')
                     break
     pal = ICON_PAL_BOX if icon == 'entrega' else ICON_PAL
     for j, row in enumerate(ICONS[icon]):
         for i, ch in enumerate(row):
             if ch in pal:
-                op[2 + i, 1 + j] = pal[ch]
+                op[3 + i, 2 + j] = pal[ch]
     return out
 
 

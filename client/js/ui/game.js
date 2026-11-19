@@ -204,11 +204,12 @@ function renderHud() {
   geo.joySpeed = car ? car.speed : 3.5;
   const look = lookOf(v.player);
   const av = $('.player-chip .avatar');
-  if (av.dataset.look !== look) { av.innerHTML = headHtml(look, 2); av.dataset.look = look; }
+  if (av.dataset.look !== look) { av.innerHTML = headHtml(look, 1.7); av.dataset.look = look; }   // 1.7: a cabeça inteira (com a aba do chapéu) cabe na bolinha
   const nh = $('.navbar .nav-head');
   if (nh.dataset.look !== look) { nh.innerHTML = headHtml(look, 1.7); nh.dataset.look = look; }
   $('.player-chip .lvl').textContent = v.level.level;
   $('.player-chip .name').textContent = v.player.displayName;
+  $('.player-chip .name').classList.toggle('long', v.player.displayName.length > 10);
   $('.player-chip .xpbar i').style.width = `${(v.level.into / v.level.need) * 100}%`;
   const badge = $('.navbar .badge');
   const newOnes = v.captures.filter((c) => c.pending).length;
@@ -396,7 +397,7 @@ function refreshObjects() {
       const near = pos && distanceM(pos, job) <= JOB_RANGE_M;
       map.setObject(key, {
         lat: job.lat, lng: job.lng, className: `mnpc ${near ? 'near' : ''}`, data: job,
-        html: `<div class="npc-wrap">${img(`bubble-job-${job.type}.png`, 30, 'npc-bubble')}${npcSprite(job, 2.3)}<div class="pshadow"></div></div>`,
+        html: `<div class="npc-wrap">${img(`bubble-job-${job.type}.png`, 34, 'npc-bubble')}${npcSprite(job, 2.3)}<div class="pshadow"></div></div>`,
       });
     }
   }

@@ -85,7 +85,7 @@ export function renderProfile(el) {
   const lv = v.level;
   $('.hero-slot', el).innerHTML = `<div class="profile-hero">
       <div class="ph-info">
-        <h2>${esc(v.player.displayName)}</h2>
+        <h2 class="${v.player.displayName.length > 14 ? 'long' : ''}">${esc(v.player.displayName)}</h2>
         <p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p>
         <div class="ph-level"><span class="ph-lv">Nível ${lv.level}</span><span>${lv.into}/${lv.need} XP</span></div>
         <div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div>

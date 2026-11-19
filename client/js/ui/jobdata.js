@@ -1,58 +1,47 @@
-// O que aparece em cada trabalho: cenário de cada etapa e alvos. Todos os trabalhos usam o toque
-// (o motor do minijogo ainda aceita 'hold' e 'drag', caso um dia se queira variar o gesto).
-// max: quantos alvos aparecem ao mesmo tempo (padrão 2).
-// As posições dos alvos são em pixels do cenário (96 x 72) e batem com scripts/gerar_trabalhos.py.
+// O que aparece em cada trabalho: cenário de cada etapa, marcador do que falta e o efeito do toque.
+// As posições e os pedaços de cada etapa vêm de jobcells.js (gerado por scripts/gerar_trabalhos.py).
+// kind: 'reveal' = cada toque revela um pedaço da imagem `to`; 'items' = cada toque tira um objeto da cena.
+// marker: sprite job-alvo-<marker>.png em cada ponto que falta (null = só um círculo em volta da mancha).
+// fx (items): fly = sai voando, screw = aperta e some, pluck = arrancado para cima, basket = voa para o cesto.
+// fade: camada por cima que vai sumindo a cada toque (a fumaça do motor).
 export const SCENE_W = 96;
 export const SCENE_H = 72;
 
 export const JOBS = {
   casa: {
-    gesture: 'tap',
     talk: 'Opa! Tô levantando uma casinha aqui e preciso de uma mão. <b>Me ajuda?</b>',
     rounds: [
-      { scene: 'casa-1', target: 'vaga', hit: 'tijolo', need: 6, label: 'Assentar os tijolos', unit: 'tijolos',
-        help: 'Toque nas vagas que piscam!', cheer: ['Isso!', 'Boa, firme!', 'Tá subindo a parede!'],
-        slots: [[26, 38], [32, 38], [38, 38], [44, 38], [50, 38], [56, 38], [62, 38], [29, 32], [41, 32], [53, 32], [65, 32]] },
-      { scene: 'casa-2', target: 'prego', hit: 'prego', need: 6, label: 'Martelar o telhado', unit: 'pregos',
-        help: 'Toque nos pregos para martelar!', cheer: ['Toc toc!', 'Na mosca!', 'Esse telhado não cai!'],
-        slots: [[30, 20], [38, 17], [46, 13], [54, 17], [62, 20], [26, 23], [68, 23], [42, 21], [50, 21]] },
-      { scene: 'casa-3', target: 'reboco', hit: 'tinta', need: 6, label: 'Pintar a casa', unit: 'partes pintadas',
-        help: 'Toque nas manchas cinzas para pintar!', cheer: ['Que cor bonita!', 'Capricho!', 'Quase lá!'],
-        slots: [[28, 30], [40, 30], [52, 30], [62, 30], [30, 46], [56, 46], [64, 48], [36, 50]] },
+      { scene: 'casa-1', kind: 'reveal', to: 'casa-2', marker: 'vaga', label: 'Assentar os tijolos', unit: 'tijolos',
+        help: 'Toque nas vagas para assentar os tijolos!', cheer: ['Isso!', 'Boa, firme!', 'Tá subindo a parede!'] },
+      { scene: 'casa-2', kind: 'reveal', to: 'casa-3', marker: 'prego', label: 'Martelar o telhado', unit: 'pregos',
+        help: 'Toque nos pregos para martelar o telhado!', cheer: ['Toc toc!', 'Na mosca!', 'Esse telhado não cai!'] },
+      { scene: 'casa-3', kind: 'reveal', to: 'casa-4', marker: 'tinta', label: 'Pintar a casa', unit: 'partes pintadas',
+        help: 'Toque na tinta para pintar a parede!', cheer: ['Que cor bonita!', 'Capricho!', 'Quase lá!'] },
     ],
   },
   carro: {
-    gesture: 'tap',
     talk: 'Ei! Esse carro chegou todo estropiado na oficina. <b>Me dá uma força?</b>',
     rounds: [
-      { scene: 'carro-1', target: 'parafuso', hit: null, need: 4, label: 'Soltar o pneu furado', unit: 'parafusos', max: 1,
-        help: 'Toque nos parafusos para soltar!', cheer: ['Soltou!', 'Mais um!', 'Pneu quase fora!'],
-        slots: [[60, 52], [66, 52], [63, 48], [63, 56]] },
-      { scene: 'carro-2', target: 'parafuso', hit: null, need: 5, label: 'Apertar o motor', unit: 'parafusos', max: 1,
-        help: 'Toque nos parafusos para apertar!', cheer: ['Bem apertado!', 'O motor agradece!', 'Vrum!'],
-        slots: [[62, 30], [70, 30], [66, 34], [62, 36], [72, 36]] },
-      { scene: 'carro-3', target: 'lama', hit: 'bolha', need: 6, label: 'Lavar o carro', unit: 'manchas',
-        help: 'Toque no barro para esfregar!', cheer: ['Brilhando!', 'Sai, barro!', 'Tá ficando novo!'],
-        slots: [[28, 36], [38, 34], [48, 40], [58, 38], [66, 42], [34, 44], [52, 46]] },
+      { scene: 'carro-1', kind: 'items', marker: 'porca', fx: 'fly', label: 'Soltar a roda furada', unit: 'porcas',
+        help: 'Toque nas porcas para soltar a roda!', cheer: ['Soltou!', 'Mais uma!', 'A roda já vai sair!'] },
+      { scene: 'carro-2', kind: 'items', marker: 'parafuso', fx: 'screw', fade: 'carro-2-fumaca', label: 'Apertar o motor', unit: 'parafusos',
+        help: 'Toque nos parafusos soltos para apertar!', cheer: ['Bem apertado!', 'A fumaça tá sumindo!', 'Vrum!'] },
+      { scene: 'carro-3', kind: 'reveal', to: 'carro-4', marker: null, fx: 'bolha', label: 'Lavar o carro', unit: 'manchas',
+        help: 'Toque no barro para esfregar!', cheer: ['Brilhando!', 'Sai, barro!', 'Tá ficando novo!'] },
     ],
   },
   horta: {
-    gesture: 'tap',
     talk: 'Bom dia! A horta tá precisando de cuidado. <b>Me ajuda?</b>',
     rounds: [
-      { scene: 'horta-1', target: 'mato', hit: null, need: 7, label: 'Arrancar o mato', unit: 'matinhos',
-        help: 'Toque no mato para arrancar!', cheer: ['Arrancou!', 'Xô, mato!', 'Tá limpinho!'],
-        slots: [[14, 30], [32, 30], [52, 42], [70, 42], [20, 54], [44, 54], [78, 54]] },
-      { scene: 'horta-2', target: 'seca', hit: 'molhada', need: 6, label: 'Regar', unit: 'canteiros',
-        help: 'Toque na terra seca para regar!', cheer: ['Que água fresquinha!', 'As plantas amaram!', 'Isso!'],
-        slots: [[10, 33], [34, 33], [58, 45], [82, 45], [22, 57], [70, 57]] },
-      { scene: 'horta-3', target: 'tomate', hit: null, need: 7, label: 'Colher', unit: 'tomates',
-        help: 'Toque nos tomates para colher!', cheer: ['Que tomatão!', 'Pro cesto!', 'Colheita boa!'],
-        slots: [[8, 30], [32, 30], [56, 42], [80, 42], [20, 54], [44, 54], [68, 54]] },
+      { scene: 'horta-1', kind: 'items', marker: 'mato', fx: 'pluck', label: 'Arrancar o mato', unit: 'matinhos',
+        help: 'Toque no mato para arrancar!', cheer: ['Arrancou!', 'Xô, mato!', 'Tá limpinho!'] },
+      { scene: 'horta-2', kind: 'reveal', to: 'horta-3', marker: 'gota', label: 'Regar', unit: 'trechos regados',
+        help: 'Toque nas gotas para regar a terra!', cheer: ['Que água fresquinha!', 'As plantas amaram!', 'Isso!'] },
+      { scene: 'horta-3', kind: 'items', marker: 'tomate', fx: 'basket', label: 'Colher', unit: 'tomates',
+        help: 'Toque nos tomates para colher!', cheer: ['Que tomatão!', 'Pro cesto!', 'Colheita boa!'] },
     ],
   },
   entrega: {
-    gesture: 'walk',
     talk: 'Opa! Tenho uma encomenda urgente. <b>Leva pra mim?</b>',
     rounds: [],
   },
