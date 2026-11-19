@@ -28,6 +28,7 @@ export const icons = {
   trophy: s('<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20.5h7M9.5 17h5"/>'),
   logout: s('<path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M10 8l-4 4 4 4M6 12h10"/>'),
   bug: s('<rect x="7" y="7" width="10" height="12" rx="5"/><path d="M12 7v12M4 11h3M17 11h3M4 17h3M17 17h3M9 4l1.5 2.5M15 4l-1.5 2.5"/>'),
+  calendar: s('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h2M13 14h3M8 17h2"/>'),
   shirt: s('<path d="M8.5 3.5 4 6 2.5 10.5l3.5 1.5V21h12v-9l3.5-1.5L20 6l-4.5-2.5c-.6 1.6-1.9 2.5-3.5 2.5s-2.9-.9-3.5-2.5Z"/>'),
   gamepad: s('<path d="M7 8h10a4.5 4.5 0 0 1 4.4 5.4l-.8 4A2.5 2.5 0 0 1 16.3 18L14.5 16h-5l-1.8 2a2.5 2.5 0 0 1-4.3-.6l-.8-4A4.5 4.5 0 0 1 7 8Z"/><path d="M8 11v3M6.5 12.5h3"/><circle cx="15.5" cy="11.6" r=".6" fill="currentColor"/><circle cx="17.2" cy="13.4" r=".6" fill="currentColor"/>'),
   gps: s('<path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>'),

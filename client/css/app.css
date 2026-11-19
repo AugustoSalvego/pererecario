@@ -372,7 +372,13 @@ svg { display: block; }
 .d-side .pill-xp { text-align: center; font-size: 12px; padding: 3px 8px; }
 .cal { background: #fff; border-radius: 22px; padding: 10px 10px 12px; box-shadow: 0 3px 0 #e6eee1; }
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.cal-title { font-size: 16px; }
+.cal-title { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 800; padding: 6px 12px; border-radius: 99px; background: #eef5ea; color: var(--ink); }
+.cal-edit { width: 15px; height: 15px; display: grid; color: var(--leaf-dark); }
+.cal-edit svg { width: 15px; height: 15px; }
+.cal-jump { display: flex; gap: 8px; margin: 2px 0 10px; }
+.cal-jump.hidden { display: none; }
+.cal-input { flex: 1; min-width: 0; height: 42px; border-radius: 14px; border: 2px solid var(--leaf); padding: 0 14px; font: inherit; font-size: 16px; font-weight: 700; letter-spacing: 1px; background: #fff; color: var(--ink); outline: none; }
+.cal-input::placeholder { font-weight: 500; letter-spacing: 0; color: #9aa69a; }
 .cal-nav { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #eef5ea; color: var(--ink); }
 .cal-nav svg { width: 18px; height: 18px; }
 .cal-nav.next svg { transform: scaleX(-1); }

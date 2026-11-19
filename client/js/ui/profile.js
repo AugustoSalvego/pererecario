@@ -155,26 +155,34 @@ function openDiary() {
     byDay.get(d).push(c);
   }
   const days = [...byDay.keys()].sort((a, b) => b - a);
-  // meses que têm alguma captura, do mais antigo para o mais recente
+  // meses que têm alguma captura (as setas pulam direto entre eles)
   const months = [...new Set(days.map((d) => { const { y, m } = ymOf(d); return y * 12 + m; }))].sort((a, b) => a - b);
-  let sel = days[0];
-  let mi = months.length - 1;
   const today = dayOf(store.now());
+  let sel = days[0];
+  let ym = (() => { const { y, m } = ymOf(sel); return y * 12 + m; })();
 
-  openSheet(`<h3>Diário de campo</h3><p class="lead">Toque num dia marcado para ver as capturas.</p>
+  openSheet(`<h3>Diário de campo</h3><p class="lead">Toque num dia marcado, ou toque no mês para digitar uma data.</p>
     <div class="cal">
-      <div class="cal-head"><button class="cal-nav" data-nav="-1" aria-label="Mês anterior">${icons.back}</button><b class="cal-title"></b><button class="cal-nav next" data-nav="1" aria-label="Próximo mês">${icons.back}</button></div>
+      <div class="cal-head"><button class="cal-nav" data-nav="-1" aria-label="Mês anterior">${icons.back}</button>
+        <button class="cal-title" aria-label="Digitar uma data"></button>
+        <button class="cal-nav next" data-nav="1" aria-label="Próximo mês">${icons.back}</button></div>
+      <form class="cal-jump hidden">
+        <input class="cal-input" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="dia/mês (ex.: 17/11)" aria-label="Data">
+        <button class="btn small" type="submit">Ir</button>
+      </form>
       <div class="cal-week">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w) => `<span>${w}</span>`).join('')}</div>
       <div class="cal-grid"></div>
     </div>
     <div class="day-title"></div><div class="day-sum"></div><div class="list diary-all"></div>`, { cls: 'diary-sheet' });
   const sheet = $('.diary-sheet');
+  const jump = $('.cal-jump', sheet), input = $('.cal-input', sheet);
+  const prevMonth = () => [...months].reverse().find((x) => x < ym);
+  const nextMonth = () => months.find((x) => x > ym);
 
   function renderMonth() {
-    const ym = months[mi];
     const y = Math.floor(ym / 12), m = ym % 12;
-    $('.cal-title', sheet).textContent = `${cap(MONTHS[m])} de ${y}`;
-    $$('.cal-nav', sheet).forEach((b) => { b.disabled = Number(b.dataset.nav) < 0 ? mi === 0 : mi === months.length - 1; });
+    $('.cal-title', sheet).innerHTML = `${cap(MONTHS[m])} de ${y} <span class="cal-edit">${icons.calendar}</span>`;
+    $$('.cal-nav', sheet).forEach((b) => { b.disabled = Number(b.dataset.nav) < 0 ? prevMonth() == null : nextMonth() == null; });
     const first = new Date(Date.UTC(y, m, 1)).getUTCDay();
     const total = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
     let html = '<span class="cal-blank"></span>'.repeat(first);
@@ -193,16 +201,61 @@ function openDiary() {
     const list = byDay.get(sel) || [];
     const xp = list.reduce((t, c) => t + (store.view.perCapture.get(c.id)?.xp || 0), 0);
     const kinds = new Set(list.map((c) => c.speciesId)).size;
-    const date = new Date(sel * 86400000 + 12 * 3600000).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const date = new Date(sel * 86400000 + 12 * 3600000).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: ymOf(sel).y !== ymOf(today).y ? 'numeric' : undefined, timeZone: 'UTC' });
     $('.day-title', sheet).textContent = sel === today ? `Hoje, ${date}` : sel === today - 1 ? `Ontem, ${date}` : cap(date);
     $('.day-sum', sheet).innerHTML = `<div><b>${list.length}</b><span>${list.length === 1 ? 'perereca' : 'pererecas'}</span></div><div><b>${kinds}</b><span>${kinds === 1 ? 'espécie' : 'espécies'}</span></div><div><b>${xp}</b><span>XP</span></div>`;
-    $('.diary-all', sheet).innerHTML = list.map((c) => diaryRow(c, false)).join('');
+    $('.diary-all', sheet).innerHTML = list.length
+      ? list.map((c) => diaryRow(c, false)).join('')
+      : '<div class="card list-item"><div class="s">Nenhuma perereca capturada neste dia.</div></div>';
   }
 
+  // "17/11", "17/11/2026", "1711" ou "17112026". Sem ano: o mais recente que não está no futuro.
+  function parseDate(text) {
+    const digits = text.replace(/\D/g, '');
+    const parts = text.includes('/') || text.includes('-') || text.includes('.')
+      ? text.split(/[/.-]/).map((x) => x.trim()).filter(Boolean)
+      : [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean);
+    const d = Number(parts[0]), m = Number(parts[1]) - 1;
+    let y = parts[2] ? Number(parts[2].length === 2 ? `20${parts[2]}` : parts[2]) : ymOf(today).y;
+    if (!(d >= 1 && d <= 31 && m >= 0 && m <= 11 && y > 2000)) return null;
+    if (new Date(Date.UTC(y, m, d)).getUTCMonth() !== m) return null; // ex.: 31/02
+    let day = dayFromYmd(y, m, d);
+    if (!parts[2] && day > today) day = dayFromYmd(--y, m, d);
+    return day;
+  }
+
+  // máscara: coloca as barras sozinho enquanto digita
+  input.addEventListener('input', () => {
+    let parts = input.value.split(/[/.-]/).map((x) => x.replace(/\D/g, ''));
+    if (parts.length === 1 && parts[0].length > 2) parts = [parts[0].slice(0, 2), parts[0].slice(2)];
+    if (parts.length === 2 && parts[1].length > 2) parts = [parts[0], parts[1].slice(0, 2), parts[1].slice(2)];
+    parts = parts.slice(0, 3).map((x, i) => x.slice(0, i === 2 ? 4 : 2));
+    input.value = parts.join('/');
+  });
+  jump.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const day = parseDate(input.value);
+    if (day == null) { sfx.error(); toast('Data inválida. Digite assim: 17/11 ou 17/11/2026.', 'warn', null, 2500); return; }
+    sel = day;
+    const { y, m } = ymOf(day);
+    ym = y * 12 + m;
+    sfx.tap();
+    jump.classList.add('hidden');
+    input.blur();
+    renderMonth();
+    showDay();
+  });
+
   $('.cal', sheet).addEventListener('click', (e) => {
+    if (e.target.closest('.cal-title')) {
+      jump.classList.toggle('hidden');
+      if (!jump.classList.contains('hidden')) { input.value = ''; input.focus(); }
+      sfx.tap();
+      return;
+    }
     const nav = e.target.closest('.cal-nav');
     if (nav && !nav.disabled) {
-      mi += Number(nav.dataset.nav);
+      ym = Number(nav.dataset.nav) < 0 ? prevMonth() : nextMonth();
       sfx.tap();
       renderMonth();
       return;
