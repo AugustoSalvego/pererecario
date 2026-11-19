@@ -268,7 +268,11 @@ export async function createApp({
     'GET /api/health': async () => ({ ok: true, serverTime: now(), version: VERSION }),
 
     // configuração pública do app (chave gratuita do mapa CARTO, se houver)
-    'GET /api/config': async () => ({ cartoKey: process.env.CARTO_KEY || null, googleClientId: googleClientId || null, emailConfirm: !!mailer }),
+    'GET /api/config': async () => ({
+      cartoKey: process.env.CARTO_KEY || null, googleClientId: googleClientId || null, emailConfirm: !!mailer,
+      // contato mostrado na Política de Privacidade e nos Termos (por padrão, o e-mail que manda os códigos)
+      contactEmail: process.env.CONTACT_EMAIL || process.env.EMAIL_FROM || null,
+    }),
 
     // Criar conta: apelido + e-mail + senha (8 ou mais). Sem e-mail, vale o formato antigo com usuário.
     'POST /api/auth/register': async (req, body) => {
@@ -624,6 +628,29 @@ export async function createApp({
       sync.refreshRanking();
       log(`${p.display_name} ${staff ? 'virou' : 'deixou de ser'} conta da organização`);
       return { ok: true, displayName: p.display_name, staff: !!staff };
+    },
+
+    // LGPD: apagar uma conta e tudo ligado a ela, a pedido do jogador (Política de Privacidade).
+    // Para não apagar por engano, o e-mail tem de ser digitado duas vezes.
+    'POST /api/admin/delete-player': async (req, body) => {
+      requireAdmin(req);
+      const user = String(body.user || '').trim().toLowerCase();
+      const p = user ? await db.one('SELECT id, display_name, email FROM players WHERE username=$1 OR email=$1', [user]) : null;
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse e-mail');
+      if (String(body.confirm || '').trim().toLowerCase() !== user) throw new HttpError(400, 'Para confirmar, escreva o mesmo e-mail nos dois campos');
+      await db.tx(async (q) => {
+        await q.run('DELETE FROM expedition_distance WHERE expedition_id IN (SELECT id FROM expeditions WHERE player_id=$1)', [p.id]);
+        for (const t of ['captures', 'expeditions', 'operations', 'conflicts', 'jobs', 'purchases', 'sales']) {
+          await q.run(`DELETE FROM ${t} WHERE player_id=$1`, [p.id]);
+        }
+        await q.run('DELETE FROM friendships WHERE player_id=$1 OR friend_id=$1', [p.id]);
+        if (p.email) await q.run('DELETE FROM email_codes WHERE email=$1', [p.email]);
+        await q.run('DELETE FROM players WHERE id=$1', [p.id]);
+      });
+      presence.delete(p.id);
+      sync.refreshRanking();
+      log(`conta apagada a pedido do jogador: ${p.display_name}`);
+      return { ok: true, displayName: p.display_name };
     },
 
     // Testar o Brevo: manda um e-mail de teste e, se falhar, mostra o motivo exato

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Termos de Uso · Pererecário</title>
+<link rel="icon" href="assets/icons/icon-64.png" type="image/png">
+<style>
+  :root { --leaf: #4cb944; --leaf-dark: #2f8a32; --ink: #17352a; --soft: #4d6a5c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #eef7e6; line-height: 1.55; }
+  header { background: var(--leaf); color: #fff; padding: 18px 20px; }
+  header a { color: #fff; text-decoration: none; font-weight: 800; font-size: 20px; }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 18px 48px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; }
+  h2 { font-size: 18px; margin: 26px 0 6px; color: var(--leaf-dark); }
+  .muted { color: var(--soft); font-size: 14px; }
+  .card { background: #fff; border-radius: 14px; padding: 4px 18px 14px; box-shadow: 0 2px 0 rgba(23,53,42,.08); }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  a { color: var(--leaf-dark); }
+  footer { margin-top: 28px; font-size: 14px; color: var(--soft); }
+</style>
+</head>
+<body>
+<header><a href="/">🐸 Pererecário</a></header>
+<main>
+<h1>Termos de Uso</h1>
+<p class="muted">Última atualização: 19 de novembro de 2026</p>
+<div class="card">
+<h2>O que é o jogo</h2>
+<p>O Pererecário é um jogo gratuito, feito como projeto acadêmico da disciplina de Sistemas Distribuídos por Danilo Augusto Salvego dos Santos. Não há compras com dinheiro de verdade: os "Brejais" (B$) só existem dentro do jogo.</p>
+
+<h2>Jogue com cuidado</h2>
+<p>O jogo usa a sua localização e convida você a andar por aí. Preste atenção ao trânsito e ao lugar onde você está, não entre em áreas proibidas ou perigosas e nunca jogue dirigindo. Os carros do jogo só andam no modo Controle, sem sair do lugar.</p>
+
+<h2>Jogo limpo</h2>
+<p>Não é permitido falsificar o GPS, automatizar o jogo, explorar falhas de propósito nem usar apelidos ofensivos. Contas que fizerem isso podem ter o progresso corrigido ou ser removidas.</p>
+
+<h2>A sua conta</h2>
+<p>Você é responsável pela sua senha. Use uma senha que não use em outros lugares. Se esquecer, use "Esqueci a senha" na tela de entrada.</p>
+
+<h2>Sem garantias</h2>
+<p>O jogo é oferecido como está, num servidor gratuito que às vezes leva um minuto para acordar. O progresso é guardado com cuidado (no celular, no servidor e em cópias de segurança), mas, por ser um projeto acadêmico, o jogo pode mudar, ficar fora do ar ou ser encerrado.</p>
+
+<h2>Privacidade</h2>
+<p>Como os seus dados são usados está explicado na <a href="privacidade.html">Política de Privacidade</a>.</p>
+
+<h2>Contato</h2>
+<p>Dúvidas ou pedidos: <span class="contato">a página do projeto no GitHub (<a href="https://github.com/AugustoSalvego/pererecario/issues">github.com/AugustoSalvego/pererecario/issues</a>)</span>.</p>
+</div>
+<footer><a href="/">Voltar ao jogo</a> · <a href="privacidade.html">Política de Privacidade</a></footer>
+</main>
+<script>
+  // e-mail de contato do jogo (o mesmo que manda os códigos); sem ele, o contato é pelo GitHub
+  fetch('/api/config').then((r) => r.json()).then((c) => {
+    if (!c.contactEmail) return;
+    document.querySelectorAll('.contato').forEach((el) => { el.innerHTML = `o e-mail <a href="mailto:${c.contactEmail}">${c.contactEmail}</a>`; });
+  }).catch(() => {});
+</script>
+</body>
+</html>

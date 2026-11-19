@@ -126,3 +126,22 @@ test('servidor hospedado sem ADMIN_KEY forte: o jogo sobe, o painel não abre ne
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('apagar conta a pedido do jogador (LGPD): some tudo, com confirmação', async () => {
+  ipN++;
+  clock += 61_000;
+  const key = 'chave-forte-de-teste';
+  const r = await call('POST', '/api/auth/register', { displayName: 'Saindo', email: 'saindo@seguranca.test', password: 'senha-saindo' });
+  assert.equal(r.status, 200);
+  await call('POST', '/api/sync', { deviceId: 'cel-s', ops: [{ opId: 'op-saindo-1', type: 'expedition.start', ts: clock, payload: { id: 'exp-saindo', startedAt: clock } }] }, { token: r.body.token });
+  assert.equal((await call('POST', '/api/admin/delete-player', { user: 'saindo@seguranca.test', confirm: 'outro@seguranca.test' }, { key })).status, 400);
+  assert.equal((await call('POST', '/api/admin/delete-player', { user: 'saindo@seguranca.test', confirm: 'saindo@seguranca.test' })).status, 403);
+  const del = await call('POST', '/api/admin/delete-player', { user: 'saindo@seguranca.test', confirm: 'SAINDO@seguranca.test' }, { key });
+  assert.equal(del.status, 200);
+  assert.equal(await db.one("SELECT id FROM players WHERE email='saindo@seguranca.test'"), null);
+  assert.equal(await db.one('SELECT op_id FROM operations WHERE player_id=$1', [r.body.player.id]), null);
+  assert.equal(await db.one('SELECT id FROM expeditions WHERE player_id=$1', [r.body.player.id]), null);
+  assert.equal((await call('POST', '/api/auth/login', { email: 'saindo@seguranca.test', password: 'senha-saindo' })).status, 401);
+  // o aparelho dele recebe "sessão inválida" (e guarda a fila, sem apagar nada do celular)
+  assert.equal((await call('POST', '/api/sync', { deviceId: 'cel-s', ops: [] }, { token: r.body.token })).status, 401);
+});

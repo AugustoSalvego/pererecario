@@ -112,7 +112,7 @@ export function renderLogin(onDone, config = {}) {
       <div class="forgot-row login-only"><button type="button" class="link-btn" data-act="forgot">Esqueci a senha</button></div>
       <div class="form-error"></div>
       <button class="btn block" type="submit">Entrar no brejo</button>
-      <div class="login-note">Seu progresso fica salvo no celular e no servidor.</div>
+      <div class="login-note">Seu progresso fica salvo no celular e no servidor.<br><a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></div>
     </form>
     <div class="login-card nick-card hidden">
       <h3>Quase lá! 🐸</h3>

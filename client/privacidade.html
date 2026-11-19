@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade · Pererecário</title>
+<link rel="icon" href="assets/icons/icon-64.png" type="image/png">
+<style>
+  :root { --leaf: #4cb944; --leaf-dark: #2f8a32; --ink: #17352a; --soft: #4d6a5c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #eef7e6; line-height: 1.55; }
+  header { background: var(--leaf); color: #fff; padding: 18px 20px; }
+  header a { color: #fff; text-decoration: none; font-weight: 800; font-size: 20px; }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 18px 48px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; }
+  h2 { font-size: 18px; margin: 26px 0 6px; color: var(--leaf-dark); }
+  .muted { color: var(--soft); font-size: 14px; }
+  .card { background: #fff; border-radius: 14px; padding: 4px 18px 14px; box-shadow: 0 2px 0 rgba(23,53,42,.08); }
+  ul { padding-left: 20px; } li { margin: 4px 0; }
+  a { color: var(--leaf-dark); }
+  footer { margin-top: 28px; font-size: 14px; color: var(--soft); }
+</style>
+</head>
+<body>
+<header><a href="/">🐸 Pererecário</a></header>
+<main>
+<h1>Política de Privacidade</h1>
+<p class="muted">Última atualização: 19 de novembro de 2026</p>
+<div class="card">
+<p>O Pererecário é um jogo gratuito de caçar pererecas pelo mapa, feito como projeto acadêmico da disciplina de Sistemas Distribuídos por Danilo Augusto Salvego dos Santos. Esta página explica, em palavras simples, quais dados o jogo usa, para quê e o que você pode pedir. Ela segue a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).</p>
+
+<h2>Quais dados o jogo guarda</h2>
+<ul>
+  <li><b>Conta:</b> o apelido que você escolhe e o seu e-mail. Se você cria uma senha, ela é guardada embaralhada (com scrypt), e ninguém consegue lê-la, nem o organizador. Se você entra com o Google, o jogo recebe do Google só o seu nome, o seu e-mail e um número que identifica a sua conta Google. A sua foto e os seus contatos não são usados.</li>
+  <li><b>Progresso no jogo:</b> as pererecas que você capturou, os trabalhos feitos, compras e vendas na loja, amigos adicionados, o visual do seu boneco e a distância que você andou em cada dia de caça.</li>
+  <li><b>Localização no momento de cada captura ou trabalho:</b> o servidor guarda onde você estava naquela hora, para conferir que a captura foi feita perto da perereca. O jogo <b>não</b> guarda o caminho que você percorre.</li>
+  <li><b>Um código aleatório do aparelho</b>, criado pelo próprio jogo, para saber de qual celular veio cada ação (é isso que permite jogar sem internet e sincronizar depois). Ele não tem relação com o número do celular nem com o seu nome.</li>
+</ul>
+
+<h2>Localização e outros jogadores</h2>
+<p>O mapa usa o GPS do celular enquanto o jogo está aberto. Se a opção <b>"Aparecer no mapa dos outros"</b> (no Perfil) estiver ligada, o seu boneco e o seu apelido aparecem para quem estiver a até cerca de 300 m de você. Essa posição é arredondada (cerca de 5 m), fica só na memória do servidor por alguns segundos e não é gravada. Desligando a opção, ninguém vê você no mapa. O ranking mostra para os outros jogadores o seu apelido, o seu boneco e o seu progresso no jogo, mas nunca o seu e-mail.</p>
+
+<h2>Para que os dados são usados</h2>
+<ul>
+  <li>Para você entrar na sua conta e ter o mesmo progresso em qualquer celular.</li>
+  <li>Para o jogo funcionar sem internet e não perder nada quando a conexão voltar.</li>
+  <li>Para mandar, pelo e-mail, o código de confirmação do cadastro e o código de "Esqueci a senha". O jogo não manda propaganda nem newsletter.</li>
+  <li>Para evitar trapaças (por exemplo, capturas longe demais da perereca).</li>
+</ul>
+<p>Os dados não são vendidos nem usados para publicidade.</p>
+
+<h2>Com quem os dados ficam (serviços usados)</h2>
+<ul>
+  <li><b>Render</b> (servidor do jogo) e <b>Neon</b> (banco de dados), ambos nos Estados Unidos.</li>
+  <li><b>GitHub</b>, onde ficam cópias de segurança do banco, criptografadas, guardadas por até 90 dias.</li>
+  <li><b>Brevo</b>, que entrega os e-mails com os códigos.</li>
+  <li><b>Google</b>, só se você usar "Continuar com Google".</li>
+  <li><b>OpenStreetMap / CARTO</b>, que fornecem as imagens do mapa. O celular pede a eles as imagens da região que aparece na tela.</li>
+</ul>
+
+<h2>No seu celular</h2>
+<p>O jogo guarda no navegador do celular (armazenamento local) a sua sessão, o seu progresso e as ações que ainda não chegaram ao servidor, para funcionar sem internet. O jogo não usa cookies de propaganda nem de rastreamento.</p>
+
+<h2>Por quanto tempo</h2>
+<p>Enquanto a sua conta existir. Se você pedir para apagar a conta, os dados saem do banco na hora e desaparecem das cópias de segurança em até 90 dias.</p>
+
+<h2>Os seus direitos</h2>
+<p>Você pode pedir para ver os seus dados, corrigir, receber uma cópia ou apagar a sua conta e tudo o que está ligado a ela. Para isso, ou para qualquer dúvida, entre em contato por <span class="contato">a página do projeto no GitHub (<a href="https://github.com/AugustoSalvego/pererecario/issues">github.com/AugustoSalvego/pererecario/issues</a>)</span>.</p>
+</div>
+<footer><a href="/">Voltar ao jogo</a> · <a href="termos.html">Termos de uso</a></footer>
+</main>
+<script>
+  // e-mail de contato do jogo (o mesmo que manda os códigos); sem ele, o contato é pelo GitHub
+  fetch('/api/config').then((r) => r.json()).then((c) => {
+    if (!c.contactEmail) return;
+    document.querySelectorAll('.contato').forEach((el) => { el.innerHTML = `o e-mail <a href="mailto:${c.contactEmail}">${c.contactEmail}</a>`; });
+  }).catch(() => {});
+</script>
+</body>
+</html>

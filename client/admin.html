@@ -76,6 +76,13 @@
         <button class="alt" id="stoff">Desmarcar</button>
         <span id="stmsg" class="muted"></span>
       </div>
+      <p class="muted" style="margin-top:6px">Jogador pediu para apagar a conta (direito dele pela LGPD, como diz a Política de Privacidade)? Escreva o e-mail duas vezes. Apaga a conta e todo o progresso; não dá para desfazer (só restaurando um backup).</p>
+      <div class="row" style="margin-bottom:12px">
+        <input id="dluser" placeholder="e-mail da conta" autocomplete="off" style="min-width:200px">
+        <input id="dlconf" placeholder="o mesmo e-mail de novo" autocomplete="off" style="min-width:200px">
+        <button class="alt" id="dlgo">Apagar conta</button>
+        <span id="dlmsg" class="muted"></span>
+      </div>
       <p class="muted" style="margin-top:6px">Jogador esqueceu a senha e o "Esqueci a senha" do jogo não resolveu? Defina uma nova (o progresso dele continua todo lá) e passe para ele.</p>
       <div class="row">
         <input id="rpuser" placeholder="e-mail (ou usuário antigo)" autocomplete="off" style="min-width:200px">
@@ -147,6 +154,16 @@ async function setStaff(staff) {
     load();
   } catch (e) { $('#stmsg').textContent = `Erro: ${e.message}`; }
 }
+$('#dlgo').addEventListener('click', async () => {
+  const user = $('#dluser').value.trim(), confirm = $('#dlconf').value.trim();
+  if (!user) { $('#dlmsg').textContent = 'Informe o e-mail da conta.'; return; }
+  try {
+    const d = await call('POST', '/api/admin/delete-player', { user, confirm });
+    $('#dlmsg').textContent = `Conta de ${d.displayName} apagada.`;
+    $('#dluser').value = ''; $('#dlconf').value = '';
+    load();
+  } catch (e) { $('#dlmsg').textContent = `Erro: ${e.message}`; }
+});
 $('#ston').addEventListener('click', () => setStaff(true));
 $('#stoff').addEventListener('click', () => setStaff(false));
 $('#rpgo').addEventListener('click', async () => {
