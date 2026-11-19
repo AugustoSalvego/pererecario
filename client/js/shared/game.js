@@ -23,7 +23,11 @@ export const BALANCO = {
   // --- modo de andar ---
   // No modo GPS (andando de verdade) aparecem todas as pererecas. No modo controle (joystick)
   // só aparece esta fração de cada raridade: 1 = todas, 0,35 = cerca de 1 em cada 3.
-  noModoControle: { common: 1, uncommon: 0.8, rare: 0.35, special: 0.15 },
+  noModoControle: { common: 1, uncommon: 0.8, rare: 0.35, special: 0.15, campus: 0 },
+
+  // --- lugares especiais (setores do campus) ---
+  // Cada lugar especial tem uma perereca exclusiva, que só nasce ali e só no modo GPS.
+  chanceDaExclusiva: 0.8,    // chance de ela estar lá em cada janela de 15 min
 
   // --- distâncias do jogador ---
   capturaAteM: 10,           // pode tocar na perereca para capturar a até 10 m
@@ -108,7 +112,7 @@ function pickTier(next, tiers, boost) {
     if (r < w) return k;
     r -= w;
   }
-  return entries[entries.length - 1][0];
+  return entries.filter(([, w]) => w > 0).pop()[0]; // (arredondamento) nunca uma raridade de peso 0
 }
 
 function pickSpecies(next, catalog, boost) {
@@ -252,6 +256,28 @@ export function spawnsFor(brejo, win, catalog, seed = '') {
       lng: ll.lng,
     });
   }
+  // lugar especial: a perereca exclusiva dele (sempre à vista, com brilho, só no modo GPS)
+  const ex = brejo.species && catalog.species.find((sp) => sp.id === brejo.species);
+  if (ex) {
+    const lug = rng(hash32(`${key}|lugar`));
+    if (lug() < BALANCO.chanceDaExclusiva) {
+      let best = null, bestGap = -1;
+      for (let t = 0; t < 24; t++) {
+        const ang = lug() * Math.PI * 2;
+        const dist = rMin + (rMax - rMin) * Math.sqrt(lug());
+        const c = { n: dist * Math.cos(ang), e: dist * Math.sin(ang) };
+        let gap = Infinity;
+        for (const q of placed) gap = Math.min(gap, Math.hypot(q.n - c.n, q.e - c.e));
+        if (gap > bestGap) { best = c; bestGap = gap; }
+        if (gap >= MIN_SPAWN_GAP_M) break;
+      }
+      const ll = offsetLatLng(brejo.lat, brejo.lng, best.n, best.e);
+      out.push({
+        id: `${brejo.id}:${win}:${n}`, kind: 'wild', brejoId: brejo.id, win, speciesId: ex.id,
+        sizeCm: sizeFor(lug, ex), hidden: false, exclusive: true, gpsOnly: true, lat: ll.lat, lng: ll.lng,
+      });
+    }
+  }
   return out;
 }
 
@@ -279,7 +305,8 @@ export function maskFromSpecies(catalog, speciesIds) {
 
 export function giftFor(playerId, friendId, day, mask, catalog) {
   const next = rng(hash32(`gift|${playerId}|${friendId}|${day}`));
-  const owned = catalog.species.filter((_, i) => (mask >>> i) & 1);
+  // perereca do campus não vira presente: só pegando no próprio lugar
+  const owned = catalog.species.filter((s, i) => (mask >>> i) & 1 && catalog.tiers[s.tier]?.weight > 0);
   let sp;
   if (owned.length) {
     // espécies mais raras do amigo têm um pouco mais de chance

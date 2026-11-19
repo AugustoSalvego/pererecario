@@ -1,14 +1,22 @@
-// Catálogo das 15 pererecas e recorte dos sprites a partir do atlas original.
+// Catálogo das pererecas e recorte dos sprites a partir dos atlas.
 let catalog = null;
 const sprites = new Map();
 
 export async function loadCatalog() {
   if (catalog) return catalog;
   catalog = await (await fetch('assets/species.json')).json();
-  const img = new Image();
-  img.src = catalog.atlas;
-  await img.decode();
+  // cada espécie pode vir de um atlas diferente (as do campus ficam em frogs_campus.png)
+  const atlases = new Map();
+  const atlasOf = (src) => {
+    if (!atlases.has(src)) {
+      const img = new Image();
+      img.src = src;
+      atlases.set(src, img.decode().then(() => img));
+    }
+    return atlases.get(src);
+  };
   await Promise.all(catalog.species.map(async (s) => {
+    const img = await atlasOf(s.atlas || catalog.atlas);
     const [x, y, w, h] = s.rect;
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
@@ -36,6 +44,6 @@ export function frogImg(id, size, cls = '') {
 export function rarityBadge(id) {
   const sp = species(id);
   const t = catalog.tiers[sp.tier];
-  const stars = { common: '●', uncommon: '●●', rare: '●●●', special: '★' }[sp.tier];
+  const stars = { common: '●', uncommon: '●●', rare: '●●●', special: '★', campus: '📍' }[sp.tier];
   return `<span class="rarity rarity-${sp.tier}" style="--tier:${t.color}"><i>${stars}</i>${t.label}</span>`;
 }

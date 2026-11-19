@@ -57,6 +57,27 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
     }
   }
 
+  // Lugares especiais do campus (server/lugares.json): cada um é um brejo fixo com uma
+  // perereca exclusiva. A cada início do servidor o arquivo é aplicado de novo (cria o que
+  // falta e atualiza nome, posição e perereca), então basta editar o arquivo e publicar.
+  const placesFile = path.join(ROOT, 'server', 'lugares.json');
+  if (fs.existsSync(placesFile)) {
+    const places = JSON.parse(fs.readFileSync(placesFile, 'utf8'));
+    await db.tx(async (q) => {
+      for (const p of places) {
+        if (!catalog.species.some((s) => s.id === p.species)) throw new Error(`lugares.json: perereca desconhecida ${p.species}`);
+        const ex = await q.one('SELECT id FROM brejos WHERE id=$1', [p.id]);
+        if (ex) {
+          await q.run('UPDATE brejos SET name=$1, lat=$2, lng=$3, radius=$4, species=$5, active=1 WHERE id=$6', [p.name, p.lat, p.lng, p.radius, p.species, p.id]);
+        } else {
+          await q.run('INSERT INTO brejos (id, name, lat, lng, radius, active, created_at, species) VALUES ($1,$2,$3,$4,$5,1,$6,$7)',
+            [p.id, p.name, p.lat, p.lng, p.radius, 0, p.species]);
+        }
+      }
+    });
+    log(`${places.length} lugares especiais do campus`);
+  }
+
   let outageUntil = 0;
 
   // Presença: quem está com o jogo aberto agora e onde. É um estado "leve": fica só na memória
@@ -73,7 +94,8 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
   const rate = new Map();
 
   async function brejos() {
-    const rows = await db.query('SELECT id, name, lat, lng, radius FROM brejos WHERE active=1 ORDER BY created_at, id');
+    const rows = await db.query('SELECT id, name, lat, lng, radius, species FROM brejos WHERE active=1 ORDER BY created_at, id');
+    for (const r of rows) if (!r.species) delete r.species;
     const version = String(hash32(JSON.stringify(rows)));
     return { brejos: rows, version };
   }
@@ -261,9 +283,11 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
         const need = radius + b.radius + MIN_BREJO_GAP_M;
         if (d < need) throw new HttpError(409, `Muito perto do brejo "${b.name}" (${Math.round(d)} m). Afaste pelo menos ${Math.ceil(need - d)} m ou diminua o raio.`);
       }
+      const species = body.species ? String(body.species) : null;
+      if (species && !catalog.species.some((s) => s.id === species && s.tier === 'campus')) throw new HttpError(400, 'Perereca exclusiva inválida');
       const id = 'b' + crypto.randomBytes(4).toString('hex');
-      await db.tx((q) => q.run('INSERT INTO brejos (id, name, lat, lng, radius, active, created_at) VALUES ($1,$2,$3,$4,$5,1,$6)',
-        [id, name, lat, lng, radius, now()]));
+      await db.tx((q) => q.run('INSERT INTO brejos (id, name, lat, lng, radius, active, created_at, species) VALUES ($1,$2,$3,$4,$5,1,$6,$7)',
+        [id, name, lat, lng, radius, now(), species]));
       log(`brejo criado: ${name} (${radius} m)`);
       return { id, ...(await brejos()) };
     },

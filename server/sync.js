@@ -38,7 +38,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       // brejo cadastrado à mão, ou lagoinha automática (recalculada a partir do próprio id)
       let b = await q.one('SELECT * FROM brejos WHERE id=$1', [parsed.brejoId]);
       if (!b) {
-        const manual = await q.query('SELECT id, name, lat, lng, radius FROM brejos WHERE active=1 ORDER BY created_at, id');
+        const manual = await q.query('SELECT id, name, lat, lng, radius, species FROM brejos WHERE active=1 ORDER BY created_at, id');
         b = findBrejo(parsed.brejoId, manual, playerId);   // as lagoinhas de cada jogador são só dele
       }
       if (!b) return { error: 'Brejo não existe' };

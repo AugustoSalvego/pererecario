@@ -1,0 +1,7 @@
+[
+  { "id": "lugar-enfermagem", "name": "Setor de Enfermagem", "lat": -23.109671, "lng": -50.360047, "radius": 35, "species": "frog_enfermeira" },
+  { "id": "lugar-agronomia", "name": "Agronomia", "lat": -23.110882, "lng": -50.360714, "radius": 35, "species": "frog_sementinha" },
+  { "id": "lugar-computacao", "name": "Ciência da Computação", "lat": -23.106386, "lng": -50.360585, "radius": 35, "species": "frog_bitinha" },
+  { "id": "lugar-veterinario", "name": "Hospital Veterinário", "lat": -23.106752, "lng": -50.357781, "radius": 35, "species": "frog_doutorinha" },
+  { "id": "lugar-biologia", "name": "Biologia", "lat": -23.108528, "lng": -50.359360, "radius": 35, "species": "frog_lupinha" }
+]
