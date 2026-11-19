@@ -31,14 +31,17 @@ function idToken(claims = {}, { key = google.privateKey, kid = 'chave-1' } = {})
 
 before(async () => {
   db = await openDb({ url: process.env.TEST_DATABASE_URL || '', file: ':memory:' });
-  // banco de Postgres compartilhado com o outro arquivo de teste: começa sem contas de teste antigas
-  if (process.env.TEST_DATABASE_URL) await db.run("DELETE FROM players WHERE email LIKE '%@gmail.com' OR email LIKE '%@teste.com'");
+  // banco de Postgres compartilhado com os outros arquivos de teste: começa e termina sem estas contas
+  if (process.env.TEST_DATABASE_URL) await cleanup();
   const app = await createApp({ db, adminKey: 'adm', tokenSecret: 's', now, quiet: true, googleClientId: CLIENT_ID, googleKeys });
   server = app.server();
   await new Promise((r) => server.listen(0, r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(async () => { server.close(); await db.close(); });
+async function cleanup() {
+  await db.run("DELETE FROM players WHERE email LIKE '%@gmail.com' OR email LIKE '%@teste.com' OR email LIKE '%@empresa.com.br'");
+}
+after(async () => { server.close(); if (process.env.TEST_DATABASE_URL) await cleanup(); await db.close(); });
 
 async function call(method, path, body, headers = {}) {
   const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
