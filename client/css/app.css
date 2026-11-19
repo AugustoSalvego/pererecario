@@ -218,12 +218,14 @@ svg { display: block; }
 /* ---------- HUD ---------- */
 .hud-top { position: absolute; left: 0; right: 0; top: 0; padding: calc(var(--safe-top) + 12px) 12px 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; z-index: 5; }
 .hud-top > * { pointer-events: auto; }
-.left-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 62%; min-width: 0; }
+.left-col { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; max-width: 66%; min-width: 0; }
 .left-col .player-chip { max-width: 100%; }
 .player-chip { display: flex; align-items: center; gap: 9px; height: 54px; background: rgba(255,255,255,.95); border-radius: 99px; padding: 0 14px 0 5px; box-shadow: 0 3px 0 rgba(23,53,42,.15); max-width: 100%; }
-.player-chip .name-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.sky-ico { width: 18px; height: 18px; flex: none; display: grid; }
-.sky-ico svg { width: 18px; height: 18px; }
+.lc-row { display: flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0; }
+.lc-row .player-chip { min-width: 0; }
+.sky-badge { flex: none; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.95); box-shadow: 0 3px 0 rgba(23,53,42,.15); display: grid; place-items: center; }
+.sky-badge svg { width: 21px; height: 21px; }
+.sky-badge.night { background: #2f3a78; box-shadow: 0 3px 0 rgba(10,16,50,.35); }
 .avatar { width: 44px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #e9ffd9, #b6e59c); display: grid; place-items: center; overflow: hidden; flex: none; border: 3px solid #fff; box-shadow: 0 0 0 2px var(--leaf); position: relative; }
 .avatar .frog { width: 82%; height: auto; }
 .player-chip .who { min-width: 0; }
