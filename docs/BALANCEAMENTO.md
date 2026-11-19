@@ -13,6 +13,8 @@ Todos os números ficam num bloco só, no começo de `client/js/shared/game.js` 
 
 **Modo controle.** Quem anda com o joystick vê só uma parte das pererecas mais raras: 80 % das incomuns, 35 % das raras e 15 % das especiais (`noModoControle`). No modo GPS aparecem todas.
 
+**Bônus do GPS.** Como o modo controle é rápido (6 m/s a pé), quem anda de verdade ganha pererecas a mais que só aparecem no GPS: **+2 em cada lagoinha** e, em metade das moitinhas, **+1** (`extraNoGps`). Elas são sorteadas com mais chance de raridade (`reforcoNoGps`: incomum ×1,3, rara ×2,5, especial ×3), o que dá, nas extras, cerca de 40 % comuns, 27 % incomuns, 24 % raras e 9 % especiais (nas normais: 55 / 28 / 13 / 4). As extras entram depois das normais (índices novos), então as pererecas que já existiam continuam iguais.
+
 **Cada jogador tem as suas.** O sorteio usa o id do jogador, então cada um tem lagoinhas e pererecas próprias.
 
 Tudo isso vem de um sorteio com "semente" fixa: o mesmo ponto da grade sempre tem a mesma lagoinha, e a mesma lagoinha, no mesmo horário, sempre tem as mesmas pererecas, em qualquer celular, mesmo offline.
@@ -37,6 +39,9 @@ Tudo isso vem de um sorteio com "semente" fixa: o mesmo ponto da grade sempre te
 | `vaoEntrePererecasM` | 12 | pererecas grudadas | 15 |
 | `noModoControle.rare` | 0,35 | quer o modo controle mais generoso | 0,6 |
 | `noModoControle.special` | 0,15 | quer a especial quase só no GPS | 0,05 |
+| `extraNoGps.lagoinha` | 2 | quer premiar mais quem anda de verdade | 3 |
+| `reforcoNoGps.rare` | 2,5 | as extras do GPS estão raras demais | 1,6 |
+| `aPeMs` | 6 | o boneco anda rápido demais no controle | 4,5 |
 
 **Raridade, XP e toques** ficam em `client/assets/species.json`, no bloco `tiers`: `weight` é a chance de cada raridade (hoje 55 / 28 / 13 / 4, somando 100), `xp` é quanto cada uma vale e `taps` é o mínimo de toques para capturar. Para a especial aparecer mais, troque 55/28/13/4 por, por exemplo, 52/28/14/6.
 
@@ -56,12 +61,12 @@ Os moradores que pedem ajuda seguem a mesma ideia das lagoinhas: uma grade invis
 
 | Carro | Preço | Velocidade (joystick) |
 |---|---|---|
-| A pé | – | 3,5 m/s |
-| Hatch | B$ 150 | 6 m/s |
-| Sedã | B$ 250 | 7 m/s |
-| Picape | B$ 400 | 7,5 m/s |
-| Jipe | B$ 600 | 8 m/s, e revela matinhos a 30 m |
-| Superesportivo | B$ 1500 | 12 m/s |
+| A pé | – | 6 m/s |
+| Hatch | B$ 150 | 10 m/s |
+| Sedã | B$ 250 | 12 m/s |
+| Picape | B$ 400 | 13 m/s |
+| Jipe | B$ 600 | 14 m/s, e revela matinhos a 30 m |
+| Superesportivo | B$ 1500 | 20 m/s |
 
 Contas rápidas: um trabalho paga em média ~B$ 32 no modo Controle e ~B$ 49 no GPS. O Hatch sai com uns **5 trabalhos** no Controle (3 no GPS); o Superesportivo, com uns 45 (30 no GPS). Cada trabalho leva de 1 a 2 minutos, e a entrega até 5. Num raio de 200 m costuma haver uns 4 moradores, renovados a cada 15 min.
 

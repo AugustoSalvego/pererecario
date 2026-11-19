@@ -10,7 +10,7 @@ O Pererecário é um jogo de localização no estilo "anda e captura". Os **brej
 
 Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especial 4 %). Cada jogador escolhe o seu boneco entre **18 estilos** (do Capuz de Sapo ao Ninja, Samurai, Cavaleiro, Mágica e Piloto de Robô), em versão masculina ou feminina e 3 tons de pele; ele anda no mapa nas 4 direções.
 
-**Dois modos de andar.** No **modo GPS** o boneco segue o celular e aparecem todas as pererecas. No **modo controle** o jogador anda com um joystick na tela (ou com as setas do teclado), sem sair do lugar, mas só aparece uma parte das raras (80 % das incomuns, 35 % das raras e 15 % das especiais). Quem anda de verdade é recompensado. Cada captura leva o modo em que foi feita, e o servidor recusa uma perereca "só de GPS" capturada no modo controle.
+**Dois modos de andar.** No **modo GPS** o boneco segue o celular e aparecem todas as pererecas. No **modo controle** o jogador anda com um joystick na tela (ou com as setas do teclado), sem sair do lugar, mas só aparece uma parte das raras (80 % das incomuns, 35 % das raras e 15 % das especiais). Quem anda de verdade é recompensado: no GPS cada lagoinha ainda tem **2 pererecas a mais**, sorteadas com mais chance de raridade (e metade das moitinhas tem 1 a mais). Cada captura leva o modo em que foi feita, e o servidor recusa uma perereca "só de GPS" capturada no modo controle.
 
 **Jogadores juntos no mapa.** Quem está com o jogo aberto a até 300 m aparece no mapa dos outros, com o boneco e o nome. Se várias pessoas estão no mesmo lugar (por exemplo, numa sala, onde o GPS de todos dá praticamente o mesmo ponto), os bonecos são afastados automaticamente até uma distância mínima na tela, sempre do mesmo jeito, então o mapa fica estável. Quem não quiser aparecer desliga isso no Perfil.
 
@@ -28,7 +28,7 @@ Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro
 
 **Ranking.** Três quadros: mais XP, mais capturas e mais Brejais ganhos (trabalhos + vendas + parceiros; comprar carro não tira pontos). Pererecas recebidas em troca não contam como captura. No perfil aparecem os 5 primeiros de XP com medalhas de ouro, prata e bronze; "Ver todos" abre o pódio e as três abas.
 
-**Loja e carros.** Com os Brejais o jogador compra um carro na **Loja do Brejo**: Hatch (B$ 150), Sedã (250), Picape (400), Jipe (600, revela os matinhos de mais longe) e Superesportivo (1500). O carro deixa o joystick mais rápido (de 3,5 m/s a pé até 12 m/s) e **só anda no modo Controle**: no GPS o jogador sempre está a pé. Os carros têm o tamanho do boneco, nas 4 direções, e quem está perto vê o carro com um balãozinho do rosto e do nome de quem está dirigindo.
+**Loja e carros.** Com os Brejais o jogador compra um carro na **Loja do Brejo**: Hatch (B$ 150), Sedã (250), Picape (400), Jipe (600, revela os matinhos de mais longe) e Superesportivo (1500). O carro deixa o joystick mais rápido (de 6 m/s a pé até 20 m/s) e **só anda no modo Controle**: no GPS o jogador sempre está a pé. Os carros têm o tamanho do boneco, nas 4 direções, e quem está perto vê o carro com um balãozinho do rosto e do nome de quem está dirigindo.
 
 | Requisito do enunciado | No jogo |
 |---|---|

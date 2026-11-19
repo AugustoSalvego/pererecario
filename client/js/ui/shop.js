@@ -1,5 +1,5 @@
 // Loja do Brejo: carros comprados com Brejais (B$) e garagem (escolher o carro ou ir a pé).
-import { CARS, carById } from '../shared/game.js';
+import { CARS, carById, WALK_SPEED } from '../shared/game.js';
 import { store } from '../store.js';
 import { geo } from '../geo.js';
 import { $, esc, openSheet, closeSheet, toast } from './common.js';
@@ -7,7 +7,7 @@ import { headHtml } from './sprites.js';
 import { sfx } from '../audio.js';
 
 const SPR = 'assets/sprites/';
-const WALK = 3.5;
+const WALK = WALK_SPEED;
 
 // carro parado ou andando (folha 2 x 4 de 32 x 28): linha 0 frente, 1 esquerda, 2 direita, 3 costas
 export function carSprite(id, { dir = 'right', scale = 2.1667, moving = false } = {}) {

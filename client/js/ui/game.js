@@ -25,7 +25,7 @@ import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
   spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, moitasNear, findBrejo, visibleInMode,
-  FROG_VIEW_M, POND_VIEW_M, jobsNear, JOB_VIEW_M, JOB_RANGE_M, DELIVERY_RANGE_M, carById,
+  FROG_VIEW_M, POND_VIEW_M, jobsNear, JOB_VIEW_M, JOB_RANGE_M, DELIVERY_RANGE_M, carById, WALK_SPEED,
 } from '../shared/game.js';
 
 // ponto de referência para o raio de visão: o jogador (ou o centro do mapa, sem GPS)
@@ -213,6 +213,12 @@ export function startGame({ firstTime = false } = {}) {
   }
   presence.start();
   store.ensureExpedition();
+  // iPhone: o sensor de movimento só pode ser liberado num toque. Quem já tinha passado do tutorial
+  // nunca era perguntado, e chacoalhar não fazia nada. Agora o primeiro toque no jogo pede.
+  if (sensors.needsPermission() && !sensors.granted) {
+    const ask = () => { document.removeEventListener('click', ask, true); sensors.request(); };
+    document.addEventListener('click', ask, true);
+  }
   prefetchTiles();
   // quem já tinha conta antes dos termos (ou quando os termos mudam) vê o resumo e marca "li e concordo"
   setTimeout(askTerms, 1500);
@@ -255,7 +261,7 @@ function renderHud() {
   }
   lastBalance = v.balance;
   const car = geo.mode === 'sim' ? carById(v.vehicle) : null;
-  geo.joySpeed = car ? car.speed : 3.5;
+  geo.joySpeed = car ? car.speed : WALK_SPEED;
   const look = lookOf(v.player);
   const av = $('.player-chip .avatar');
   if (av.dataset.look !== look) { av.innerHTML = headHtml(look, 1.7); av.dataset.look = look; }   // 1.7: a cabeça inteira (com a aba do chapéu) cabe na bolinha
@@ -342,7 +348,7 @@ function renderGpsChip() {
   btn.innerHTML = ctl ? `${icons.gamepad}Controle` : `${icons.gps}GPS`;
   $('#game').classList.toggle('controle', ctl);
   $('.joystick').classList.toggle('hidden', !ctl);
-  $('.shake-btn').classList.toggle('hidden', !(ctl || !sensors.hasMotion));
+  $('.shake-btn').classList.remove('hidden');   // o botão fica sempre: serve de reserva se chacoalhar não funcionar
   placeTopStack();
 }
 
@@ -355,7 +361,7 @@ async function toggleMode() {
     toast('🎮 Modo controle: ande com o joystick. Aqui aparecem menos pererecas raras.', '', null, 4000);
   } else {
     await geo.setMode('real');
-    toast('📍 Modo GPS: ande de verdade e todas as pererecas aparecem, inclusive as raras!', 'ok', null, 4000);
+    toast('📍 Modo GPS: ande de verdade e aparecem mais pererecas, e mais raras!', 'ok', null, 4000);
   }
 }
 

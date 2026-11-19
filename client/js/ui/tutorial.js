@@ -36,7 +36,7 @@ function slides(look) {
           <span class="tut-tap tm-tap"></span>
         </div>
         <div class="tut-mode-cards">
-          <div class="tmc gps"><b>${icons.gps}GPS</b><ul><li>Anda de verdade</li><li><b>Todas</b> as pererecas, até as raras</li><li>Trabalhos pagam <b>+${Math.round((BALANCO.bonusNoGps - 1) * 100)}%</b></li></ul></div>
+          <div class="tmc gps"><b>${icons.gps}GPS</b><ul><li>Anda de verdade</li><li><b>Mais</b> pererecas, e mais raras</li><li>Trabalhos pagam <b>+${Math.round((BALANCO.bonusNoGps - 1) * 100)}%</b></li></ul></div>
           <div class="tmc ctl"><b>${icons.gamepad}Controle</b><ul><li>Joystick ou toque no mapa, sem sair do lugar</li><li><b>Menos</b> pererecas raras</li><li>O carro só anda aqui</li></ul></div>
         </div>`,
       artStyle: 'height:250px',

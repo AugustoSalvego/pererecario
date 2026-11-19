@@ -3,11 +3,11 @@
 //  - Controle ("sim"): o boneco anda com o joystick da tela (ou tocando no mapa).
 //    Aparecem menos pererecas raras (BALANCO.noModoControle).
 // A distância percorrida alimenta a caçada do dia.
-import { distanceM, offsetLatLng } from './shared/game.js';
+import { distanceM, offsetLatLng, WALK_SPEED } from './shared/game.js';
 import { store } from './store.js';
 
 const MAX_ACCURACY_FOR_DISTANCE = 35;
-const JOY_SPEED = 3.5;   // m/s a pé (joystick todo inclinado ou tocando no mapa: a mesma velocidade)
+const JOY_SPEED = WALK_SPEED;   // m/s a pé (joystick todo inclinado ou tocando no mapa: a mesma velocidade)
 
 class Geo extends EventTarget {
   pos = null;

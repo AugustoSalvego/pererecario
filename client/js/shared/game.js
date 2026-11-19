@@ -29,6 +29,11 @@ export const BALANCO = {
   // No modo GPS (andando de verdade) aparecem todas as pererecas. No modo controle (joystick)
   // só aparece esta fração de cada raridade: 1 = todas, 0,35 = cerca de 1 em cada 3.
   noModoControle: { common: 1, uncommon: 0.8, rare: 0.35, special: 0.15 },
+  // Quem anda de verdade (GPS) ainda ganha pererecas a mais, e elas são mais raras: compensa o modo
+  // controle ser mais rápido. Lagoinha: +2 só no GPS. Moitinha: 50% de chance de +1 só no GPS.
+  extraNoGps: { lagoinha: 2, moita: 0.5 },
+  reforcoNoGps: { uncommon: 1.3, rare: 2.5, special: 3 },   // multiplica a chance de cada raridade nas extras
+  aPeMs: 6,                  // velocidade a pé no modo controle (m/s); os carros são mais rápidos
 
   // --- trabalhos (NPCs que pagam em Brejais, B$) ---
   trabalhoACadaM: 140,       // um NPC a cada ~140 m (sorteado de novo a cada janela de 15 min)
@@ -342,13 +347,14 @@ export function jobsNear(p, radiusM, win, seed = '') {
 
 export const jobPay = (type, mode) => Math.round((BALANCO.pagamento[type] || 0) * (mode === 'gps' ? BALANCO.bonusNoGps : 1));
 
-// Carros da loja (só andam no modo controle). speed em m/s; a pé no controle são 3,5 m/s.
+// Carros da loja (só andam no modo controle). speed em m/s; a pé no controle são BALANCO.aPeMs (6 m/s).
+export const WALK_SPEED = BALANCO.aPeMs;
 export const CARS = [
-  { id: 'hatch', name: 'Hatch', price: 150, speed: 6 },
-  { id: 'sedan', name: 'Sedã', price: 250, speed: 7 },
-  { id: 'pickup', name: 'Picape', price: 400, speed: 7.5 },
-  { id: 'jeep', name: 'Jipe', price: 600, speed: 8, perk: 'Abre matinhos de mais longe (30 m)' },
-  { id: 'super', name: 'Superesportivo', price: 1500, speed: 12 },
+  { id: 'hatch', name: 'Hatch', price: 150, speed: 10 },
+  { id: 'sedan', name: 'Sedã', price: 250, speed: 12 },
+  { id: 'pickup', name: 'Picape', price: 400, speed: 13 },
+  { id: 'jeep', name: 'Jipe', price: 600, speed: 14, perk: 'Abre matinhos de mais longe (30 m)' },
+  { id: 'super', name: 'Superesportivo', price: 1500, speed: 20 },
 ];
 export const carById = (id) => CARS.find((c) => c.id === id) || null;
 
@@ -392,14 +398,20 @@ export function spawnsFor(brejo, win, catalog, seed = '') {
   const next = rng(hash32(key));                 // espécie e tamanho
   const pos = rng(hash32(`${key}|pos`));         // posição
   const modo = rng(hash32(`${key}|modo`));       // quais aparecem no modo controle
-  const n = spawnCount(brejo);
+  const n0 = spawnCount(brejo);
+  // extras do GPS: entram DEPOIS das normais (índices n0, n0+1...), então as normais continuam
+  // exatamente iguais (mesmos ids, espécies e lugares) e o que já foi capturado não muda
+  const gps = rng(hash32(`${key}|gps`));
+  const extra = brejo.moita ? (gps() < BALANCO.extraNoGps.moita ? 1 : 0) : BALANCO.extraNoGps.lagoinha;
+  const n = n0 + extra;
   // na moitinha não tem água no meio: as pererecas nascem em qualquer ponto dela
   const rMin = brejo.moita ? 0 : Math.max(POND_CLEAR_M, brejo.radius * 0.3);
   const rMax = brejo.moita ? brejo.radius : Math.max(rMin + 10, brejo.radius * 0.9);
   const placed = [];
   const out = [];
   for (let i = 0; i < n; i++) {
-    const sp = pickSpecies(next, catalog);
+    const bonus = i >= n0;   // perereca extra do GPS: sorteio próprio, com mais chance de rara
+    const sp = bonus ? pickSpecies(gps, catalog, BALANCO.reforcoNoGps) : pickSpecies(next, catalog);
     // tenta algumas posições e fica com a mais afastada das outras pererecas
     let best = null, bestGap = -1;
     for (let t = 0; t < 24; t++) {
@@ -419,9 +431,11 @@ export function spawnsFor(brejo, win, catalog, seed = '') {
       brejoId: brejo.id,
       win,
       speciesId: sp.id,
-      sizeCm: sizeFor(next, sp),
+      sizeCm: sizeFor(bonus ? gps : next, sp),
       hidden: sp.tier !== 'common', // comuns ficam à vista; as demais se escondem num matinho
-      gpsOnly: modo() >= (BALANCO.noModoControle[sp.tier] ?? 1), // só aparece andando com GPS
+      // só aparece andando com GPS (as extras, sempre)
+      gpsOnly: bonus || modo() >= (BALANCO.noModoControle[sp.tier] ?? 1),
+      gpsBonus: bonus || undefined,
       lat: ll.lat,
       lng: ll.lng,
     });

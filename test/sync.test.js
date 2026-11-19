@@ -165,6 +165,22 @@ test('cada jogador tem lagoinhas e pererecas próprias', async () => {
   assert.notEqual(r.body.results[0].status, 'applied');
 });
 
+test('bônus do GPS: lagoinha tem 2 pererecas a mais, só no GPS, e o servidor confere o modo', async () => {
+  const p = await newPlayer('gil');
+  const here = { lat: -23.21, lng: -50.51 };
+  const pond = pondsNear(here, 400, p.id)[0];
+  const all = spawnsFor(pond, windowOf(clock), app.catalog, p.id);
+  const extras = all.filter((s) => s.gpsBonus);
+  assert.equal(extras.length, 2, 'lagoinha deveria ter 2 extras do GPS');
+  assert.ok(extras.every((s) => s.gpsOnly && !visibleInMode(s, 'controle') && visibleInMode(s, 'gps')));
+  const e = extras[0];
+  const at = windowStart(e.win) + 1000;
+  const ctl = await sync(p, 'c1', [captureOp(e, at, { mode: 'controle' })]);
+  assert.equal(ctl.body.results[0].status, 'rejected');
+  const gps = await sync(p, 'c1', [captureOp(e, at, { mode: 'gps' })]);
+  assert.equal(gps.body.results[0].status, 'applied', JSON.stringify(gps.body.results[0]));
+});
+
 test('modo controle: pererecas "só GPS" são recusadas; no modo GPS valem', async () => {
   const p = await newPlayer('rui');
   const here = { lat: -23.2, lng: -50.5 };
