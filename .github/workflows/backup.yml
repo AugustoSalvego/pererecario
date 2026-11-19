@@ -30,17 +30,26 @@ jobs:
       BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
     steps:
       - name: Conferir os segredos
+        id: check
         run: |
+          # antes de o jogo ir para o ar (nenhum segredo cadastrado), só avisa, sem dar erro
+          if [ -z "$GAME_URL$ADMIN_KEY$BACKUP_PASSWORD" ]; then
+            echo "::notice::Backup ainda não configurado (docs/HOSPEDAGEM.md, passo 3)."
+            echo "configured=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           for v in GAME_URL ADMIN_KEY BACKUP_PASSWORD; do
             if [ -z "${!v}" ]; then echo "Falta o segredo $v (veja docs/HOSPEDAGEM.md)"; exit 1; fi
           done
+          echo "configured=true" >> "$GITHUB_OUTPUT"
       - name: Baixar o backup do servidor
+        if: steps.check.outputs.configured == 'true'
         # o servidor gratuito pode estar dormindo: tenta por até ~3 minutos
         run: |
           curl -fsS --retry 8 --retry-delay 20 --retry-all-errors --max-time 120 \
             -H "X-Admin-Key: $ADMIN_KEY" -H "X-Backup-Origem: github" "${GAME_URL%/}/api/admin/backup" -o backup.json
           node -e "const d=require('./backup.json'); if (d.app!=='pererecario') { console.error('resposta inesperada'); process.exit(1) } console.log('Backup ok:', JSON.stringify(d.counts))"
       - name: Compactar e criptografar
+        if: steps.check.outputs.configured == 'true'
         run: |
           STAMP=$(date -u +%Y-%m-%d_%H%M)
           gzip -9 backup.json
@@ -48,6 +57,7 @@ jobs:
           rm backup.json.gz
           echo "STAMP=$STAMP" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.configured == 'true'
         with:
           name: backup-${{ env.STAMP }}
           path: pererecario-*.json.gz.enc
