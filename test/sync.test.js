@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, brejosNear, distanceM } from '../client/js/shared/game.js';
+import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, brejosNear, distanceM, jobsNear, jobPay } from '../client/js/shared/game.js';
 
 let server, base, app, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
@@ -173,6 +173,71 @@ test('presença: jogadores perto se veem, longe não, e quem se esconde some', a
   const r4 = await call('POST', '/api/presence', { ...sala }, auth(c));
   assert.ok(!r4.body.players.some((o) => o.id === a.id));
   clock -= 60_000;
+});
+
+// trabalhos de um jogador perto de um ponto, voltando no tempo até achar 'n' (sem entregas, se pedido)
+function findJobs(p, n, { types = ['casa', 'carro', 'horta'] } = {}) {
+  const out = [];
+  for (let w = windowOf(clock); out.length < n && w > windowOf(clock) - 400; w--) {
+    for (const j of jobsNear({ lat: -23.3, lng: -50.6 }, 1500, w, p.id)) if (types.includes(j.type) && out.length < n) out.push(j);
+  }
+  return out;
+}
+const jobOp = (j, extra = {}) => ({
+  opId: crypto.randomUUID(), type: 'job.done', ts: clock,
+  payload: { doneId: crypto.randomUUID(), jobId: j.id, mode: 'gps', doneAt: windowStart(j.win) + 60000, lat: j.lat, lng: j.lng, ...extra },
+});
+const buyOp = (item) => ({ opId: crypto.randomUUID(), type: 'shop.buy', ts: clock, payload: { buyId: crypto.randomUUID(), item, boughtAt: clock } });
+
+test('trabalho paga uma vez só, no lugar e na hora certos (GPS paga mais)', async () => {
+  const p = await newPlayer('pedro');
+  const [j] = findJobs(p, 1);
+  const r = await sync(p, 'c1', [jobOp(j)]);
+  assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body.results[0]));
+  assert.equal(r.body.results[0].pay, jobPay(j.type, 'gps'));
+  const again = await sync(p, 'c2', [jobOp(j)]);                       // outro aparelho, mesmo trabalho
+  assert.equal(again.body.results[0].status, 'conflict');
+  assert.equal(again.body.state.jobs.length, 1);
+  const far = await sync(p, 'c1', [jobOp(findJobs(p, 2)[1], { lat: j.lat + 0.01 })]);   // ~1 km longe
+  assert.equal(far.body.results[0].status, 'rejected');
+  const ctl = findJobs(p, 3)[2];
+  const r2 = await sync(p, 'c1', [jobOp(ctl, { mode: 'controle' })]);
+  assert.equal(r2.body.results[0].pay, jobPay(ctl.type, 'controle'));
+  assert.ok(jobPay(ctl.type, 'gps') > jobPay(ctl.type, 'controle'));
+});
+
+test('entrega só conta chegando no ponto de entrega', async () => {
+  const p = await newPlayer('carla');
+  const [j] = findJobs(p, 1, { types: ['entrega'] });
+  const atNpc = await sync(p, 'c1', [jobOp(j)]);
+  assert.equal(atNpc.body.results[0].status, 'rejected');
+  const atDest = await sync(p, 'c1', [jobOp(j, { lat: j.dest.lat, lng: j.dest.lng })]);
+  assert.equal(atDest.body.results[0].status, 'applied', JSON.stringify(atDest.body.results[0]));
+});
+
+test('loja: sem saldo é recusada; item repetido não cobra; dois aparelhos gastando o mesmo dinheiro', async () => {
+  const p = await newPlayer('lojinha');
+  const poor = await sync(p, 'c1', [buyOp('hatch')]);
+  assert.equal(poor.body.results[0].status, 'rejected');
+  const jobs = findJobs(p, 6);
+  await sync(p, 'c1', jobs.map((j) => jobOp(j)));
+  let st = (await sync(p, 'c1', [])).body.state;
+  const earned = st.jobs.reduce((t, j) => t + j.pay, 0);
+  assert.ok(earned >= 250 && earned < 400, `ganhou ${earned}`);
+  // aparelho A e B, offline, compram o sedã (B$ 250) com o mesmo dinheiro
+  const a = await sync(p, 'A', [buyOp('sedan')]);
+  const b = await sync(p, 'B', [buyOp('sedan')]);
+  assert.equal(a.body.results[0].status, 'applied');
+  assert.equal(b.body.results[0].status, 'conflict');               // já tem: não cobra de novo
+  const c = await sync(p, 'B', [buyOp('pickup')]);                    // não sobrou dinheiro para a picape
+  assert.equal(c.body.results[0].status, 'rejected');
+  st = c.body.state;
+  assert.deepEqual(st.purchases.map((x) => x.item), ['sedan']);
+  // carro em uso: só o que tem
+  const v1 = await sync(p, 'A', [{ opId: crypto.randomUUID(), type: 'vehicle.select', ts: clock, payload: { vehicle: 'pickup', ts: clock } }]);
+  assert.equal(v1.body.results[0].status, 'rejected');
+  const v2 = await sync(p, 'A', [{ opId: crypto.randomUUID(), type: 'vehicle.select', ts: clock, payload: { vehicle: 'sedan', ts: clock } }]);
+  assert.equal(v2.body.state.player.vehicle, 'sedan');
 });
 
 test('reenvio da mesma operação não duplica a captura (idempotência)', async () => {

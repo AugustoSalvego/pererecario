@@ -191,6 +191,27 @@ MODELS = {
 }
 MODEL_ORDER = list(MODELS)
 
+# NPCs dos trabalhos (não aparecem no guarda-roupa do jogador)
+NPCS = {
+    'pedreiro': dict(name='Pedreiro', head='hardhat', torso='jacket', legs='pants', outline='2a1f12', pal={
+        'hat': P('f6c934', 'cf9f1a', 'ffe680'), 'brim': P('e8b520', 'b88a10', 'f6c934'), 'band': P('fff3b0', 'fff3b0'),
+        'shirt': P('ff8a2a', 'd0661a', 'ffb06a'), 'stripe': P('e8f0f2', 'c8d0d4'),
+        'pants': P('3f6fb5', '2c5390', '5d8bd0'), 'boot': P('7a5232', '5a3a22', '9a7048')}),
+    'mecanico': dict(name='Mecânico', head='cap', torso='overalls', legs='pants', outline='141c26', pal={
+        'hat': P('d9363a', 'a8262a', 'f06a62'), 'brim': P('b82a2e', '8a1f22', 'd9363a'), 'band': P('8a1f22', '8a1f22'),
+        'shirt': P('e6e9ec', 'b9c0c6', 'ffffff'), 'overall': P('3e5f8a', '2b4466', '5a7fae'), 'strap': P('3e5f8a', '2b4466'),
+        'btn': P('f2c230', 'f2c230'), 'pants': P('3e5f8a', '2b4466', '5a7fae'), 'boot': P('2a2a30', '1a1a20', '44444c')}),
+    'agricultor': dict(name='Agricultor', head='straw', torso='shirt', legs='pants', outline='2a2016', pal={
+        'hat': P('f2d36b', 'cfae45', 'fbe69a'), 'brim': P('e8c75a', 'c2a03a', 'f7df8e'), 'band': P('3a7a3a', '3a7a3a'),
+        'shirt': P('4f9a48', '3a7a36', '74bd6a'), 'pants': P('8a6a45', '634a30', 'a8865c'), 'boot': P('5a4030', '3e2c20', '7a5a44')}),
+    'carteiro': dict(name='Carteiro', head='cap', torso='straps', legs='pants', outline='14202e', pal={
+        'hat': P('2f6fc0', '22539a', '5a92de'), 'brim': P('265ea8', '1b4580', '2f6fc0'), 'band': P('1b4580', '1b4580'),
+        'shirt': P('8fc4ee', '6aa6d6', 'b5daf6'), 'strap': P('7a5232', '5a3a22'), 'pack': P('c99a5a', 'a07840', 'e0b878'),
+        'belt': P('2a3a52', '2a3a52'), 'belly': P('8fc4ee', '6aa6d6'),
+        'pants': P('2a3a52', '1c283a', '3e5274'), 'boot': P('2a2a30', '1a1a20', '44444c')}),
+}
+MODELS.update(NPCS)
+
 
 def palette(model, skin):
     s, sd, sl, ck = SKIN[skin]
@@ -574,6 +595,10 @@ def hat_on(c, kind, view, pal):
         for x in range(5, 19, 2):
             c.dot(pal['band'][1], x, 10)
         c.ellipse('pom', cx, 2.6, 2.4, 2.2)
+    elif kind == 'hardhat':
+        c.ellipse('hat', cx, 9.0, 7.2, 6.0, ymax=9)
+        c.rect('brim', 3 if not side else 4, 9, 20 if not side else 18, 10)
+        c.rect('band', int(cx), 3, int(cx), 8)
     elif kind == 'headlamp':
         c.rect('band', 4, 8, 19 if not side else 17, 9)
         if view == 'down':
@@ -879,6 +904,10 @@ def sheet(model, gender, skin):
 def main():
     import os
     out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'client', 'assets', 'sprites')
+    for npc in NPCS:
+        for gender in ('masculino', 'feminino'):
+            for skin in SKIN:
+                sheet(npc, gender, skin).save(os.path.join(out, f'npc-{npc}-{gender}-{skin}.png'))
     for model in MODEL_ORDER:
         for gender in ('masculino', 'feminino'):
             for skin in SKIN:
@@ -889,6 +918,10 @@ def main():
 def preview(path):
     """folha de conferência: todos os estilos, de frente, de lado e de costas"""
     cols = []
+    for npc in NPCS:
+        for gender in ('masculino', 'feminino'):
+            for skin in SKIN:
+                sheet(npc, gender, skin).save(os.path.join(out, f'npc-{npc}-{gender}-{skin}.png'))
     for model in MODEL_ORDER:
         for gender, skin in (('masculino', 'clara'), ('feminino', 'escura')):
             cols.append((model, gender, skin))

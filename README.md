@@ -20,6 +20,8 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 6. Quem estiver jogando a até 300 m aparece no seu mapa, com o nome (dá para se esconder no Perfil). De dia o mapa é claro; à noite fica azulado, com vaga-lumes e uma luz em volta do seu boneco.
 7. Encontrou outro jogador? Na aba **Amigos**, um escaneia o **QR code** do outro: vocês viram parceiros de brejo e quem escaneou ganha uma **perereca-presente** (uma por amigo por dia).
 8. Complete o **Pererecário** (15 espécies, das comuns até a especial) e veja suas repetidas no **Meu Brejo**. Cada dia em que você joga é uma **caçada**; no Perfil ficam a caçada de hoje, o ranking e o **Diário de campo** com as últimas capturas.
+9. Pelo mapa aparecem **moradores pedindo ajuda** (balãozinho em cima da cabeça): o pedreiro constrói uma casinha, a mecânica conserta um carro, o agricultor cuida da horta e o carteiro precisa de uma entrega. Chegue perto, toque nele e jogue o minijogo de 3 etapas (cada trabalho leva no máximo 5 minutos). No fim você recebe **Brejais (B$)**, a moeda do jogo; no GPS o pagamento é maior.
+10. Com os Brejais, compre um **carro** na **Loja do Brejo** (botão de sacola ou toque no saldo): Hatch, Sedã, Picape, Jipe ou Superesportivo. O carro só anda no **modo Controle** (no GPS você sempre vai a pé, por segurança) e quem estiver perto vê o seu carro com um balãozinho do seu rosto e do seu nome.
 
 Para instalar como app: no Android, menu ⋮ → "Instalar app"/"Adicionar à tela inicial"; no iPhone, Compartilhar → "Adicionar à Tela de Início".
 
@@ -29,7 +31,7 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 14 testes de sincronização, idempotência, conflitos e falhas
+npm test             # 22 testes de sincronização, idempotência, conflitos, falhas, trabalhos e loja
 ```
 
 Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
@@ -66,8 +68,11 @@ client/                 PWA (HTML/CSS/JS sem build)
   js/sync.js            módulo de sincronização (conectividade, reenvio, backoff)
   js/geo.js, sensors.js GPS (real ou simulado) e acelerômetro (chacoalhar)
   js/ui/                telas: login, mapa, captura, álbum, Meu Brejo, amigos, perfil, demonstração
+  js/ui/jobs.js         conversa com os moradores, minijogos dos trabalhos e entrega
+  js/ui/shop.js         Loja do Brejo (carros) e desenho do carro com o balão do rosto
   admin.html            painel do servidor (dados, conflitos, simulação de queda)
-  assets/               atlas com as 15 pererecas + catálogo das espécies
+  assets/               atlas com as 15 pererecas, catálogo das espécies, bonecos, moradores, carros e cenas dos trabalhos
+scripts/                geradores das artes em pixel (Python + Pillow)
 server/                 Node.js (http nativo) + SQLite/PostgreSQL
   app.js                rotas REST
   sync.js               aplicação idempotente das operações e resolução de conflitos

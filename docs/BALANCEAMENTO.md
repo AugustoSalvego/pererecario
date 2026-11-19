@@ -37,6 +37,33 @@ Tudo isso vem de um sorteio com "semente" fixa: o mesmo ponto da grade sempre te
 
 **Raridade, XP e toques** ficam em `client/assets/species.json`, no bloco `tiers`: `weight` é a chance de cada raridade (hoje 55 / 28 / 13 / 4, somando 100), `xp` é quanto cada uma vale e `taps` é o mínimo de toques para capturar. Para a especial aparecer mais, troque 55/28/13/4 por, por exemplo, 52/28/14/6.
 
+## Trabalhos, Brejais e carros
+
+Os moradores que pedem ajuda seguem a mesma ideia das lagoinhas: uma grade invisível de 180 m, e a cada 15 minutos cada ponto da grade sorteia se tem um morador (65 %), qual serviço e onde fica. Os números ficam no mesmo bloco `BALANCO`; os carros ficam na lista `CARS`, logo abaixo, em `client/js/shared/game.js`.
+
+| Número | Valor | Se acontecer isto... | ...faça isto |
+|---|---|---|---|
+| `trabalhoACadaM` | 180 | o público quase não acha morador | 140 |
+| `chanceDeTrabalho` | 0,65 | morador demais no mapa | 0,45 |
+| `pagamento` | casa 35 · carro 30 · horta 25 · entrega 40 | carro demora demais para sair | aumente uns 30 % |
+| `bonusNoGps` | 1,5 | quer premiar mais quem anda de verdade | 2 |
+| `veTrabalhosAteM` | 160 | quer ver moradores de mais longe | 220 |
+| `entregaDistM` | 140–260 | a entrega está longe demais | 100–180 |
+| `entregaMin` | 5 | o prazo da entrega está apertado | 7 |
+
+| Carro | Preço | Velocidade (joystick) |
+|---|---|---|
+| A pé | – | 3,5 m/s |
+| Hatch | B$ 150 | 6 m/s |
+| Sedã | B$ 250 | 7 m/s |
+| Picape | B$ 400 | 7,5 m/s |
+| Jipe | B$ 600 | 8 m/s, e revela matinhos a 30 m |
+| Superesportivo | B$ 1500 | 12 m/s |
+
+Contas rápidas: um trabalho paga em média ~B$ 32 no modo Controle e ~B$ 49 no GPS. O Hatch sai com uns **5 trabalhos** no Controle (3 no GPS); o Superesportivo, com uns 45 (30 no GPS). Cada trabalho leva de 1 a 2 minutos, e a entrega até 5. Num raio de 160 m costuma haver 1 ou 2 moradores, renovados a cada 15 min.
+
+Cuidado: mudar `pagamento` ou o preço de um carro vale para os próximos trabalhos e compras; o que já foi pago fica gravado no servidor como foi. Não mude `trabalhoACadaM` com gente jogando (o mesmo cuidado das lagoinhas).
+
 ## Contas rápidas para o dia do evento
 
 - Lagoinhas em volta de quem joga: ~6 num raio de 200 m, ~23 num raio de 400 m, ~140 num raio de 1 km.

@@ -40,6 +40,18 @@ linha 3     parado        passo 1       passo 2      ← de costas (andando para
 
 Quer outro estilo ou mais tons de pele? Além do script, é preciso acrescentar o nome em `LOOK_MODELS` (`client/js/shared/game.js`), em `LOOK_NAMES` (`client/js/ui/sprites.js`) e na lista de bonecos do `client/sw.js`.
 
+## Moradores, carros e trabalhos
+
+| Arquivos | Script | Formato |
+|---|---|---|
+| `npc-<serviço>-<gênero>-<tom>.png` (24 arquivos: pedreiro, mecanico, agricultor, carteiro) | `scripts/gerar_bonecos.py` (dicionário `NPCS`) | Mesmo formato dos bonecos: 72 × 128, 3 colunas × 4 linhas (quadros de 24 × 32) |
+| `car-<modelo>.png` (hatch, sedan, pickup, jeep, super) | `scripts/gerar_carros.py` | 64 × 112: **2 colunas × 4 linhas** de quadros de 32 × 28 (linhas: para baixo, esquerda, direita, para cima; as 2 colunas são o balanço da roda) |
+| `bubble-job-<serviço>.png` | `scripts/gerar_carros.py` (`ICONS`) | 16 × 18, balãozinho com o ícone do serviço em cima do morador |
+| `job-<casa\|carro\|horta>-<1..4>.png` | `scripts/gerar_trabalhos.py` | 96 × 72, a cena de cada etapa do minijogo (a 4 é a cena pronta, mostrada no pagamento) |
+| `job-alvo-<nome>.png` (13 arquivos) | `scripts/gerar_trabalhos.py` | 12 × 12, os alvos do minijogo (tijolo, prego, tinta, parafuso, lama, mato, tomate...) |
+
+O sedã é desenhado pixel por pixel num bloco de texto (`SEDAN` em `gerar_carros.py`): cada letra é uma cor. Para conferir as cenas: `python3 scripts/gerar_trabalhos.py --previa previa.png`. Ao acrescentar ou renomear algum desses arquivos, atualize também a lista do `client/sw.js`.
+
 ## Cenário e efeitos
 
 | Arquivo | Onde aparece | Tamanho atual (px) | Observações |
@@ -62,3 +74,4 @@ As **15 pererecas** continuam vindo do atlas original (`client/assets/frogs_atla
 1. `npm start` e abra `http://localhost:8080`.
 2. Perfil → **Como jogar**: o tutorial mostra os bonecos parados e andando, e a última tela mostra os 3 tons.
 3. No mapa, toque no botão **GPS** para mudar para o **modo controle** e ande com o joystick: o boneco anda nas 4 direções.
+4. Faça alguns trabalhos, compre um carro na loja e mude para o modo controle: o carro aparece nas 4 direções, com o balãozinho do rosto.

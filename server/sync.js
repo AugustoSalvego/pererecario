@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import {
   spawnsFor, parseSpawnId, giftFor, windowStart, windowEnd, GRACE_MS, dayOf,
   distanceM, CAPTURE_RANGE_M, xpBreakdown, levelFor, validLook, findBrejo, visibleInMode,
+  jobById, jobPay, JOB_RANGE_M, DELIVERY_RANGE_M, carById, balanceOf, BALANCO,
 } from '../client/js/shared/game.js';
 
 const GPS_TOLERANCE_M = 45;
@@ -220,6 +221,67 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       return { status: 'applied' };
     },
 
+    // Trabalho feito: o servidor recalcula o NPC a partir do id (jogador + janela + ponto da grade),
+    // confere horário e lugar, e paga. O mesmo trabalho nunca paga duas vezes.
+    async 'job.done'(q, playerId, deviceId, p) {
+      const doneAt = num(p.doneAt);
+      if (!str(p.doneId, 64) || !str(p.jobId, 80) || doneAt === null) return { status: 'rejected', error: 'Trabalho malformado' };
+      const job = jobById(p.jobId, playerId);
+      if (!job) return { status: 'rejected', error: 'Esse trabalho não existe' };
+      if (doneAt > now() + MAX_FUTURE_MS) return { status: 'rejected', error: 'Trabalho com horário no futuro' };
+      const limit = windowEnd(job.win) + GRACE_MS + (job.type === 'entrega' ? BALANCO.entregaMin * 60000 : 0);
+      if (doneAt < windowStart(job.win) || doneAt > limit) return { status: 'rejected', error: 'O NPC já tinha ido embora nesse horário' };
+      if (num(p.lat) === null || num(p.lng) === null) return { status: 'rejected', error: 'Posição ausente' };
+      const at = { lat: p.lat, lng: p.lng };
+      const target = job.type === 'entrega' ? job.dest : job;
+      const range = (job.type === 'entrega' ? DELIVERY_RANGE_M : JOB_RANGE_M) + GPS_TOLERANCE_M;
+      const d = distanceM(at, target);
+      if (d > range) return { status: 'rejected', error: `Longe demais do ${job.type === 'entrega' ? 'ponto de entrega' : 'NPC'} (${Math.round(d)} m)` };
+      const mode = p.mode === 'controle' ? 'controle' : 'gps';
+      const existing = await q.one('SELECT * FROM jobs WHERE player_id=$1 AND job_id=$2', [playerId, p.jobId]);
+      if (existing) {
+        return { status: 'conflict', conflict: { kept: { id: existing.id, deviceId: existing.device_id, doneAt: Number(existing.done_at) }, policy: 'o mesmo trabalho só paga uma vez' } };
+      }
+      const pay = jobPay(job.type, mode);
+      await q.run(
+        `INSERT INTO jobs (id, player_id, job_id, type, pay, mode, done_at, device_id, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [p.doneId, playerId, p.jobId, job.type, pay, mode, doneAt, deviceId, now()],
+      );
+      return { status: 'applied', pay };
+    },
+
+    // Compra na loja. Regra de conflito do dinheiro: a compra só vale se, quando chegar ao servidor,
+    // o saldo cobrir o preço. Dois celulares gastando o mesmo dinheiro offline: a primeira compra que
+    // chega é aplicada e a outra é recusada (o dinheiro não sai). Item repetido não é cobrado de novo.
+    async 'shop.buy'(q, playerId, deviceId, p) {
+      const car = carById(p.item);
+      const at = num(p.boughtAt);
+      if (!str(p.buyId, 64) || !car || at === null) return { status: 'rejected', error: 'Compra malformada' };
+      const owned = await q.one('SELECT * FROM purchases WHERE player_id=$1 AND item=$2', [playerId, car.id]);
+      if (owned) return { status: 'conflict', conflict: { kept: { id: owned.id, deviceId: owned.device_id }, policy: 'item já comprado em outro aparelho: não foi cobrado de novo' } };
+      const jobs = await q.query('SELECT pay FROM jobs WHERE player_id=$1', [playerId]);
+      const buys = await q.query('SELECT price FROM purchases WHERE player_id=$1', [playerId]);
+      const balance = balanceOf(jobs, buys);
+      if (balance < car.price) return { status: 'rejected', error: `Saldo insuficiente no servidor (B$ ${balance} de B$ ${car.price})` };
+      await q.run(
+        'INSERT INTO purchases (id, player_id, item, price, bought_at, device_id, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [p.buyId, playerId, car.id, car.price, at, deviceId, now()],
+      );
+      return { status: 'applied' };
+    },
+
+    // Carro em uso: última escrita vence (como o visual). Só vale carro que o jogador tem.
+    async 'vehicle.select'(q, playerId, deviceId, p) {
+      const ts = num(p.ts);
+      const v = p.vehicle == null ? null : String(p.vehicle);
+      if (ts === null || (v !== null && !carById(v))) return { status: 'rejected', error: 'Carro inválido' };
+      if (v && !(await q.one('SELECT id FROM purchases WHERE player_id=$1 AND item=$2', [playerId, v]))) {
+        return { status: 'rejected', error: 'Você ainda não tem esse carro' };
+      }
+      await q.run('UPDATE players SET vehicle=$1, vehicle_ts=$2 WHERE id=$3 AND vehicle_ts < $2', [v, ts, playerId]);
+      return { status: 'applied' };
+    },
+
     async 'profile.avatar'(q, playerId, deviceId, p) {
       const ts = num(p.ts);
       if (!speciesIds.has(p.speciesId) || ts === null) return { status: 'rejected', error: 'Avatar inválido' };
@@ -267,6 +329,8 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
     const dist = await db.query(
       `SELECT d.* FROM expedition_distance d JOIN expeditions e ON e.id = d.expedition_id WHERE e.player_id=$1`, [playerId],
     );
+    const jobs = await db.query('SELECT * FROM jobs WHERE player_id=$1 ORDER BY done_at, id', [playerId]);
+    const buys = await db.query('SELECT * FROM purchases WHERE player_id=$1 ORDER BY bought_at, id', [playerId]);
     const friends = await db.query(
       `SELECT f.friend_id, f.created_at, p.display_name, p.avatar FROM friendships f
        JOIN players p ON p.id = f.friend_id WHERE f.player_id=$1 ORDER BY f.created_at`, [playerId],
@@ -280,7 +344,10 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       player: {
         id: p.id, username: p.username, displayName: p.display_name, avatar: p.avatar,
         avatarTs: p.avatar_ts, look: p.look, lookTs: p.look_ts, friendCode: p.friend_code, createdAt: p.created_at,
+        vehicle: p.vehicle || null, vehicleTs: Number(p.vehicle_ts) || 0,
       },
+      jobs: jobs.map((j) => ({ id: j.id, jobId: j.job_id, type: j.type, pay: j.pay, mode: j.mode, doneAt: Number(j.done_at), deviceId: j.device_id })),
+      purchases: buys.map((b) => ({ id: b.id, item: b.item, price: b.price, boughtAt: Number(b.bought_at), deviceId: b.device_id })),
       captures: caps.map((c) => ({
         id: c.id, spawnId: c.spawn_id, speciesId: c.species_id, sizeCm: c.size_cm, kind: c.kind,
         brejoId: c.brejo_id, friendId: c.friend_id, expeditionId: c.expedition_id, caughtAt: c.caught_at,

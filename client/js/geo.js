@@ -17,6 +17,7 @@ class Geo extends EventTarget {
   watchId = null;
   walkTimer = null;
   joy = { x: 0, y: 0 };
+  joySpeed = JOY_SPEED; // a pé; com carro a tela troca para a velocidade do carro
   joyTimer = null;
   glideTimer = null;
 
@@ -153,7 +154,7 @@ class Geo extends EventTarget {
       const dt = Math.min(0.25, (t - last) / 1000);
       last = t;
       if (!this.pos) return;
-      const n = this.joy.y * JOY_SPEED * dt, e = this.joy.x * JOY_SPEED * dt;
+      const n = this.joy.y * this.joySpeed * dt, e = this.joy.x * this.joySpeed * dt;
       const p = offsetLatLng(this.pos.lat, this.pos.lng, n, e);
       this.update({ lat: p.lat, lng: p.lng, accuracy: 5, simulated: true });
     }, 100);

@@ -32,6 +32,7 @@ class Presence extends EventTarget {
       const r = await api.post('/api/presence', {
         lat: geo.pos.lat, lng: geo.pos.lng, mode: geo.playMode,
         look: normalizeLook(store.view.player?.look), hidden: !!store.settings.hidePresence,
+        vehicle: geo.mode === 'sim' ? store.view.vehicle : null,
       }, { timeout: 5000 });
       const t = Date.now();
       const seen = new Set();

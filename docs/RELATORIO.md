@@ -18,11 +18,15 @@ Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especi
 
 Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
+**Trabalhos e Brejais.** Pelo mapa aparecem moradores (NPCs) pedindo ajuda, com um balãozinho que mostra o serviço: o **pedreiro** constrói uma casinha, a **mecânica** conserta um carro, o **agricultor** cuida da horta e o **carteiro** pede uma entrega. Eles aparecem em qualquer lugar e mudam a cada 15 minutos, pelo mesmo sorteio determinístico das lagoinhas (grade de ~180 m, semente = jogador + janela + ponto da grade), então o celular offline e o servidor chegam aos mesmos moradores. Cada trabalho é um minijogo de 3 etapas em que o jogador toca rápido nos alvos que piscam na cena antes que sumam (tijolos, pregos e manchas da casa; parafusos e barro do carro; mato, terra seca e tomates da horta) e leva no máximo 5 minutos; a entrega é diferente: o jogador leva a caixa até uma lagoinha a 140–260 m, com 5 minutos de prazo. No fim aparece só o agradecimento ("O pedreiro agradece!") e o botão **Coletar B$ X**. A moeda do jogo são os **Brejais (B$)**; quem faz o trabalho no modo GPS ganha 50 % a mais.
+
+**Loja e carros.** Com os Brejais o jogador compra um carro na **Loja do Brejo**: Hatch (B$ 150), Sedã (250), Picape (400), Jipe (600, revela os matinhos de mais longe) e Superesportivo (1500). O carro deixa o joystick mais rápido (de 3,5 m/s a pé até 12 m/s) e **só anda no modo Controle**: no GPS o jogador sempre está a pé. Os carros têm o tamanho do boneco, nas 4 direções, e quem está perto vê o carro com um balãozinho do rosto e do nome de quem está dirigindo.
+
 | Requisito do enunciado | No jogo |
 |---|---|
 | Identificação do jogador | Conta com usuário e senha; token assinado guardado no aparelho |
 | Estado e progresso das partidas | **Caçada do dia** = a partida: criada automaticamente no primeiro movimento ou captura do dia; acumula capturas, XP e distância. O identificador é fixo por jogador e por dia (`dia:<jogador>:<dia>`), então dois aparelhos no mesmo dia jogam **a mesma partida** |
-| Pontuações e resultados | XP por captura (10/25/60/150 + 50 por espécie nova), nível, ranking geral |
+| Pontuações e resultados | XP por captura (10/25/60/150 + 50 por espécie nova), nível, ranking geral, saldo de Brejais |
 | Histórico das partidas | No servidor, cada partida fica registrada com jogador, dia, pererecas, distância e quantos aparelhos jogaram nela (visível no painel `/admin`). No app, o **Diário de campo** mostra as últimas capturas e o Perfil mostra a caçada de hoje |
 
 | Tela | |
@@ -49,7 +53,7 @@ flowchart LR
   subgraph Nuvem["Servidor (Node.js)"]
     API["API REST/JSON<br/>/api/auth · /api/sync · /api/brejos · /api/ranking"]
     APPLY["Aplicação idempotente<br/>+ resolução de conflitos"]
-    DB[("PostgreSQL ou SQLite<br/>players · captures · expeditions<br/>operations · conflicts · brejos")]
+    DB[("PostgreSQL ou SQLite<br/>players · captures · expeditions · jobs<br/>purchases · operations · conflicts · brejos")]
     API --> APPLY --> DB
   end
   SYNC <-->|"HTTPS · POST /api/sync"| API
@@ -137,7 +141,9 @@ sequenceDiagram
   end
 ```
 
-**Tipos de operação:** `capture`, `favorite`, `expedition.start`, `expedition.progress`, `expedition.end`, `friend.add`, `profile.avatar`, `profile.look` (as operações `expedition.*` atualizam a caçada do dia).
+**Tipos de operação:** `capture`, `favorite`, `expedition.start`, `expedition.progress`, `expedition.end`, `friend.add`, `profile.avatar`, `profile.look`, `job.done` (trabalho concluído), `shop.buy` (compra na loja) e `vehicle.select` (carro escolhido). As operações `expedition.*` atualizam a caçada do dia.
+
+**Saldo derivado, não armazenado:** assim como o XP, o saldo de Brejais não é um número guardado que se incrementa. Ele é calculado como *soma dos pagamentos dos trabalhos − soma dos preços das compras* (`balanceOf` em `game.js`, usado pelo cliente e pelo servidor). Reenviar um trabalho ou uma compra não muda o saldo, porque cada um é uma linha com chave única.
 
 **Quando sincroniza (automático, sem reiniciar a partida):**
 - logo após cada nova operação;
@@ -169,6 +175,9 @@ O caso típico do enunciado: o mesmo jogador, em dois aparelhos offline, mexe na
 | **Favorito, avatar, boneco** | Alterados nos dois aparelhos | **Last-Writer-Wins** pelo horário corrigido da alteração | Preferências simples, sem valor de jogo; vale a decisão mais recente do jogador. |
 | **Amizade** | Adicionada nos dois aparelhos | Idempotente (chave única do par, mútua) | Adicionar duas vezes é o mesmo que adicionar uma. |
 | **Presente do QR** | Escaneado de novo no mesmo dia / em outro aparelho | O id do encontro inclui o dia (`gift:jogador:amigo:dia`), então vale a regra da captura: só o primeiro conta | Limita a um presente por amigo por dia mesmo offline. |
+| **Trabalho** | O mesmo morador ajudado nos dois aparelhos | **Paga uma vez só:** chave única `(jogador, trabalho)`; o segundo recebe `conflict` e não ganha nada | Como na captura, o morador é um encontro único da janela de 15 min. |
+| **Compra** | Os dois aparelhos, offline, gastam o mesmo dinheiro (cada um vê saldo suficiente) | **O servidor confere o saldo na hora em que a compra chega.** A primeira que chega é aplicada; a segunda é recusada (`rejected`, "saldo insuficiente no servidor") e o dinheiro não é descontado. Comprar o mesmo carro nos dois aparelhos dá `conflict` e cobra uma vez só | Dinheiro não pode ficar negativo nem ser gasto duas vezes. Aqui a ordem de chegada importa de propósito: é a mesma regra de um banco (a primeira transação que chega usa o saldo). O aparelho que perdeu recebe o aviso e o saldo volta a ser o do servidor. |
+| **Carro em uso** | Escolhido nos dois aparelhos | **Last-Writer-Wins**, e só vale um carro que o jogador tem | Preferência simples, como o boneco. |
 
 Como o XP é derivado das capturas, ele converge sozinho depois que as capturas convergem.
 
@@ -176,7 +185,7 @@ Como o XP é derivado das capturas, ele converge sozinho depois que as capturas 
 
 ### Presença: um dado que não precisa de sincronização
 
-A posição dos outros jogadores segue uma regra diferente do resto do jogo. Capturas, favoritos, boneco e distância são **dados duráveis**: entram na fila offline, têm id único e não podem se perder nem duplicar. Já a posição de agora é um **dado passageiro (soft state)**: vale só por alguns segundos e uma posição velha não serve para nada. Por isso ela não entra no IndexedDB nem na fila: o celular envia a posição a cada 4 s quando está online, o servidor guarda só na memória, com validade de 45 s, e responde com quem está por perto. Sem internet, os outros jogadores simplesmente somem do mapa, e o resto do jogo continua normalmente.
+A posição dos outros jogadores segue uma regra diferente do resto do jogo. Capturas, favoritos, boneco e distância são **dados duráveis**: entram na fila offline, têm id único e não podem se perder nem duplicar. Já a posição de agora é um **dado passageiro (soft state)**: vale só por alguns segundos e uma posição velha não serve para nada. Por isso ela não entra no IndexedDB nem na fila: o celular envia a posição a cada 4 s quando está online, o servidor guarda só na memória, com validade de 45 s, e responde com quem está por perto. Sem internet, os outros jogadores simplesmente somem do mapa, e o resto do jogo continua normalmente. No modo Controle, a presença também leva o carro em uso (o servidor só repassa um carro que existe), para os outros verem o jogador dirigindo.
 
 ## 7. Tratamento de falhas de comunicação
 
@@ -205,7 +214,8 @@ O jogo muda conforme o ambiente físico do jogador:
 | **Proximidade entre jogadores** | Câmera + QR code | Cada jogador tem um QR no perfil. Escanear o de outra pessoa exige estar perto dela: cria a amizade e libera uma perereca-presente. O QR carrega os dados necessários, então funciona até offline. |
 | **Contexto temporal** | Relógio corrigido pelo servidor | As pererecas de cada brejo mudam a cada 15 min; os presentes são diários. |
 | **Dia e noite** | Posição + hora (cálculo da altura do sol, sem internet) | O mapa e o minijogo mudam de aparência: de dia, cores normais; à noite, mapa azulado, luz em volta do boneco, vaga-lumes, lua e estrelas. |
-| **Forma de se deslocar** | GPS real ou joystick (modo controle) | Andar de verdade mostra todas as pererecas; no modo controle aparecem menos raras. |
+| **Forma de se deslocar** | GPS real ou joystick (modo controle) | Andar de verdade mostra todas as pererecas e paga 50 % a mais nos trabalhos; no modo controle aparecem menos raras. A entrega do carteiro exige ir até outro ponto do mapa dentro do prazo. |
+| **Velocidade** | Velocidade calculada pelo GPS | Por segurança, o carro do jogo só anda no modo Controle. No GPS, se o jogador passar de ~25 km/h por 5 s (está num ônibus ou carro de verdade), capturas e trabalhos ficam pausados com um aviso. |
 | **Presença de outros jogadores** | Posição dos jogadores com o jogo aberto | Quem está a até 300 m aparece no mapa, com boneco e nome; os bonecos se afastam para não se amontoar. |
 | **Retorno físico** | Vibração e som (Web Audio) | Vibra a cada toque certeiro, ao capturar e ao chacoalhar; sons sintetizados na hora (bolhas, folhas, respingos), sem arquivos de áudio. |
 
@@ -219,11 +229,13 @@ O jogo muda conforme o ambiente físico do jogador:
 - Lagoinhas e pererecas são recalculadas com a semente **do jogador autenticado**: um jogador não consegue capturar uma perereca que pertence a outro. No modo controle, perereca "só de GPS" é recusada.
 - Presença: a posição recebida é arredondada para ~5 m antes de ser mostrada aos outros, só vai para quem está a até 300 m e some sozinha após 45 s sem notícias. O jogador pode se esconder no Perfil.
 - Presentes do QR: confere que o amigo existe, que não é o próprio jogador e que a espécie bate com o cálculo determinístico.
+- Trabalhos: o servidor recalcula o morador a partir do id (tipo, lugar e janela de 15 min), confere o horário, a distância até o morador (ou até o ponto de entrega, no caso do carteiro) e que ele ainda não foi ajudado. O pagamento gravado é o calculado pelo servidor (`jobPay`), não o enviado pelo aparelho.
+- Loja: o preço vem do catálogo do servidor; a compra só é aplicada se o saldo do servidor cobrir o preço. O carro só pode ser escolhido se o jogador tiver comprado.
 - Senhas com scrypt; tokens com HMAC-SHA256; limite de tentativas de login por IP; rotas de administração protegidas por chave.
 
 ## 10. Testes automatizados
 
-`npm test` roda 19 testes (`test/sync.test.js`) com o servidor real e banco em memória:
+`npm test` roda 22 testes (`test/sync.test.js`) com o servidor real e banco em memória:
 
 1. cadastro, login e acesso sem token;
 2. servidor e cliente calculam as mesmas pererecas;
@@ -242,15 +254,19 @@ O jogo muda conforme o ambiente físico do jogador:
 15. brejo cadastrado à mão esconde a lagoinha automática que está em cima dele (e o servidor recusa capturas nela);
 16. cada jogador tem lagoinhas e pererecas próprias, e um não consegue capturar a perereca do outro;
 17. modo controle: perereca "só de GPS" é recusada, e a mesma perereca no modo GPS é aceita;
-18. presença: jogadores perto se veem, longe não, quem se esconde some e a presença expira sozinha.
+18. presença: jogadores perto se veem, longe não, quem se esconde some e a presença expira sozinha;
+19. trabalho paga uma vez só, no lugar e na hora certos, e no GPS paga mais;
+20. entrega só conta chegando ao ponto de entrega;
+21. loja: compra sem saldo é recusada, carro repetido não cobra duas vezes, dois aparelhos não gastam o mesmo dinheiro e não dá para usar um carro que não foi comprado.
 
-Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor) também foram exercitados num navegador Chrome automatizado.
+Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro e outro jogador vendo o carro) também foram exercitados num navegador Chrome automatizado.
 
 ## 11. Limitações conhecidas
 
 - As lagoinhas automáticas podem cair em cima de um prédio, de uma rua ou de uma área cercada, porque o jogo não conhece o desenho do lugar; com o alcance de 10 m e a folga de GPS, normalmente dá para capturar da calçada. Quando isso atrapalhar, dá para cadastrar um brejo à mão no lugar certo (ele esconde a automática que estiver em cima). O servidor recusa um brejo cadastrado em cima ou colado em outro (folga mínima de 15 m entre as bordas).
 - As artes atuais do boneco, das lagoinhas e dos matinhos são provisórias (ver `docs/ARTES.md`).
 - O modo de andar (GPS ou controle) é informado pelo próprio celular; um celular adulterado poderia mentir o modo, assim como poderia falsificar o GPS. Para um jogo acadêmico, a validação de distância, horário e espécie no servidor é suficiente.
+- O servidor confere onde e quando o trabalho foi feito, mas não tem como saber se o minijogo foi realmente jogado (ele roda só no celular). Como cada morador paga uma vez só e eles são poucos por região, o ganho de uma trapaça é pequeno.
 - A presença fica só na memória do servidor: se o servidor reiniciar, os jogadores somem do mapa por alguns segundos, até o próximo envio (a cada 4 s).
 - O mapa offline mostra apenas a região já vista ou baixada antecipadamente ao redor dos brejos; fora disso aparece o gramado do jogo.
 - No iPhone, o sensor de movimento só pode ser liberado após um toque do usuário (o app pede na primeira abertura).

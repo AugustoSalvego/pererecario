@@ -3,7 +3,7 @@
 //  - tiles do mapa e fontes guardados conforme são usados (cache-first);
 //  - chamadas /api/* NUNCA passam pelo cache: o próprio app trata o offline
 //    com IndexedDB e fila de sincronização.
-const VERSION = 'pererecario-v1.16.1';
+const VERSION = 'pererecario-v1.17.0';
 const SHELL = `${VERSION}-shell`;
 const TILES = 'pererecario-tiles';
 const FONTS = 'pererecario-fonts';
@@ -15,7 +15,7 @@ const ASSETS = [
   'js/shared/game.js',
   'js/ui/common.js', 'js/ui/icons.js', 'js/ui/login.js', 'js/ui/game.js', 'js/ui/map.js', 'js/ui/capture.js',
   'js/ui/album.js', 'js/ui/pond.js', 'js/ui/friends.js', 'js/ui/profile.js', 'js/ui/demo.js',
-  'js/ui/sprites.js', 'js/ui/tutorial.js', 'js/ui/joystick.js', 'js/ui/others.js', 'js/ui/daynight.js', 'js/ui/wardrobe.js', 'js/presence.js',
+  'js/ui/sprites.js', 'js/ui/tutorial.js', 'js/ui/joystick.js', 'js/ui/others.js', 'js/ui/daynight.js', 'js/ui/wardrobe.js', 'js/ui/jobs.js', 'js/ui/jobdata.js', 'js/ui/shop.js', 'js/presence.js',
   'assets/species.json', 'assets/frogs_atlas.png',
   'assets/icons/icon-64.png', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/apple-touch-icon.png',
   'vendor/qrcode.js', 'vendor/jsQR.js',
@@ -36,6 +36,15 @@ for (const m of ['froghood', 'explorer', 'dartfrog', 'raincoat', 'scientist', 'f
   'lantern', 'mage', 'royal', 'ninja', 'samurai', 'knight', 'pirate', 'magical', 'pilot']) {
   for (const g of ['masculino', 'feminino']) for (const t of ['clara', 'media', 'escura']) ASSETS.push(`assets/sprites/char-${m}-${g}-${t}.png`);
 }
+
+// carros, NPCs e cenários dos trabalhos
+for (const c of ['hatch', 'sedan', 'pickup', 'jeep', 'super']) ASSETS.push(`assets/sprites/car-${c}.png`);
+for (const n of ['pedreiro', 'mecanico', 'agricultor', 'carteiro']) {
+  for (const g of ['masculino', 'feminino']) for (const t of ['clara', 'media', 'escura']) ASSETS.push(`assets/sprites/npc-${n}-${g}-${t}.png`);
+}
+for (const j of ['casa', 'carro', 'horta']) for (let i = 1; i <= 4; i++) ASSETS.push(`assets/sprites/job-${j}-${i}.png`);
+for (const j of ['casa', 'carro', 'horta', 'entrega']) ASSETS.push(`assets/sprites/bubble-job-${j}.png`);
+for (const a of ['vaga', 'tijolo', 'prego', 'reboco', 'tinta', 'parafuso', 'lama', 'bolha', 'mato', 'seca', 'molhada', 'tomate', 'caixa']) ASSETS.push(`assets/sprites/job-alvo-${a}.png`);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

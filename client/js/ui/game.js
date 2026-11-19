@@ -11,6 +11,8 @@ import { mountJoystick } from './joystick.js';
 import { mountOthers } from './others.js';
 import { skyPhase } from './daynight.js';
 import { presence } from '../presence.js';
+import { openJobTalk, runJobGame, startDelivery, deliveryState, cancelDelivery, finishDelivery, npcSprite } from './jobs.js';
+import { openShop, carSprite, faceBubble } from './shop.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
 import { $, $$, esc, toast, openSheet, closeSheet, fmtDist } from './common.js';
@@ -23,7 +25,7 @@ import { api } from '../api.js';
 import { sfx, vibrate, unlockAudio } from '../audio.js';
 import {
   spawnsFor, windowOf, windowEnd, distanceM, hash32, captureRange, REVEAL_RANGE_M, brejosNear, findBrejo, visibleInMode,
-  FROG_VIEW_M, POND_VIEW_M,
+  FROG_VIEW_M, POND_VIEW_M, jobsNear, JOB_VIEW_M, JOB_RANGE_M, DELIVERY_RANGE_M, carById,
 } from '../shared/game.js';
 
 // ponto de referência para o raio de visão: o jogador (ou o centro do mapa, sem GPS)
@@ -53,13 +55,14 @@ export function startGame({ firstTime = false } = {}) {
     <div class="map-host"></div>
     <div class="hud-top">
       <div class="left-col"><div class="lc-row"><button class="player-chip" data-nav="profile" aria-label="Perfil"><div class="avatar-wrap"><div class="avatar"></div><span class="lvl"></span></div><div class="who"><div class="name"></div><div class="xpbar"><i></i></div></div></button><button class="sky-badge" aria-label="Dia ou noite"></button></div><div class="nearby-chip hidden"></div></div>
-      <div class="status-col"><button class="status-pill" aria-label="Estado da conexão"></button><button class="mode-btn" aria-label="Modo de andar"></button><div class="gps-chip"></div></div>
+      <div class="status-col"><button class="status-pill" aria-label="Estado da conexão"></button><button class="mode-btn" aria-label="Modo de andar"></button><button class="money-pill" aria-label="Saldo e loja"></button><div class="gps-chip"></div></div>
     </div>
     <div class="hint-bubble hidden"></div>
     <button class="compass hidden" aria-label="Lagoinha mais próxima"><span class="arrow">➤</span><span class="txt"></span></button>
     <button class="hud-expedition" data-nav="profile"></button>
     <div class="joystick hidden"></div>
     <div class="hud-right">
+      <button class="icon-btn shop-btn" aria-label="Loja">${icons.bag}</button>
       <button class="icon-btn shake-btn hidden" aria-label="Chacoalhar">${icons.shake}</button>
       <button class="icon-btn recenter hidden" aria-label="Centralizar">${icons.locate}</button>
     </div>
@@ -111,11 +114,15 @@ export function startGame({ firstTime = false } = {}) {
   $('.recenter', root).addEventListener('click', recenter);
   $('.status-pill', root).addEventListener('click', statusSheet);
   $('.compass', root).addEventListener('click', () => {
+    const dl = deliveryState();
+    if (dl) { map.follow = false; $('.recenter', root).classList.remove('hidden'); map.setCenter(dl.job.dest.lat, dl.job.dest.lng, true); return; }
     const b = findBrejo($('.compass', root).dataset.target, store.brejos, seed());
     if (b) { map.follow = false; $('.recenter', root).classList.remove('hidden'); map.setCenter(b.lat, b.lng, true); }
   });
   $('.shake-btn', root).addEventListener('click', () => doShake());
   $('.mode-btn', root).addEventListener('click', toggleMode);
+  $('.money-pill', root).addEventListener('click', () => { sfx.tap(); openShop(); });
+  $('.shop-btn', root).addEventListener('click', () => { sfx.tap(); openShop(); });
   $('.sky-badge', root).addEventListener('click', () => {
     sfx.tap();
     toast(skyNow === 'night' ? '🌙 É noite aqui: o mapa fica azulado e os vaga-lumes aparecem.' : '☀️ É dia aqui. Quando o sol se pôr, o mapa vira noite.', '', null, 2600);
@@ -139,15 +146,21 @@ export function startGame({ firstTime = false } = {}) {
   sync.addEventListener('synced', () => { if (current === 'profile') renderSyncCard(screens.profile); });
   sync.addEventListener('conflict', (e) => {
     const { op, result } = e.detail;
+    if (op.type === 'job.done') return toast('Esse trabalho já tinha sido pago em outro aparelho: não paga duas vezes.', 'conflict', 'sync', 5000);
+    if (op.type === 'shop.buy') return toast('Esse carro já tinha sido comprado em outro aparelho: não foi cobrado de novo.', 'conflict', 'sync', 5000);
     const name = species(op.payload.speciesId)?.name || 'perereca';
     if (result.status === 'conflict') toast(`Conflito resolvido: a ${esc(name)} já tinha sido capturada antes no aparelho ${esc(result.conflict.kept.deviceId)}. Ficou a primeira captura.`, 'conflict', 'sync', 6000);
     else toast(`Conflito resolvido: sua captura da ${esc(name)} foi a primeira e substituiu a do outro aparelho.`, 'conflict', 'sync', 6000);
   });
-  sync.addEventListener('rejected', (e) => toast(`O servidor recusou uma operação: ${esc(e.detail.result.error)}`, 'warn', 'cloudOff', 5000));
+  sync.addEventListener('rejected', (e) => {
+    const { op, result } = e.detail;
+    if (op.type === 'shop.buy') return toast(`Compra desfeita: ${esc(result.error)}. Seu dinheiro não saiu.`, 'warn', 'cloudOff', 6000);
+    toast(`O servidor recusou uma operação: ${esc(result.error)}`, 'warn', 'cloudOff', 5000);
+  });
   sync.addEventListener('auth-expired', async () => { toast('Sessão expirada. Entre novamente.', 'warn'); await store.logout(); setTimeout(() => location.reload(), 1500); });
   geo.addEventListener('change', onGeo);
   geo.addEventListener('error', () => renderHint());
-  geo.addEventListener('mode', () => { renderGpsChip(); renderHint(); refreshObjects(); });
+  geo.addEventListener('mode', () => { renderGpsChip(); renderHint(); renderHud(); refreshObjects(); drawPlayer(true); });
   sensors.addEventListener('shake', () => doShake());
 
   setInterval(tick, 1000);
@@ -186,6 +199,9 @@ function renderAll() {
 function renderHud() {
   const v = store.view;
   if (!v.player) return;
+  $('.money-pill').innerHTML = `<span class="bcoin">B$</span> ${v.balance}`;
+  const car = geo.mode === 'sim' ? carById(v.vehicle) : null;
+  geo.joySpeed = car ? car.speed : 3.5;
   const look = lookOf(v.player);
   const av = $('.player-chip .avatar');
   if (av.dataset.look !== look) { av.innerHTML = headHtml(look, 2); av.dataset.look = look; }
@@ -285,10 +301,13 @@ function renderExpedition() {
   el.innerHTML = `<div><b>🐸 ${cur?.captures.length || 0}</b>hoje</div><div class="sep"></div><div><b>${fmtDist(cur?.meters || 0)}</b>andados</div>`;
 }
 
+// o Jipe abre matinhos de mais longe (só no modo controle, que é onde o carro anda)
+const revealRange = () => (geo.mode === 'sim' && store.view.vehicle === 'jeep' ? 30 : REVEAL_RANGE_M);
+
 function hiddenNearby() {
   const pos = geo.pos;
   if (!pos) return [];
-  return visibleSpawns().filter((s) => isHidden(s) && distanceM(pos, s) <= REVEAL_RANGE_M);
+  return visibleSpawns().filter((s) => isHidden(s) && distanceM(pos, s) <= revealRange());
 }
 
 function renderHint() {
@@ -301,6 +320,7 @@ function renderHint() {
   else if (geo.mode === 'real' && geo.error === 'unsupported') msg = 'Este aparelho não informa a localização.';
   else if (!pos) msg = '📡 Procurando sinal de GPS…';
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
+  else if (driving) msg = '🚗 Parece que você está num veículo. Por segurança, capturas e trabalhos ficam pausados.';
   else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
   el.innerHTML = msg;
   renderCompass();
@@ -366,7 +386,28 @@ function refreshObjects() {
     }
     map.setObject(key, { lat: s.lat, lng: s.lng, html, className: cls, data: s });
   }
-  for (const k of map.objectKeys()) if ((k.startsWith('frog:') || k.startsWith('pond:')) && !keep.has(k)) map.removeObject(k);
+  // NPCs de trabalho (some quem já foi ajudado nesta janela)
+  const win = windowOf(store.now());
+  if (vp) {
+    for (const job of jobsNear(vp, JOB_VIEW_M, win, seed())) {
+      if (store.view.jobsDone.has(job.id)) continue;
+      const key = `job:${job.id}`;
+      keep.add(key);
+      const near = pos && distanceM(pos, job) <= JOB_RANGE_M;
+      map.setObject(key, {
+        lat: job.lat, lng: job.lng, className: `mnpc ${near ? 'near' : ''}`, data: job,
+        html: `<div class="npc-wrap">${img(`bubble-job-${job.type}.png`, 30, 'npc-bubble')}${npcSprite(job, 2.3)}<div class="pshadow"></div></div>`,
+      });
+    }
+  }
+  const dl = deliveryState();
+  if (dl) {
+    keep.add('dest');
+    map.setObject('dest', { lat: dl.job.dest.lat, lng: dl.job.dest.lng, className: 'mdest', data: dl,
+      html: `<div class="dest-pin">${img('bubble-job-entrega.png', 34)}</div>` });
+    map.setFeature('dest-ring', { lat: dl.job.dest.lat, lng: dl.job.dest.lng, radiusM: DELIVERY_RANGE_M, className: 'dest-ring' });
+  } else map.removeFeature('dest-ring');
+  for (const k of map.objectKeys()) if ((k.startsWith('frog:') || k.startsWith('pond:') || k.startsWith('job:') || k === 'dest') && !keep.has(k)) map.removeObject(k);
 
   if (pos) {
     drawPlayer();
@@ -380,11 +421,16 @@ function drawPlayer(force = false) {
   const pos = geo.pos;
   if (!pos || !map) return;
   const look = lookOf(store.view.player);
-  const sig = `${look}|${playerDir}|${walking}`;
+  const car = geo.mode === 'sim' ? store.view.vehicle : null;   // carro só no modo controle
+  const sig = `${look}|${playerDir}|${walking}|${car}`;
   const o = map.objects.get('player');
   map.setObject('player', {
-    lat: pos.lat, lng: pos.lng, className: 'mplayer', depthScale: false, top: true,
-    html: (!o || o.sig !== sig || force) ? `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}</div>` : null,
+    lat: pos.lat, lng: pos.lng, className: `mplayer ${car ? 'incar' : ''}`, depthScale: false, top: true,
+    html: (!o || o.sig !== sig || force)
+      ? (car
+        ? `<div class="cwrap">${faceBubble(look)}${carSprite(car, { dir: playerDir, moving: walking })}</div>`
+        : `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}</div>`)
+      : null,
   });
   map.objects.get('player').sig = sig;
 }
@@ -412,9 +458,11 @@ function onGeo() {
     const jump = distanceM(map.center, pos) > 40;
     map.setCenter(pos.lat, pos.lng, jump);
   }
+  checkSpeed();
   refreshObjects();
   renderHint();
   prefetchTiles();
+  checkDelivery();
   renderExpedition();
 }
 
@@ -423,6 +471,17 @@ function renderCompass() {
   const el = $('.compass');
   if (!el) return;
   const pos = geo.pos;
+  const dl = deliveryState();
+  if (dl && pos && current === 'map') {
+    const left = Math.max(0, dl.deadline - store.now());
+    el.classList.remove('hidden');
+    el.classList.add('delivery');
+    $('.arrow', el).style.transform = `rotate(${bearing(pos, dl.job.dest) - 90}deg)`;
+    $('.txt', el).textContent = `📦 ${dl.job.dest.name} · ${fmtDist(distanceM(pos, dl.job.dest))} · ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`;
+    el.dataset.target = '';
+    return;
+  }
+  el.classList.remove('delivery');
   const nearest = pos ? brejosShown().map((b) => ({ b, d: distanceM(pos, b) })).sort((a, b) => a.d - b.d)[0] : null;
   const show = nearest && nearest.d - nearest.b.radius > 25 && current === 'map';
   el.classList.toggle('hidden', !show);
@@ -442,6 +501,7 @@ function recenter() {
 let ticks = 0;
 function tick() {
   if (++ticks % 30 === 0) applySky();
+  if (deliveryState()) { renderCompass(); checkDelivery(); }
   const w = windowOf(store.now());
   if (w !== lastWin) {
     if (lastWin != null) toast('🐸 Novas pererecas chegaram às lagoinhas!', 'ok', null, 2500);
@@ -454,17 +514,20 @@ function tick() {
 function onTapObject(key, data) {
   unlockAudio();
   if (key.startsWith('pond:')) return brejoSheet(data);
+  if (key.startsWith('job:')) return tapJob(data);
+  if (key === 'dest') return toast(`📦 Ponto de entrega: ${esc(data.job.dest.name)}. Chegue a ${DELIVERY_RANGE_M} m dele.`, '', null, 2500);
   if (key.startsWith('other:')) {
     sfx.pop();
     return toast(`${data.mode === 'controle' ? '🎮' : '📍'} ${esc(data.name)} está caçando por perto! Para virarem amigos, troquem o QR code em Amigos.`, '', 'friends', 4000);
   }
   if (!key.startsWith('frog:')) return;
+  if (driving) { sfx.error(); return toast('🚗 Por segurança, capturas ficam pausadas enquanto você está num veículo.', 'warn', null, 3000); }
   const s = data;
   const pos = geo.pos;
   const d = pos ? distanceM(pos, s) : Infinity;
   if (isHidden(s)) {
     if (revealing.has(s.id)) return;
-    if (d > REVEAL_RANGE_M) { sfx.tap(); return toast(`Algo se mexe no matinho… Chegue mais perto (faltam ${fmtDist(Math.ceil(d - REVEAL_RANGE_M))}).`, '', 'walk'); }
+    if (d > revealRange()) { sfx.tap(); return toast(`Algo se mexe no matinho… Chegue mais perto (faltam ${fmtDist(Math.ceil(d - revealRange()))}).`, '', 'walk'); }
     sfx.rustle();
     vibrate(40);
     return revealFrom([s]);
@@ -476,6 +539,44 @@ function onTapObject(key, data) {
   }
   sfx.pop();
   startCapture(s);
+}
+
+// ---------- trabalhos ----------
+function tapJob(job) {
+  const pos = geo.pos;
+  const d = pos ? distanceM(pos, job) : Infinity;
+  if (driving) { sfx.error(); return toast('🚗 Por segurança, trabalhos ficam pausados enquanto você está num veículo.', 'warn', null, 3000); }
+  if (deliveryState()) { sfx.tap(); return toast('Termine a entrega que você está fazendo primeiro.', '', null, 2500); }
+  if (d > JOB_RANGE_M) { sfx.tap(); return toast(`Chegue mais perto para conversar (faltam ${fmtDist(Math.ceil(d - JOB_RANGE_M))}).`, '', 'walk', 2500); }
+  sfx.pop();
+  openJobTalk(job, {
+    onAccept: ({ mode, pay }) => {
+      if (job.type === 'entrega') { startDelivery(job, { mode, pay }); refreshObjects(); renderCompass(); return; }
+      runJobGame(job, { mode, pay, onClose: () => { refreshObjects(); renderAll(); } });
+    },
+  });
+}
+
+let delivering = false;
+function checkDelivery() {
+  const d = deliveryState();
+  if (!d || delivering) return;
+  if (store.now() > d.deadline + 15000) { cancelDelivery('⏰ O tempo da entrega acabou. Fica para a próxima!'); refreshObjects(); return; }
+  const pos = geo.pos;
+  if (pos && distanceM(pos, d.job.dest) <= DELIVERY_RANGE_M) {
+    delivering = true;
+    finishDelivery(d, () => { delivering = false; refreshObjects(); renderAll(); });
+  }
+}
+
+// Segurança: no modo GPS, se o celular estiver rápido demais (num carro, ônibus…), pausa capturas e trabalhos.
+let driving = false, fastSince = 0, slowSince = 0;
+function checkSpeed() {
+  const pos = geo.pos;
+  if (geo.mode !== 'real' || !pos || pos.speed == null) { if (driving) { driving = false; renderHint(); } return; }
+  const t = Date.now();
+  if (pos.speed > 7) { slowSince = 0; fastSince ||= t; if (!driving && t - fastSince > 5000) { driving = true; renderHint(); } }
+  else { fastSince = 0; slowSince ||= t; if (driving && pos.speed < 3 && t - slowSince > 10000) { driving = false; renderHint(); } }
 }
 
 function startCapture(spawn) {
@@ -492,7 +593,7 @@ function doShake() {
   setTimeout(() => sfx.ribbit(), 250);
   vibrate([60, 40, 60]);
   if (!pos) return toast('Sem posição ainda: espere o GPS.', 'warn');
-  map.setFeature('wave', { lat: pos.lat, lng: pos.lng, radiusM: REVEAL_RANGE_M, className: 'shake-wave' });
+  map.setFeature('wave', { lat: pos.lat, lng: pos.lng, radiusM: revealRange(), className: 'shake-wave' });
   setTimeout(() => map.removeFeature('wave'), 1400);
   const close = hiddenNearby().filter((s) => !revealing.has(s.id));
   if (close.length) {

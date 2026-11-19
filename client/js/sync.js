@@ -132,7 +132,9 @@ class Sync extends EventTarget {
     store.log('ok', `Servidor confirmou: ${parts.join(', ')}`);
     for (const { op, result } of events) {
       if (result.conflict) {
-        store.log('conflict', `Conflito na perereca ${op.payload.spawnId}: ficou a captura do aparelho ${result.conflict.kept.deviceId} (a mais antiga)`);
+        const what = op.type === 'capture' ? `Conflito na perereca ${op.payload.spawnId}: ficou a captura do aparelho ${result.conflict.kept.deviceId} (a mais antiga)`
+          : `Conflito em ${op.type}: ${result.conflict.policy || 'mantido o que chegou primeiro'} (aparelho ${result.conflict.kept.deviceId})`;
+        store.log('conflict', what);
         this.emit('conflict', { op, result });
       }
       if (result.status === 'rejected') {

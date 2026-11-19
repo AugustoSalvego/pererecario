@@ -7,12 +7,12 @@
 import * as db from './db.js';
 import { api } from './api.js';
 import { getCatalog } from './catalog.js';
-import { xpBreakdown, levelFor, windowOf, dayOf, dayExpeditionId } from './shared/game.js';
+import { xpBreakdown, levelFor, windowOf, dayOf, dayExpeditionId, balanceOf, carById } from './shared/game.js';
 
 export const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
   : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
 
-const EMPTY = { player: null, captures: [], expeditions: [], friends: [] };
+const EMPTY = { player: null, captures: [], expeditions: [], friends: [], jobs: [], purchases: [] };
 const PROGRESS_EVERY_MS = 60 * 1000;
 
 class Store extends EventTarget {
@@ -159,6 +159,8 @@ class Store extends EventTarget {
     const captures = new Map((s.captures || []).map((c) => [c.spawnId, { ...c, pending: false }]));
     const exps = new Map((s.expeditions || []).map((e) => [e.id, { ...e, distance: { ...e.distance } }]));
     const friends = new Map((s.friends || []).map((f) => [f.id, { ...f }]));
+    const jobs = new Map((s.jobs || []).map((j) => [j.jobId, { ...j, pending: false }]));
+    const purchases = new Map((s.purchases || []).map((b) => [b.item, { ...b, pending: false }]));
     const player = s.player ? { ...s.player } : this.session?.player ? { ...this.session.player } : null;
     const me = this.deviceId;
     const ensureExp = (id, at) => {
@@ -208,6 +210,19 @@ class Store extends EventTarget {
         case 'profile.avatar':
           if (player && p.ts > (player.avatarTs || 0)) { player.avatar = p.speciesId; player.avatarTs = p.ts; }
           break;
+        case 'job.done':
+          if (!jobs.has(p.jobId)) jobs.set(p.jobId, { id: p.doneId, jobId: p.jobId, type: p.type, pay: p.pay, mode: p.mode, doneAt: p.doneAt, deviceId: me, pending: true });
+          break;
+        case 'shop.buy': {
+          // compra otimista: só entra se o saldo local cobrir (o servidor confere de novo)
+          const car = carById(p.item);
+          const bal = balanceOf([...jobs.values()], [...purchases.values()]);
+          if (car && !purchases.has(car.id) && bal >= car.price) purchases.set(car.id, { id: p.buyId, item: car.id, price: car.price, boughtAt: p.boughtAt, deviceId: me, pending: true });
+          break;
+        }
+        case 'vehicle.select':
+          if (player && p.ts > (player.vehicleTs || 0) && (p.vehicle == null || purchases.has(p.vehicle))) { player.vehicle = p.vehicle; player.vehicleTs = p.ts; }
+          break;
         default: break;
       }
     }
@@ -249,6 +264,12 @@ class Store extends EventTarget {
       friends: [...friends.values()],
       pending: this.outbox.length,
       totalMeters: expList.reduce((a, e) => a + e.meters, 0),
+      jobs: [...jobs.values()].sort((a, b) => b.doneAt - a.doneAt),
+      jobsDone: new Set(jobs.keys()),
+      purchases: [...purchases.values()],
+      cars: new Set(purchases.keys()),
+      balance: balanceOf([...jobs.values()], [...purchases.values()]),
+      vehicle: player?.vehicle && purchases.has(player.vehicle) ? player.vehicle : null,
     };
     this.emit('change', this.view);
   }
@@ -320,6 +341,20 @@ class Store extends EventTarget {
 
   async setLook(look) {
     await this.addOp('profile.look', { look, ts: this.now() });
+  }
+
+  // ---------- trabalhos e loja ----------
+  async jobDone(job, pos, mode, pay) {
+    const doneAt = this.now();
+    await this.addOp('job.done', { doneId: uuid(), jobId: job.id, type: job.type, pay, mode, doneAt, lat: pos.lat, lng: pos.lng });
+  }
+
+  async buy(carId) {
+    await this.addOp('shop.buy', { buyId: uuid(), item: carId, boughtAt: this.now() });
+  }
+
+  async selectVehicle(carId) {
+    await this.addOp('vehicle.select', { vehicle: carId || null, ts: this.now() });
   }
 
   async setAvatar(speciesId) {

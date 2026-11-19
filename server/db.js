@@ -86,6 +86,28 @@ export const SCHEMA = [
     resolved_at BIGINT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL,
+    job_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    pay INTEGER NOT NULL,
+    mode TEXT NOT NULL,
+    done_at BIGINT NOT NULL,
+    device_id TEXT NOT NULL,
+    received_at BIGINT NOT NULL,
+    UNIQUE (player_id, job_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS purchases (
+    id TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL,
+    item TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    bought_at BIGINT NOT NULL,
+    device_id TEXT NOT NULL,
+    received_at BIGINT NOT NULL,
+    UNIQUE (player_id, item)
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_captures_player ON captures (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expeditions_player ON expeditions (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_operations_received ON operations (received_at)`,
@@ -174,6 +196,8 @@ const MIGRATIONS = [
   "ALTER TABLE players ADD COLUMN look TEXT NOT NULL DEFAULT 'froghood-masculino-clara'",
   'ALTER TABLE players ADD COLUMN look_ts BIGINT NOT NULL DEFAULT 0',
   "ALTER TABLE captures ADD COLUMN mode TEXT NOT NULL DEFAULT 'gps'",
+  'ALTER TABLE players ADD COLUMN vehicle TEXT',
+  'ALTER TABLE players ADD COLUMN vehicle_ts BIGINT NOT NULL DEFAULT 0',
 ];
 
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {

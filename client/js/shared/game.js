@@ -25,6 +25,15 @@ export const BALANCO = {
   // só aparece esta fração de cada raridade: 1 = todas, 0,35 = cerca de 1 em cada 3.
   noModoControle: { common: 1, uncommon: 0.8, rare: 0.35, special: 0.15 },
 
+  // --- trabalhos (NPCs que pagam em Brejais, B$) ---
+  trabalhoACadaM: 180,       // um NPC a cada ~180 m (sorteado de novo a cada janela de 15 min)
+  chanceDeTrabalho: 0.65,    // chance de cada ponto da grade ter um NPC naquela janela
+  pagamento: { casa: 35, carro: 30, horta: 25, entrega: 40 },
+  veTrabalhosAteM: 160,      // NPCs aparecem no mapa a até 160 m (para dar tempo de ir até eles)
+  bonusNoGps: 1.5,           // no modo GPS o trabalho paga 1,5x
+  entregaDistM: [140, 260],  // a entrega é numa lagoinha a esta distância do carteiro
+  entregaMin: 5,             // minutos para entregar
+
   // --- distâncias do jogador ---
   capturaAteM: 10,           // pode tocar na perereca para capturar a até 10 m
   folgaDoGpsM: 10,           // folga extra quando o GPS do celular diz que está impreciso
@@ -202,6 +211,90 @@ export function findBrejo(id, manual, seed = '') {
   if (!a || !kept.every((k) => distanceM(a, k) >= a.radius + k.radius)) return null;
   return a;
 }
+
+// ---------- trabalhos e loja ----------
+// NPCs de trabalho aparecem em qualquer lugar, como as lagoinhas: uma grade fixa, com um sorteio
+// por jogador, por ponto da grade e por janela de 15 min. Assim o servidor recalcula o mesmo NPC
+// a partir do id e confere quem trabalhou onde e quando.
+export const JOB_TYPES = {
+  casa: { npc: 'pedreiro', title: 'Construir casinha', done: 'Casinha pronta!', thanks: 'O pedreiro agradece!' },
+  carro: { npc: 'mecanico', title: 'Consertar carro', done: 'Carro consertado!', thanks: 'A oficina agradece!' },
+  horta: { npc: 'agricultor', title: 'Ajudar na horta', done: 'Horta caprichada!', thanks: 'O agricultor agradece!' },
+  entrega: { npc: 'carteiro', title: 'Fazer uma entrega', done: 'Entrega feita!', thanks: 'O carteiro agradece!' },
+};
+const JOB_ORDER = ['casa', 'carro', 'horta', 'entrega'];
+const JOB_ID = /^j(\d+)_(-?\d+)_(-?\d+)$/;
+export const JOB_RANGE_M = 25;      // distância para falar com o NPC
+export const JOB_VIEW_M = BALANCO.veTrabalhosAteM;
+export const DELIVERY_RANGE_M = 25; // distância da lagoinha para a entrega contar
+
+const jobCell = () => BALANCO.trabalhoACadaM;
+const jobRowLat = (i) => (i * jobCell()) / M_PER_DEG;
+const jobColStep = (i) => jobCell() / (M_PER_DEG * Math.cos(rad(jobRowLat(i))));
+
+export function jobAt(win, i, j, seed = '') {
+  const next = rng(hash32(`trabalho|${seed}|${win}|${i}|${j}`));
+  if (next() > BALANCO.chanceDeTrabalho) return null;
+  const p = offsetLatLng(jobRowLat(i), j * jobColStep(i), (next() - 0.5) * jobCell() * 0.6, (next() - 0.5) * jobCell() * 0.6);
+  // não fica em cima de uma lagoinha: se cair perto de uma, desiste deste ponto
+  if (pondsNear(p, AUTO.radius + 12, seed).length) return null;
+  const type = JOB_ORDER[Math.floor(next() * JOB_ORDER.length)];
+  const job = {
+    id: `j${win}_${i}_${j}`, win, type, lat: p.lat, lng: p.lng,
+    gender: next() < 0.5 ? 'masculino' : 'feminino', skin: ['clara', 'media', 'escura'][Math.floor(next() * 3)],
+  };
+  if (type === 'entrega') {
+    const [dMin, dMax] = BALANCO.entregaDistM;
+    const options = pondsNear(p, dMax, seed).filter((b) => distanceM(p, b) >= dMin);
+    if (options.length) {
+      const d = options[Math.floor(next() * options.length)];
+      job.dest = { lat: d.lat, lng: d.lng, name: d.name, id: d.id };
+    } else {
+      const ang = next() * Math.PI * 2;
+      const q = offsetLatLng(p.lat, p.lng, Math.cos(ang) * 200, Math.sin(ang) * 200);
+      job.dest = { lat: q.lat, lng: q.lng, name: 'ponto de entrega', id: null };
+    }
+  }
+  return job;
+}
+
+export function jobById(id, seed = '') {
+  const m = JOB_ID.exec(String(id));
+  return m ? jobAt(Number(m[1]), Number(m[2]), Number(m[3]), seed) : null;
+}
+
+export function jobsNear(p, radiusM, win, seed = '') {
+  if (!p) return [];
+  const out = [];
+  const i0 = Math.floor((p.lat * M_PER_DEG - radiusM) / jobCell()) - 1;
+  const i1 = Math.ceil((p.lat * M_PER_DEG + radiusM) / jobCell()) + 1;
+  for (let i = i0; i <= i1; i++) {
+    const step = jobColStep(i);
+    const dLng = radiusM / (M_PER_DEG * Math.cos(rad(jobRowLat(i))));
+    const j0 = Math.floor((p.lng - dLng) / step) - 1, j1 = Math.ceil((p.lng + dLng) / step) + 1;
+    for (let j = j0; j <= j1; j++) {
+      const job = jobAt(win, i, j, seed);
+      if (job && distanceM(p, job) <= radiusM) out.push(job);
+    }
+  }
+  return out;
+}
+
+export const jobPay = (type, mode) => Math.round((BALANCO.pagamento[type] || 0) * (mode === 'gps' ? BALANCO.bonusNoGps : 1));
+
+// Carros da loja (só andam no modo controle). speed em m/s; a pé no controle são 3,5 m/s.
+export const CARS = [
+  { id: 'hatch', name: 'Hatch', price: 150, speed: 6 },
+  { id: 'sedan', name: 'Sedã', price: 250, speed: 7 },
+  { id: 'pickup', name: 'Picape', price: 400, speed: 7.5 },
+  { id: 'jeep', name: 'Jipe', price: 600, speed: 8, perk: 'Abre matinhos de mais longe (30 m)' },
+  { id: 'super', name: 'Superesportivo', price: 1500, speed: 12 },
+];
+export const carById = (id) => CARS.find((c) => c.id === id) || null;
+
+// Saldo em Brejais: tudo o que os trabalhos pagaram menos tudo o que foi comprado.
+export const balanceOf = (jobs, purchases) =>
+  jobs.reduce((t, j) => t + (j.pay || 0), 0) - purchases.reduce((t, p) => t + (p.price || 0), 0);
 
 // Brejos criados antes da trava de distância podem estar sobrepostos: o jogo mostra
 // só o mais antigo de cada grupo sobreposto (a lista vem em ordem de criação).

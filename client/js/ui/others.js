@@ -8,6 +8,7 @@ import { presence } from '../presence.js';
 import { geo } from '../geo.js';
 import { metersPerPx } from './map.js';
 import { charHtml, bearing, dirFromBearing } from './sprites.js';
+import { carSprite, faceBubble } from './shop.js';
 import { hash32, distanceM, offsetLatLng } from '../shared/game.js';
 import { esc } from './common.js';
 
@@ -43,6 +44,7 @@ export function mountOthers(map, { onTap } = {}) {
       s.name = o.name;
       s.look = o.look;
       s.mode = o.mode;
+      s.vehicle = o.vehicle || null;
     }
 
     // 2) afastamento: em metros locais, com o próprio jogador fixo no lugar
@@ -85,13 +87,15 @@ export function mountOthers(map, { onTap } = {}) {
       const s = shown.get(p.id);
       const ll = offsetLatLng(ref.lat, ref.lng, p.y / Y_SQUASH, p.x);
       const walking = s.movingUntil > t;
-      const sig = `${s.look}|${s.dir}|${walking}|${s.name}`;
+      const sig = `${s.look}|${s.dir}|${walking}|${s.name}|${s.vehicle}`;
       const key = `other:${p.id}`;
       const o = map.objects.get(key);
       map.setObject(key, {
         lat: ll.lat, lng: ll.lng, className: 'mother', depthScale: false, data: { id: p.id, name: s.name, mode: s.mode },
         html: (!o || o.sig !== sig)
-          ? `<div class="owrap"><div class="pshadow"></div>${charHtml(s.look, { dir: s.dir, walking, scale: 2.3 })}<span class="oname">${esc(s.name)}</span></div>`
+          ? (s.vehicle
+            ? `<div class="cwrap other">${faceBubble(s.look, s.name)}${carSprite(s.vehicle, { dir: s.dir, moving: walking })}</div>`
+            : `<div class="owrap"><div class="pshadow"></div>${charHtml(s.look, { dir: s.dir, walking, scale: 2.3 })}<span class="oname">${esc(s.name)}</span></div>`)
           : null,
       });
       map.objects.get(key).sig = sig;

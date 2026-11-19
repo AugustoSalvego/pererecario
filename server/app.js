@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, makeTokens, friendCode } from './auth.js';
 import { makeSync } from './sync.js';
-import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook } from '../client/js/shared/game.js';
+import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook, carById } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLIENT_DIR = path.join(ROOT, 'client');
@@ -179,6 +179,7 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
         presence.set(playerId, {
           id: playerId, name: p.display_name, look: validLook(body.look) ? body.look : p.look, lat: round5(lat), lng: round5(lng),
           mode: body.mode === 'controle' ? 'controle' : 'gps', ts: now(),
+          vehicle: body.mode === 'controle' && carById(body.vehicle) ? body.vehicle : null,
         });
       }
       const me = { lat, lng };
