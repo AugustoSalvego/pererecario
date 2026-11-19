@@ -33,7 +33,7 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 26 testes: sincronização, idempotência, conflitos, falhas, trabalhos, loja, vendas, backup
+npm test             # 50 testes: sincronização, idempotência, conflitos, falhas, trabalhos, loja, vendas, backup, contas e código por e-mail
 ```
 
 Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
@@ -47,6 +47,7 @@ Passo a passo completo em [`docs/HOSPEDAGEM.md`](docs/HOSPEDAGEM.md). Em resumo:
 1. **Banco no [Neon](https://neon.com)** (PostgreSQL grátis e sem prazo de validade): crie um projeto na região AWS US East 1 (N. Virginia) e copie a *connection string*.
 2. **Servidor no [Render](https://render.com)**: **New → Blueprint** com este repositório. O [`render.yaml`](render.yaml) cria o servidor e pede `DATABASE_URL` (a do Neon), `ADMIN_KEY` (senha do `/admin`) e `CARTO_KEY` (opcional).
 3. **Backup automático**: cadastre os segredos `GAME_URL`, `ADMIN_KEY` e `BACKUP_PASSWORD` no GitHub. O workflow [`backup`](.github/workflows/backup.yml) copia o banco inteiro a cada 6 horas, criptografado, e guarda por 90 dias. Para restaurar: `node scripts/restaurar_backup.js arquivo`.
+4. **Opcionais e grátis:** `GOOGLE_CLIENT_ID` (botão "Continuar com Google") e `BREVO_API_KEY` + `EMAIL_FROM` (código de 6 números por e-mail no cadastro e no "Esqueci a senha"). Sem eles, o jogo funciona só com e-mail e senha, sem código.
 
 Por que não o Postgres gratuito do próprio Render: ele expira 30 dias depois de criado e não tem backup. E por que não SQLite em produção: no plano grátis, os arquivos do servidor são apagados quando ele reinicia ou dorme (por isso o servidor nem sobe hospedado sem `DATABASE_URL`).
 
@@ -82,7 +83,9 @@ server/                 Node.js (http nativo) + SQLite/PostgreSQL
   app.js                rotas REST
   sync.js               aplicação idempotente das operações e resolução de conflitos
   db.js                 camada de banco (mesmo SQL nos dois motores)
-test/sync.test.js       testes automatizados
+  mailer.js             envio do código por e-mail (Brevo)
+  google.js             conferência do login com o Google
+test/                   testes automatizados (sincronização, contas, código por e-mail, Postgres)
 ```
 
 ## Autor

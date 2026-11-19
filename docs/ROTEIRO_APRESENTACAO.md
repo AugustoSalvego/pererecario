@@ -4,7 +4,7 @@ Os 6 testes obrigatórios do enunciado, passo a passo.
 
 ## Preparação (antes de começar)
 
-- **Dois celulares** (A e B) com o jogo aberto no link do servidor, logados **na mesma conta** de demonstração (crie uma com e-mail e senha, ou entre nos dois com a mesma conta Google).
+- **Dois celulares** (A e B) com o jogo aberto no link do servidor, logados **na mesma conta** de demonstração (crie uma com e-mail e senha, ou entre nos dois com a mesma conta Google). Crie a conta **antes** da apresentação: com o código por e-mail ligado, o cadastro pede o código de 6 números que chega no e-mail.
 - **Notebook no projetor** com o painel do servidor aberto: `https://SEU-APP.onrender.com/admin` (com a `ADMIN_KEY`). Ele mostra capturas, log de operações, conflitos e atualiza a cada 3 s.
 - As lagoinhas aparecem sozinhas em qualquer lugar: o público só precisa abrir o link e criar uma conta (apelido, e-mail e senha, ou "Continuar com Google").
 - **Um brejo na sala**: no celular, Perfil → Painel de demonstração → chave de admin → nome "Brejo da Sala" → raio 40 → **Criar brejo onde estou**. (Faça isso antes, no lugar da apresentação.)

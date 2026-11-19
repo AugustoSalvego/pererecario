@@ -30,7 +30,7 @@ Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro
 
 | Requisito do enunciado | No jogo |
 |---|---|
-| Identificação do jogador | Conta com apelido + e-mail + senha, ou "Continuar com Google" (o servidor confere o token do Google); token próprio assinado guardado no aparelho |
+| Identificação do jogador | Conta com apelido + e-mail + senha (com código de 6 números no e-mail para confirmar), ou "Continuar com Google" (o servidor confere o token do Google); token próprio assinado guardado no aparelho |
 | Estado e progresso das partidas | **Caçada do dia** = a partida: criada automaticamente no primeiro movimento ou captura do dia; acumula capturas, XP e distância. O identificador é fixo por jogador e por dia (`dia:<jogador>:<dia>`), então dois aparelhos no mesmo dia jogam **a mesma partida** |
 | Pontuações e resultados | XP por captura (10/25/60/150 + 50 por espécie nova), nível, ranking geral, saldo de Brejais |
 | Histórico das partidas | No servidor, cada partida fica registrada com jogador, dia, pererecas, distância e quantos aparelhos jogaram nela (visível no painel `/admin`). No app, o **Diário de campo** mostra as últimas capturas e o Perfil mostra a caçada de hoje |
@@ -93,6 +93,8 @@ Rotas principais:
 | Rota | Função |
 |---|---|
 | `POST /api/auth/register`, `POST /api/auth/login` | Cria conta (apelido, e-mail, senha) / entra (e-mail e senha); devolve token, jogador e hora do servidor |
+| `POST /api/auth/register/confirm`, `POST /api/auth/code/resend` | Termina o cadastro com o código de 6 números do e-mail; manda o código de novo (depois de 1 minuto) |
+| `POST /api/auth/forgot`, `POST /api/auth/reset` | Esqueci a senha: manda o código para o e-mail da conta; com o código, grava a senha nova e já entra |
 | `POST /api/auth/google`, `POST /api/auth/google/link`, `POST /api/auth/password` | Entra ou cria conta com o Google; liga o Google a uma conta existente; cria ou troca a senha |
 | `POST /api/sync` | Envia até 100 operações e recebe o resultado de cada uma, o estado canônico do jogador e os brejos (se mudaram) |
 | `GET /api/brejos` | Lista de brejos e a versão da lista |
@@ -243,7 +245,8 @@ O jogo muda conforme o ambiente físico do jogador:
 - Loja: o preço vem do catálogo do servidor; a compra só é aplicada se o saldo do servidor cobrir o preço. O carro só pode ser escolhido se o jogador tiver comprado.
 - Senhas com scrypt (mínimo de 8 caracteres); tokens com HMAC-SHA256; limite de tentativas de login por IP e por conta; rotas de administração protegidas por chave.
 - "Continuar com Google": o servidor confere o ID token do Google sem biblioteca externa (`server/google.js`): assinatura RS256 com as chaves públicas do Google (guardadas pelo tempo que o Google indica), emissor `accounts.google.com`, aplicativo (`aud` = nosso Client ID) e validade. A conta é identificada pelo `sub` do Google, não pelo e-mail.
-- Mesmo e-mail nos dois jeitos: entrar com o Google num Gmail que já tem conta com senha liga as duas. Como o e-mail do cadastro com senha não é confirmado, essa senha é desativada nessa hora (quem a criou podia não ser o dono do Gmail) e a pessoa pode criar outra no Perfil. Para e-mails que não são Gmail, o Google não é "dono" do endereço, então a ligação só acontece pelo Perfil, já logado.
+- Código por e-mail (Brevo, `server/mailer.js`): com o envio configurado, o cadastro com e-mail e senha não cria a conta na hora. O servidor guarda um pedido (com a senha já embaralhada pelo scrypt) e manda um código de 6 números, sorteado com `crypto.randomInt`. O banco não guarda o código, só uma assinatura HMAC dele presa ao pedido. O código vale 15 minutos e uma vez só, aceita 5 tentativas erradas e pode ser reenviado depois de 1 minuto; um pedido novo para o mesmo e-mail invalida o anterior. Para não encherem a caixa de ninguém (nem gastarem os 300 e-mails do dia), há limite de 5 e-mails por endereço por hora e de 10 por aparelho a cada 10 minutos. Se o e-mail não sai, nada fica pendurado e a pessoa é avisada. O "Esqueci a senha" usa o mesmo mecanismo. Sem o Brevo configurado, o cadastro funciona como antes, sem código.
+- Mesmo e-mail nos dois jeitos: entrar com o Google num Gmail que já tem conta com senha liga as duas. Se o e-mail da conta foi confirmado pelo código, a senha continua valendo. Se não foi (conta criada sem o Brevo ligado), essa senha é desativada nessa hora, porque quem a criou podia não ser o dono do Gmail, e a pessoa pode criar outra no Perfil. Para e-mails que não são Gmail, o Google não é "dono" do endereço, então a ligação só acontece pelo Perfil, já logado. Em qualquer caso, o dono real do e-mail recupera a conta pelo "Esqueci a senha", que confirma o e-mail.
 
 ## 10. Testes automatizados
 
@@ -277,9 +280,11 @@ O jogo muda conforme o ambiente físico do jogador:
 
 Em `test/contas.test.js`, outros 10 testes cobrem as contas: cadastro e login por e-mail, conta nova pelo Google pedindo o apelido, tokens do Google falsificados, de outro aplicativo, de outro emissor, vencidos ou alterados depois de assinados (todos recusados), ligação pelo mesmo Gmail com a senha antiga desativada, e-mail que não é Gmail não ligando sozinho, a mesma conta Google não ligando em dois jogadores, troca de senha e limite de tentativas por conta. O Google é simulado com uma chave RSA de teste.
 
+Em `test/codigo.test.js`, 13 testes cobrem o código por e-mail, com o Brevo trocado por um carteiro de mentira: a conta só nasce com o código certo (e o banco não guarda o código nem a senha), código vencido, limite de 5 tentativas, reenvio só depois de 1 minuto (o código novo vale e o velho não), pedido novo invalidando o anterior, limites de e-mails por endereço e por aparelho, esqueci a senha do começo ao fim, falha no envio sem deixar nada pendurado, Google ligando a uma conta confirmada sem desativar a senha, o jogo sem o Brevo configurado, o e-mail de teste do painel e o formato da chamada à API do Brevo.
+
 No GitHub, os mesmos testes rodam também contra um PostgreSQL de verdade, com um teste a mais: derrubar todas as conexões do banco (como quando ele reinicia ou "dorme") não derruba o servidor.
 
-Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro e outro jogador vendo o carro) também foram exercitados num navegador Chrome automatizado.
+Os fluxos completos (login, cadastro com o código do e-mail, esqueci a senha, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro e outro jogador vendo o carro) também foram exercitados num navegador Chrome automatizado.
 
 ## 11. Limitações conhecidas
 

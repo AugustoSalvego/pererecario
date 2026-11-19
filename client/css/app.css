@@ -108,6 +108,8 @@ svg { display: block; }
 
 /* ============ TELA DE LOGIN ============ */
 #login { position: absolute; inset: 0; overflow: hidden; display: flex; flex-direction: column; background: linear-gradient(#7fd3ff 0%, #bdeeff 42%, #dff7ff 60%); }
+/* em celular baixinho (ou com a mensagem de erro) a tela rola em vez de cortar o botão */
+.login-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .scene { position: absolute; inset: 0; pointer-events: none; }
 .scene .sun { position: absolute; top: 9%; right: 12%; width: 86px; height: 86px; border-radius: 50%; background: radial-gradient(circle, #fff6c2, #ffd84d 60%, #ffc533); box-shadow: 0 0 0 16px rgba(255,236,150,.35), 0 0 0 34px rgba(255,236,150,.18); animation: sunPulse 5s ease-in-out infinite; }
 @keyframes sunPulse { 50% { box-shadow: 0 0 0 22px rgba(255,236,150,.3), 0 0 0 44px rgba(255,236,150,.12); } }
@@ -986,3 +988,30 @@ svg { display: block; }
 .g-badge { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 14px; color: #fff; background: conic-gradient(#ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); box-shadow: 0 2px 0 rgba(0,0,0,.12); }
 .account-list .list-item[data-act] { cursor: pointer; }
 .sheet .g-slot { display: flex; justify-content: center; min-height: 44px; }
+
+/* ---------- código do e-mail (cadastro) e esqueci a senha ---------- */
+.forgot-row { display: flex; justify-content: flex-end; margin: -8px 2px 0; }
+.link-btn { background: none; border: 0; padding: 6px 4px; font-weight: 700; font-size: 14px; color: var(--leaf-dark); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; text-decoration-color: rgba(47,138,50,.35); }
+.link-btn:disabled { color: var(--ink-soft); text-decoration: none; }
+.forgot-card h3 { margin: 2px 0 6px; font-size: 22px; }
+.code-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.code-ico { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: #e7f6dc; color: var(--leaf-dark); box-shadow: 0 3px 0 #cfe6bf; animation: mailBob 2.4s ease-in-out infinite; }
+.code-ico svg { width: 26px; height: 26px; }
+@keyframes mailBob { 50% { transform: translateY(-3px) rotate(-5deg); } }
+.code-head h3 { margin: 0 0 4px; font-size: 21px; }
+.code-lead { margin: 0; color: var(--ink-soft); font-size: 14.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.code-lead b { color: var(--ink); }
+.otp { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin: 0 0 12px; cursor: text; }
+.otp input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; outline: none; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: transparent; font-size: 16px; padding: 0; user-select: text; -webkit-user-select: text; }
+.otp input::selection { background: transparent; }
+.otp-box { height: 56px; border-radius: 14px; border: 2.5px solid #dfe9d8; background: #f7fbf2; display: grid; place-items: center; font-size: 26px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; transition: border-color .15s, background .15s, box-shadow .15s; }
+.otp-box.filled { background: #fff; border-color: #b9df9f; animation: otpIn .2s cubic-bezier(.2,1.6,.4,1); }
+.otp-box.cur { border-color: var(--leaf); background: #fff; box-shadow: 0 0 0 4px rgba(76,185,68,.16); }
+.otp-box.cur::after { content: ''; width: 2px; height: 26px; border-radius: 2px; background: var(--leaf-dark); animation: blink 1s steps(1) infinite; }
+@keyframes otpIn { from { transform: scale(.7); } }
+.code-card.bad .otp { animation: otpShake .38s; }
+.code-card.bad .otp-box { border-color: #eba897; }
+@keyframes otpShake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.code-card .field.pw { margin-top: 2px; }
+.code-help { margin: 12px 4px 2px; font-size: 13px; color: var(--ink-soft); text-align: center; line-height: 1.4; }
+.code-links { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }

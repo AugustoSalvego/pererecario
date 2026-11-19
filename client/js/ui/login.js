@@ -3,7 +3,7 @@ import { store } from '../store.js';
 import { frogImg } from '../catalog.js';
 import { icons } from './icons.js';
 import { img } from './sprites.js';
-import { $, h, toast } from './common.js';
+import { $, h, esc, toast } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
 const hills = `
@@ -66,7 +66,7 @@ export function renderLogin(onDone, config = {}) {
   const root = $('#login');
   root.classList.remove('hidden');
   root.innerHTML = '';
-  const el = h(`<div style="position:absolute;inset:0;display:flex;flex-direction:column">
+  const el = h(`<div class="login-wrap">
     <div class="scene">
       <div class="sun"></div>
       <div class="cloud" style="top:12%;width:90px;animation-delay:-8s"></div>
@@ -94,6 +94,7 @@ export function renderLogin(onDone, config = {}) {
       <label class="field">${icons.mail}<input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="Seu e-mail (Gmail)" maxlength="254"></label>
       <label class="field pw">${icons.key}<input name="password" type="password" autocomplete="current-password" placeholder="Senha"><button type="button" class="eye" aria-label="Mostrar senha">${icons.eye}</button></label>
       <div class="pw-hint reg-only hidden">Mínimo de 8 caracteres.</div>
+      <div class="forgot-row login-only"><button type="button" class="link-btn" data-act="forgot">Esqueci a senha</button></div>
       <div class="form-error"></div>
       <button class="btn block" type="submit">Entrar no brejo</button>
       <div class="login-note">Seu progresso fica salvo no celular e no servidor.</div>
@@ -106,6 +107,26 @@ export function renderLogin(onDone, config = {}) {
       <button class="btn block" type="button" data-act="nick-ok">Começar a caçar</button>
       <button class="btn ghost block" type="button" data-act="nick-back" style="margin-top:8px">Voltar</button>
     </div>
+    <div class="login-card forgot-card hidden">
+      <h3>Esqueci a senha 🔑</h3>
+      <p class="nick-lead">Digite o e-mail da sua conta. Vou mandar um código de 6 números para você criar uma senha nova. Seu progresso continua todo lá.</p>
+      <label class="field">${icons.mail}<input name="femail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="Seu e-mail" maxlength="254" enterkeyhint="send"></label>
+      <div class="form-error forgot-error"></div>
+      <button class="btn block" type="button" data-act="forgot-ok">Mandar o código</button>
+      <button class="btn ghost block" type="button" data-act="forgot-back" style="margin-top:8px">Voltar</button>
+    </div>
+    <div class="login-card code-card hidden">
+      <div class="code-head"><span class="code-ico">${icons.mail}</span><div><h3 class="code-title">Confira seu e-mail</h3><p class="code-lead"></p></div></div>
+      <label class="otp">
+        <input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" aria-label="Código de 6 números" enterkeyhint="done">
+        <span class="otp-box"></span><span class="otp-box"></span><span class="otp-box"></span><span class="otp-box"></span><span class="otp-box"></span><span class="otp-box"></span>
+      </label>
+      <label class="field pw reset-only hidden">${icons.key}<input name="newpass" type="password" autocomplete="new-password" placeholder="Senha nova (8 ou mais)" maxlength="128" enterkeyhint="done"><button type="button" class="eye" aria-label="Mostrar senha">${icons.eye}</button></label>
+      <div class="form-error code-error"></div>
+      <button class="btn block" type="button" data-act="code-ok">Confirmar</button>
+      <p class="code-help">Não chegou em 1 minuto? Olhe no <b>spam</b> ou em <b>lixo eletrônico</b>. O código vale por 15 minutos.</p>
+      <div class="code-links"><button type="button" class="link-btn" data-act="code-resend">Mandar de novo</button><button type="button" class="link-btn" data-act="code-back">Trocar o e-mail</button></div>
+    </div>
   </div>`);
   root.appendChild(el);
 
@@ -115,8 +136,18 @@ export function renderLogin(onDone, config = {}) {
   const banner = $('.offline-banner', el);
   const gArea = $('.google-area', el);
   const nickCard = $('.nick-card', el);
+  const forgotCard = $('.forgot-card', el);
+  const codeCard = $('.code-card', el);
   let mode = 'login';
   let clientId = null;
+
+  // um cartão por vez: e-mail e senha, apelido (Google), esqueci a senha, código do e-mail
+  function showCard(card) {
+    for (const c of [form, nickCard, forgotCard, codeCard]) c.classList.toggle('hidden', c !== card);
+    card.style.animation = 'none';
+    void card.offsetHeight;          // recomeça a animação de "subir"
+    card.style.animation = '';
+  }
 
   const refreshOnline = () => {
     const off = api.isOffline();
@@ -138,12 +169,14 @@ export function renderLogin(onDone, config = {}) {
     } catch {}
     window.removeEventListener('online', refreshOnline);
     window.removeEventListener('offline', refreshOnline);
+    clearInterval(countdown);
     sfx.win();
     root.classList.add('hidden');
     root.innerHTML = '';
     onDone(isNew);
     if (r.passwordReset) toast('Sua conta agora entra com o Google. Para entrar também com senha, crie uma nova em Perfil → Conta.', 'ok', 'key', 7000);
     else if (r.linked) toast('Sua conta foi ligada ao Google.', 'ok', 'check', 3500);
+    else if (r.passwordChanged) toast('Senha nova salva! Bem-vindo de volta ao brejo.', 'ok', 'key', 4000);
   }
 
   // ----- Google -----
@@ -157,8 +190,7 @@ export function renderLogin(onDone, config = {}) {
       const r = await api.post('/api/auth/google', { credential }, AUTH_WAIT);
       if (r.needsNickname) {
         pendingCredential = credential;
-        form.classList.add('hidden');
-        nickCard.classList.remove('hidden');
+        showCard(nickCard);
         const inp = $('input[name=nick]', nickCard);
         inp.value = r.suggestion || '';
         setTimeout(() => inp.focus(), 50);
@@ -190,8 +222,7 @@ export function renderLogin(onDone, config = {}) {
   });
   $('[data-act=nick-back]', nickCard).addEventListener('click', () => {
     pendingCredential = null;
-    nickCard.classList.add('hidden');
-    form.classList.remove('hidden');
+    showCard(form);
   });
   googleClientId(config).then(async (id) => {
     clientId = id;
@@ -203,19 +234,206 @@ export function renderLogin(onDone, config = {}) {
   });
 
   // ----- e-mail e senha -----
-  $('.eye', form).addEventListener('click', (e) => {
-    const inp = form.password;
+  el.querySelectorAll('.eye').forEach((eye) => eye.addEventListener('click', () => {
+    const inp = eye.parentElement.querySelector('input');
     const show = inp.type === 'password';
     inp.type = show ? 'text' : 'password';
-    e.currentTarget.innerHTML = show ? icons.eyeOff : icons.eye;
-    e.currentTarget.setAttribute('aria-label', show ? 'Esconder senha' : 'Mostrar senha');
+    eye.innerHTML = show ? icons.eyeOff : icons.eye;
+    eye.setAttribute('aria-label', show ? 'Esconder senha' : 'Mostrar senha');
+  }));
+
+  // ----- código de 6 números (confirmar o cadastro ou criar senha nova) -----
+  const otp = $('input[name=code]', codeCard);
+  const boxes = [...codeCard.querySelectorAll('.otp-box')];
+  const newPass = $('input[name=newpass]', codeCard);
+  const codeErr = $('.code-error', codeCard);
+  const okBtn = $('[data-act=code-ok]', codeCard);
+  const resendBtn = $('[data-act=code-resend]', codeCard);
+  const backBtn = $('[data-act=code-back]', codeCard);
+  let flow = null;      // { purpose, ticket, email, start, key, dead }
+  let parked = null;    // pedido de cadastro guardado ao tocar "Trocar o e-mail"
+  let countdown = null;
+  let busy = false;
+  const okLabel = () => (flow?.purpose === 'reset' ? 'Trocar a senha e entrar' : 'Confirmar e entrar');
+
+  function paintOtp() {
+    const v = otp.value;
+    const focused = document.activeElement === otp;
+    boxes.forEach((b, i) => {
+      b.textContent = v[i] || '';
+      b.classList.toggle('filled', !!v[i]);
+      b.classList.toggle('cur', focused && v.length < 6 && i === v.length);
+    });
+  }
+  function codeError(msg) {
+    codeErr.textContent = msg;
+    okBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    codeCard.classList.remove('bad');
+    void codeCard.offsetWidth;
+    codeCard.classList.add('bad');
+    sfx.error();
+  }
+  function startCountdown(seconds) {
+    clearInterval(countdown);
+    let left = Math.max(0, Math.round(seconds || 0));
+    const paint = () => {
+      resendBtn.disabled = left > 0;
+      resendBtn.textContent = left > 0 ? `Mandar de novo em ${left}s` : 'Mandar de novo';
+    };
+    paint();
+    if (left > 0) countdown = setInterval(() => { left--; paint(); if (left <= 0) clearInterval(countdown); }, 1000);
+  }
+
+  function openCode(purpose, resp, start, key = null) {
+    flow = { purpose, ticket: resp.ticket, email: resp.email, start, key, dead: false, sentAt: resp.sentAt ?? Date.now() };
+    const signup = purpose === 'signup';
+    $('.code-title', codeCard).textContent = signup ? 'Confira seu e-mail' : 'Crie uma senha nova';
+    $('.code-lead', codeCard).innerHTML = `Mandei um código de 6 números para <b>${esc(resp.email)}</b>.`;
+    codeCard.querySelectorAll('.reset-only').forEach((x) => x.classList.toggle('hidden', signup));
+    okBtn.textContent = okLabel();
+    backBtn.textContent = signup ? 'Trocar o e-mail' : 'Voltar';
+    otp.value = '';
+    newPass.value = '';
+    codeErr.textContent = '';
+    paintOtp();
+    startCountdown(resp.resendIn ?? 60);
+    showCard(codeCard);
+    sfx.pop();
+    setTimeout(() => otp.focus(), 80);
+  }
+
+  async function submitCode() {
+    if (busy || !flow) return;
+    const code = otp.value;
+    if (flow.dead) { codeError('Esse código não vale mais. Toque em "Mandar de novo" para receber outro.'); return; }
+    if (code.length !== 6) { codeError('Digite os 6 números que chegaram no e-mail.'); otp.focus(); return; }
+    if (flow.purpose === 'reset' && newPass.value.length < 8) { codeError('A senha nova precisa de pelo menos 8 caracteres.'); newPass.focus(); return; }
+    busy = true;
+    okBtn.disabled = true;
+    okBtn.textContent = 'Conferindo…';
+    const done = slowHint(okBtn);
+    try {
+      const r = flow.purpose === 'signup'
+        ? await api.post('/api/auth/register/confirm', { ticket: flow.ticket, code }, AUTH_WAIT)
+        : await api.post('/api/auth/reset', { ticket: flow.ticket, code, password: newPass.value }, AUTH_WAIT);
+      const isNew = flow.purpose === 'signup';
+      flow = null;
+      parked = null;
+      await enter(r, isNew);
+      return;
+    } catch (ex) {
+      codeError(ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : ex.message);
+      if (ex.data?.expired && flow) { flow.dead = true; startCountdown(0); }
+      otp.value = '';
+      paintOtp();
+      if (!flow?.dead) otp.focus();
+    } finally {
+      busy = false;
+      done();
+      okBtn.disabled = false;
+      okBtn.textContent = okLabel();
+    }
+  }
+
+  otp.addEventListener('input', () => {
+    const v = otp.value.replace(/\D/g, '').slice(0, 6);   // aceita "123 456" colado do e-mail
+    if (v !== otp.value) otp.value = v;
+    codeErr.textContent = '';
+    codeCard.classList.remove('bad');
+    paintOtp();
+    if (v.length < 6) return;
+    sfx.tap();
+    if (flow?.purpose === 'reset' && newPass.value.length < 8) { newPass.focus(); return; }
+    submitCode();
   });
+  otp.addEventListener('focus', paintOtp);
+  otp.addEventListener('blur', paintOtp);
+  otp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitCode(); } });
+  newPass.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitCode(); } });
+  okBtn.addEventListener('click', submitCode);
+
+  resendBtn.addEventListener('click', async () => {
+    if (!flow || busy) return;
+    busy = true;
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'Mandando…';
+    try {
+      let r;
+      try {
+        r = flow.dead ? await flow.start() : await api.post('/api/auth/code/resend', { ticket: flow.ticket }, AUTH_WAIT);
+      } catch (ex) {
+        if (!ex.data?.expired) throw ex;
+        r = await flow.start();       // o pedido venceu: começa outro com os mesmos dados
+      }
+      if (r.token) { flow = null; await enter(r, true); return; }
+      flow.ticket = r.ticket;
+      flow.dead = false;
+      flow.sentAt = Date.now();
+      otp.value = '';
+      codeErr.textContent = '';
+      paintOtp();
+      startCountdown(r.resendIn ?? 60);
+      toast(`Código novo enviado para ${r.email}`, 'ok', 'mail', 3000);
+      sfx.pop();
+      otp.focus();
+    } catch (ex) {
+      codeError(ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : ex.message);
+      startCountdown(ex.data?.resendIn || 0);
+    } finally { busy = false; }
+  });
+
+  backBtn.addEventListener('click', () => {
+    clearInterval(countdown);
+    if (flow?.purpose === 'signup') {
+      parked = flow.dead ? null : flow;
+      flow = null;
+      showCard(form);
+      setTimeout(() => form.email.focus(), 80);
+    } else {
+      flow = null;
+      showCard(forgotCard);
+    }
+  });
+
+  // ----- esqueci a senha -----
+  const fEmail = $('input[name=femail]', forgotCard);
+  const fErr = $('.forgot-error', forgotCard);
+  const fBtn = $('[data-act=forgot-ok]', forgotCard);
+  $('[data-act=forgot]', form).addEventListener('click', () => {
+    sfx.tap();
+    fEmail.value = form.email.value.trim();
+    fErr.textContent = '';
+    showCard(forgotCard);
+    setTimeout(() => fEmail.focus(), 80);
+  });
+  $('[data-act=forgot-back]', forgotCard).addEventListener('click', () => {
+    if (fEmail.value.trim()) form.email.value = fEmail.value.trim();
+    showCard(form);
+  });
+  async function sendForgot() {
+    const email = fEmail.value.trim();
+    fErr.textContent = '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { fErr.textContent = 'Digite o e-mail da sua conta.'; sfx.error(); return; }
+    fBtn.disabled = true;
+    fBtn.textContent = 'Mandando…';
+    const done = slowHint(fBtn);
+    try {
+      const start = () => api.post('/api/auth/forgot', { email }, AUTH_WAIT);
+      openCode('reset', await start(), start);
+    } catch (ex) {
+      fErr.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : ex.message;
+      sfx.error();
+    } finally { done(); fBtn.disabled = false; fBtn.textContent = 'Mandar o código'; }
+  }
+  fBtn.addEventListener('click', sendForgot);
+  fEmail.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendForgot(); } });
 
   el.querySelectorAll('.segmented button').forEach((b) => b.addEventListener('click', () => {
     mode = b.dataset.mode;
     sfx.tap();
     el.querySelectorAll('.segmented button').forEach((x) => x.classList.toggle('on', x === b));
     el.querySelectorAll('.reg-only').forEach((x) => x.classList.toggle('hidden', mode !== 'register'));
+    el.querySelectorAll('.login-only').forEach((x) => x.classList.toggle('hidden', mode === 'register'));
     form.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
     submit.textContent = mode === 'register' ? 'Criar minha conta' : 'Entrar no brejo';
     err.textContent = '';
@@ -238,13 +456,28 @@ export function renderLogin(onDone, config = {}) {
     submit.textContent = 'Um instante…';
     const done = slowHint(submit);
     try {
-      const r = mode === 'register'
-        ? await api.post('/api/auth/register', { displayName, email, password }, AUTH_WAIT)
-        : await api.post('/api/auth/login', { email, password }, AUTH_WAIT);   // contas antigas: aceita o usuário no lugar do e-mail
-      await enter(r, mode === 'register');
+      if (mode === 'register') {
+        // voltou para corrigir algo e mandou igualzinho: o código que já chegou continua valendo
+        const key = `${email.toLowerCase()}\n${displayName}\n${password}`;
+        if (parked && parked.key === key) {
+          const p = parked;
+          parked = null;
+          openCode('signup', { ticket: p.ticket, email: p.email, sentAt: p.sentAt, resendIn: 60 - (Date.now() - p.sentAt) / 1000 }, p.start, key);
+          return;
+        }
+        const start = () => api.post('/api/auth/register', { displayName, email, password }, AUTH_WAIT);
+        const r = await start();
+        // com o e-mail ligado no servidor, a conta só nasce depois do código
+        if (r.needsCode) { parked = null; openCode('signup', r, start, key); return; }
+        await enter(r, true);
+      } else {
+        const r = await api.post('/api/auth/login', { email, password }, AUTH_WAIT);   // contas antigas: aceita o usuário no lugar do e-mail
+        await enter(r, false);
+      }
     } catch (ex) {
       err.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se para entrar.' : ex.message;
       sfx.error();
+      submit.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     } finally {
       done();
       submit.disabled = false;

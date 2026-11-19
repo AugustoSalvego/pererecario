@@ -119,6 +119,20 @@ export const SCHEMA = [
     received_at BIGINT NOT NULL,
     UNIQUE (player_id, capture_id)
   )`,
+  // Códigos de 6 números enviados por e-mail (confirmar cadastro, esqueci a senha).
+  // Duram 15 minutos e não entram no backup. O código não é guardado, só uma assinatura dele.
+  `CREATE TABLE IF NOT EXISTS email_codes (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    data TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    sent_at BIGINT NOT NULL,
+    expires_at BIGINT NOT NULL,
+    created_at BIGINT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes (email, purpose)`,
   `CREATE INDEX IF NOT EXISTS idx_captures_player ON captures (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expeditions_player ON expeditions (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_operations_received ON operations (received_at)`,

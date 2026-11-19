@@ -7,6 +7,7 @@ import { hashPassword, verifyPassword, makeTokens, friendCode } from './auth.js'
 import { makeSync } from './sync.js';
 import { exportAll } from './backup.js';
 import { makeGoogleVerifier, GoogleError } from './google.js';
+import { mailerFromEnv, codeEmail } from './mailer.js';
 import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook, carById } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,7 +21,7 @@ const MIME = {
 };
 
 class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, extra = null) { super(message); this.status = status; this.extra = extra; }
 }
 
 export function loadCatalog() {
@@ -34,9 +35,17 @@ const NO_PASSWORD = '!sem-senha';                    // conta só com Google: ne
 const hasPassword = (p) => String(p?.pass_hash || '').startsWith('scrypt$');
 const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ');
 
+// Código de 6 números por e-mail: vale 15 minutos, 5 tentativas, reenvio depois de 1 minuto
+const CODE_TTL = 15 * 60_000;
+const RESEND_AFTER = 60_000;
+const MAX_ATTEMPTS = 5;
+const MAILS_PER_EMAIL_HOUR = 5;
+
 export async function createApp({
   db, adminKey = process.env.ADMIN_KEY || 'brejo-admin', tokenSecret = process.env.TOKEN_SECRET, now = () => Date.now(), quiet = false,
   googleClientId = process.env.GOOGLE_CLIENT_ID || null, googleKeys = undefined,
+  // Carteiro (Brevo). Sem ele, o cadastro é como antes: sem código (docs/HOSPEDAGEM.md, passo 6)
+  mailer = mailerFromEnv(), mailDailyMax = Number(process.env.MAIL_DAILY_MAX) || 280,
 } = {}) {
   // "Continuar com Google" só aparece se o servidor tiver o Client ID (docs/HOSPEDAGEM.md)
   const google = googleClientId ? makeGoogleVerifier({ clientId: googleClientId, now, ...(googleKeys ? { fetchKeys: googleKeys } : {}) }) : null;
@@ -95,13 +104,13 @@ export async function createApp({
   // atrás do proxy do Render todo mundo chega com o mesmo IP: usa o X-Forwarded-For
   const clientIp = (req) => String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
 
-  function limit(ip, key, max) {
+  function limit(ip, key, max, windowMs = 60000, message = 'Muitas tentativas. Espere um minuto.') {
     const k = `${key}:${ip}`;
     const t = now();
-    const arr = (rate.get(k) || []).filter((x) => t - x < 60000);
+    const arr = (rate.get(k) || []).filter((x) => t - x < windowMs);
     arr.push(t);
     rate.set(k, arr);
-    if (arr.length > max) throw new HttpError(429, 'Muitas tentativas. Espere um minuto.');
+    if (arr.length > max) throw new HttpError(429, message);
   }
 
   function auth(req) {
@@ -157,11 +166,88 @@ export async function createApp({
     }
   }
 
+  // ----- código por e-mail -----
+  const mailStats = { sent: 0, failed: 0, today: 0, day: '', lastError: null, lastErrorAt: 0 };
+  // guarda só uma assinatura do código, presa ao pedido (ticket): quem lê o banco não vê o código
+  const codeHash = (ticket, code) => crypto.createHmac('sha256', tokenSecret).update(`codigo:${ticket}:${code}`).digest('base64url');
+  const sameHash = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const secs = (ms) => Math.max(1, Math.ceil(ms / 1000));
+
+  // contra quem tenta encher a caixa de alguém (ou gastar os 300 e-mails do dia)
+  function limitMail(req, email) {
+    limit(clientIp(req), 'email-ip', 10, 10 * 60_000, 'Muitos e-mails pedidos deste aparelho. Espere alguns minutos.');
+    limit(email, 'email-conta', MAILS_PER_EMAIL_HOUR, 3600_000, 'Já mandei vários códigos para esse e-mail. Espere um pouco (até 1 hora) e tente de novo.');
+  }
+
+  async function mailCode({ email, purpose, displayName }) {
+    const day = new Date(now()).toISOString().slice(0, 10);
+    if (mailStats.day !== day) { mailStats.day = day; mailStats.today = 0; }
+    if (mailStats.today >= mailDailyMax) {
+      throw new HttpError(503, `O jogo já mandou e-mails demais hoje. Tente amanhã${google ? ' ou use "Continuar com Google"' : ''}.`);
+    }
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    try {
+      await mailer({ to: email, ...codeEmail({ code, purpose, displayName, minutes: CODE_TTL / 60_000 }) });
+    } catch (e) {
+      mailStats.failed++;
+      mailStats.lastError = String(e.message || e).slice(0, 300);
+      mailStats.lastErrorAt = now();
+      console.warn('E-mail com código NÃO enviado:', mailStats.lastError);
+      throw new HttpError(502, `Não consegui mandar o e-mail agora. Tente de novo daqui a pouco${google ? ' ou use "Continuar com Google"' : ''}.`);
+    }
+    mailStats.sent++;
+    mailStats.today++;
+    return code;
+  }
+
+  // novo pedido de código: manda o e-mail e só então guarda o pedido (o anterior do mesmo e-mail deixa de valer)
+  async function startCode(req, { email, purpose, displayName, data }) {
+    const last = await db.one('SELECT sent_at FROM email_codes WHERE email=$1 AND purpose=$2 ORDER BY sent_at DESC LIMIT 1', [email, purpose]);
+    const wait = last ? Number(last.sent_at) + RESEND_AFTER - now() : 0;
+    if (wait > 0) throw new HttpError(429, `Acabei de mandar um código para esse e-mail. Espere ${secs(wait)} segundos para pedir outro.`, { resendIn: secs(wait) });
+    limitMail(req, email);
+    const ticket = crypto.randomBytes(18).toString('base64url');
+    const code = await mailCode({ email, purpose, displayName });
+    const t = now();
+    await db.tx(async (q) => {
+      await q.run('DELETE FROM email_codes WHERE expires_at < $1 OR (email=$2 AND purpose=$3)', [t - 3600_000, email, purpose]);
+      await q.run(`INSERT INTO email_codes (id, email, purpose, code_hash, data, attempts, sent_at, expires_at, created_at)
+        VALUES ($1,$2,$3,$4,$5,0,$6,$7,$6)`, [ticket, email, purpose, codeHash(ticket, code), JSON.stringify(data || {}), t, t + CODE_TTL]);
+    });
+    return { ticket, email, resendIn: RESEND_AFTER / 1000, expiresIn: CODE_TTL / 1000 };
+  }
+
+  const gone = () => new HttpError(410, 'Esse código não vale mais. Peça um código novo.', { expired: true });
+
+  // confere o código; certo, o pedido é apagado (vale uma vez só)
+  async function useCode({ ticket, code, purpose }) {
+    const id = String(ticket || '').slice(0, 64);
+    const row = id ? await db.one('SELECT * FROM email_codes WHERE id=$1 AND purpose=$2', [id, purpose]) : null;
+    if (!row) throw gone();
+    const drop = () => db.tx((q) => q.run('DELETE FROM email_codes WHERE id=$1', [id]));
+    if (Number(row.expires_at) < now()) {
+      await drop();
+      throw new HttpError(410, `O código venceu (ele vale ${CODE_TTL / 60_000} minutos). Peça um código novo.`, { expired: true });
+    }
+    // conta a tentativa antes de conferir (duas tentativas ao mesmo tempo não passam do limite)
+    const counted = await db.tx((q) => q.run('UPDATE email_codes SET attempts = attempts + 1 WHERE id=$1 AND attempts < $2', [id, MAX_ATTEMPTS]));
+    if (!counted.changes) { await drop(); throw new HttpError(429, 'Muitas tentativas erradas. Peça um código novo.', { expired: true }); }
+    const typed = String(code || '').replace(/\D/g, '');
+    if (typed.length !== 6 || !sameHash(codeHash(id, typed), row.code_hash)) {
+      const left = MAX_ATTEMPTS - Number(row.attempts) - 1;
+      if (left <= 0) { await drop(); throw new HttpError(400, 'Código errado de novo. Peça um código novo.', { expired: true, attemptsLeft: 0 }); }
+      throw new HttpError(400, `Código errado. Confira o e-mail: você tem mais ${left} tentativa${left > 1 ? 's' : ''}.`, { attemptsLeft: left });
+    }
+    const used = await drop();
+    if (!used.changes) throw gone();   // o mesmo código foi usado ao mesmo tempo em outro toque
+    return { row, data: JSON.parse(row.data || '{}') };
+  }
+
   const routes = {
     'GET /api/health': async () => ({ ok: true, serverTime: now(), version: VERSION }),
 
     // configuração pública do app (chave gratuita do mapa CARTO, se houver)
-    'GET /api/config': async () => ({ cartoKey: process.env.CARTO_KEY || null, googleClientId: googleClientId || null }),
+    'GET /api/config': async () => ({ cartoKey: process.env.CARTO_KEY || null, googleClientId: googleClientId || null, emailConfirm: !!mailer }),
 
     // Criar conta: apelido + e-mail + senha (8 ou mais). Sem e-mail, vale o formato antigo com usuário.
     'POST /api/auth/register': async (req, body) => {
@@ -189,9 +275,72 @@ export async function createApp({
           ? 'Esse e-mail já entra com o Google: use "Continuar com Google"'
           : 'Já existe uma conta com esse e-mail. Entre com ela.');
       }
+      // Com o carteiro ligado, a conta só nasce depois do código que vai para o e-mail
+      // (ninguém cria conta com o e-mail de outra pessoa).
+      if (mailer) {
+        const out = await startCode(req, { email, purpose: 'signup', displayName, data: { displayName, passHash: await hashPassword(password) } });
+        log(`cadastro esperando o código do e-mail: ${displayName}`);
+        return { needsCode: true, ...out };
+      }
       const id = await createPlayer({ displayName, passHash: await hashPassword(password), email });
       log(`novo jogador (e-mail): ${displayName}`);
       return session(id);
+    },
+
+    // Terminar o cadastro com o código de 6 números
+    'POST /api/auth/register/confirm': async (req, body) => {
+      limit(clientIp(req), 'auth', 30);
+      const { row, data } = await useCode({ ticket: body.ticket, code: body.code, purpose: 'signup' });
+      if (await db.one('SELECT id FROM players WHERE email=$1', [row.email])) throw new HttpError(409, 'Já existe uma conta com esse e-mail. Entre com ela.');
+      const id = await createPlayer({ displayName: data.displayName, passHash: data.passHash, email: row.email, emailVerified: 1 });
+      log(`novo jogador (e-mail confirmado): ${data.displayName}`);
+      return session(id, { created: true });
+    },
+
+    // Mandar o código de novo (mesmo pedido; depois de 1 minuto)
+    'POST /api/auth/code/resend': async (req, body) => {
+      limit(clientIp(req), 'auth', 30);
+      if (!mailer) throw new HttpError(404, 'O envio de e-mails não está ligado neste servidor');
+      const ticket = String(body.ticket || '').slice(0, 64);
+      const row = ticket ? await db.one('SELECT * FROM email_codes WHERE id=$1', [ticket]) : null;
+      if (!row || Number(row.expires_at) < now()) throw new HttpError(410, 'Esse pedido venceu. Comece de novo.', { expired: true });
+      const wait = Number(row.sent_at) + RESEND_AFTER - now();
+      if (wait > 0) throw new HttpError(429, `Espere ${secs(wait)} segundos para pedir outro código.`, { resendIn: secs(wait) });
+      limitMail(req, row.email);
+      const data = JSON.parse(row.data || '{}');
+      const code = await mailCode({ email: row.email, purpose: row.purpose, displayName: data.displayName });
+      const t = now();
+      await db.tx((q) => q.run('UPDATE email_codes SET code_hash=$1, attempts=0, sent_at=$2, expires_at=$3 WHERE id=$4',
+        [codeHash(ticket, code), t, t + CODE_TTL, ticket]));
+      return { ticket, email: row.email, resendIn: RESEND_AFTER / 1000, expiresIn: CODE_TTL / 1000 };
+    },
+
+    // Esqueci a senha: manda um código para o e-mail da conta
+    'POST /api/auth/forgot': async (req, body) => {
+      limit(clientIp(req), 'auth', 30);
+      if (!mailer) throw new HttpError(404, 'A recuperação por e-mail ainda não está ligada. Peça ao organizador do jogo para trocar sua senha.');
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, 'Esse e-mail não parece certo');
+      const p = await db.one('SELECT id, display_name FROM players WHERE email=$1', [email]);
+      if (!p) throw new HttpError(404, 'Não achei nenhuma conta com esse e-mail. Confira ou crie uma conta.');
+      const out = await startCode(req, { email, purpose: 'reset', displayName: p.display_name, data: { displayName: p.display_name } });
+      log(`código de senha nova enviado: ${p.display_name}`);
+      return out;
+    },
+
+    // Senha nova com o código (e já entra)
+    'POST /api/auth/reset': async (req, body) => {
+      limit(clientIp(req), 'auth', 30);
+      const password = String(body.password || '');
+      if (password.length < 8) throw new HttpError(400, 'A senha nova precisa de pelo menos 8 caracteres');
+      const { row } = await useCode({ ticket: body.ticket, code: body.code, purpose: 'reset' });
+      const p = await db.one('SELECT id, display_name FROM players WHERE email=$1', [row.email]);
+      if (!p) throw new HttpError(404, 'Essa conta não existe mais');
+      const passHash = await hashPassword(password);
+      // o código provou que o e-mail é da pessoa
+      await db.tx((q) => q.run('UPDATE players SET pass_hash=$1, email_verified=1 WHERE id=$2', [passHash, p.id]));
+      log(`senha nova pelo código do e-mail: ${p.display_name}`);
+      return session(p.id, { passwordChanged: true });
     },
 
     // Entrar: e-mail (ou o usuário antigo) + senha. Além do limite por aparelho, 10 tentativas por minuto por conta.
@@ -350,6 +499,7 @@ export async function createApp({
         db: db.kind,
         outageUntil,
         online: (cleanPresence(), presence.size),
+        mail: { enabled: !!mailer, sent: mailStats.sent, failed: mailStats.failed, today: mailStats.today, dailyMax: mailDailyMax, lastError: mailStats.lastError, lastErrorAt: mailStats.lastErrorAt },
         counts: {
           players: players.length,
           captures: Number((await db.one('SELECT COUNT(*) AS n FROM captures')).n),
@@ -412,8 +562,8 @@ export async function createApp({
       return data;
     },
 
-    // Jogador esqueceu a senha (não há e-mail no cadastro): o organizador define uma nova,
-    // e o progresso continua todo lá.
+    // Jogador esqueceu a senha e o "Esqueci a senha" por e-mail não resolveu (ou não está ligado):
+    // o organizador define uma nova, e o progresso continua todo lá.
     'POST /api/admin/reset-password': async (req, body) => {
       requireAdmin(req);
       const username = String(body.user ?? body.username ?? '').trim().toLowerCase();
@@ -425,6 +575,26 @@ export async function createApp({
       await db.tx((q) => q.run('UPDATE players SET pass_hash=$1 WHERE id=$2', [passHash, p.id]));
       log(`senha redefinida pelo administrador: ${username}`);
       return { ok: true, displayName: p.display_name };
+    },
+
+    // Testar o Brevo: manda um e-mail de teste e, se falhar, mostra o motivo exato
+    'POST /api/admin/test-email': async (req, body) => {
+      requireAdmin(req);
+      if (!mailer) throw new HttpError(404, 'O e-mail está desligado: faltam BREVO_API_KEY e EMAIL_FROM no Render (docs/HOSPEDAGEM.md, passo 6)');
+      const to = String(body.to || '').trim().toLowerCase();
+      if (!EMAIL_RE.test(to)) throw new HttpError(400, 'Esse e-mail não parece certo');
+      try {
+        await mailer({ to, ...codeEmail({ purpose: 'test' }) });
+      } catch (e) {
+        mailStats.failed++;
+        mailStats.lastError = String(e.message || e).slice(0, 300);
+        mailStats.lastErrorAt = now();
+        throw new HttpError(400, `O e-mail não saiu. ${mailStats.lastError}`);
+      }
+      mailStats.sent++;
+      mailStats.today++;
+      log(`e-mail de teste enviado para ${to}`);
+      return { ok: true, from: process.env.EMAIL_FROM || null };
     },
 
     'POST /api/admin/outage': async (req, body) => {
@@ -505,7 +675,7 @@ export async function createApp({
     } catch (e) {
       const status = e.status || 500;
       if (status === 500) console.error(e);
-      send(res, status, { error: status === 500 ? 'Erro interno no servidor' : e.message }, cors);
+      send(res, status, { error: status === 500 ? 'Erro interno no servidor' : e.message, ...(status === 500 ? {} : e.extra || {}) }, cors);
     }
   }
 

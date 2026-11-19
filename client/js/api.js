@@ -2,7 +2,7 @@
 // classificação de falhas: sem rede, servidor indisponível ou erro da API.
 export class OfflineError extends Error { constructor(m = 'Sem conexão com a internet') { super(m); this.kind = 'offline'; } }
 export class ServerDownError extends Error { constructor(m = 'Servidor indisponível') { super(m); this.kind = 'server-down'; } }
-export class HttpError extends Error { constructor(status, m) { super(m); this.status = status; this.kind = 'http'; } }
+export class HttpError extends Error { constructor(status, m, data = {}) { super(m); this.status = status; this.kind = 'http'; this.data = data; } }
 
 export const api = {
   base: '',
@@ -30,7 +30,7 @@ export const api = {
     }
     const data = await res.json().catch(() => ({}));
     if (res.status === 503 || res.status === 502 || res.status === 504) throw new ServerDownError(data.error || 'Servidor indisponível');
-    if (!res.ok) throw new HttpError(res.status, data.error || `Erro ${res.status}`);
+    if (!res.ok) throw new HttpError(res.status, data.error || `Erro ${res.status}`, data);
     return data;
   },
 
