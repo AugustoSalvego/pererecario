@@ -6,6 +6,15 @@ import { img } from './sprites.js';
 import { $, h, esc, toast, termsAlert } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
+// Mensagem de erro para o jogador. Erros do armazenamento do celular (IndexedDB) vêm em inglês e
+// não dizem nada para quem joga: a conta já está salva no servidor, então é só tentar de novo.
+function msgOf(ex) {
+  if (ex instanceof DOMException || /IDB|database|transaction/i.test(String(ex?.message || ''))) {
+    return 'O celular não deixou salvar agora. Toque de novo (sua conta já está guardada no servidor). Se continuar, feche e abra o jogo.';
+  }
+  return ex?.message || 'Algo deu errado. Tente de novo.';
+}
+
 const hills = `
 <svg class="hills" viewBox="0 0 400 300" preserveAspectRatio="none">
   <path d="M0 40 C 70 0, 140 25, 200 12 S 330 -10, 400 30 V300 H0Z" fill="#8fd16f"/>
@@ -246,7 +255,7 @@ export function renderLogin(onDone, config = {}) {
       }
       await enter(r, !!r.created);
     } catch (ex) {
-      err.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se para entrar.' : ex.message;
+      err.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se para entrar.' : msgOf(ex);
       sfx.error();
     } finally { gArea.classList.remove('busy'); done(); }
   }
@@ -262,7 +271,7 @@ export function renderLogin(onDone, config = {}) {
       const r = await api.post('/api/auth/google', { credential: pendingCredential, displayName: nick, acceptTerms: true }, AUTH_WAIT);
       await enter(r, true);
     } catch (ex) {
-      nerr.textContent = ex.status === 401 ? 'O login do Google expirou. Volte e toque em "Continuar com Google" de novo.' : ex.message;
+      nerr.textContent = ex.status === 401 ? 'O login do Google expirou. Volte e toque em "Continuar com Google" de novo.' : msgOf(ex);
       sfx.error();
       btn.disabled = false;
       btn.textContent = 'Começar a caçar';
@@ -370,7 +379,7 @@ export function renderLogin(onDone, config = {}) {
       await enter(r, isNew);
       return;
     } catch (ex) {
-      codeError(ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : ex.message);
+      codeError(ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : msgOf(ex));
       if (ex.data?.expired && flow) { flow.dead = true; startCountdown(0); }
       otp.value = '';
       paintOtp();
@@ -425,7 +434,7 @@ export function renderLogin(onDone, config = {}) {
       sfx.pop();
       otp.focus();
     } catch (ex) {
-      codeError(ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : ex.message);
+      codeError(ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : msgOf(ex));
       startCountdown(ex.data?.resendIn || 0);
     } finally { busy = false; }
   });
@@ -469,7 +478,7 @@ export function renderLogin(onDone, config = {}) {
       const start = () => api.post('/api/auth/forgot', { email }, AUTH_WAIT);
       openCode('reset', await start(), start);
     } catch (ex) {
-      fErr.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : ex.message;
+      fErr.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se e tente de novo.' : msgOf(ex);
       sfx.error();
     } finally { done(); fBtn.disabled = false; fBtn.textContent = 'Mandar o código'; }
   }
@@ -528,7 +537,7 @@ export function renderLogin(onDone, config = {}) {
         await enter(r, false);
       }
     } catch (ex) {
-      err.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se para entrar.' : ex.message;
+      err.textContent = ex.kind === 'offline' ? 'Sem internet. Conecte-se para entrar.' : msgOf(ex);
       sfx.error();
       submit.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     } finally {

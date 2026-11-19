@@ -6,11 +6,14 @@
 //            (banco restaurado de um backup, por exemplo), o celular reenvia o que faltar.
 const DB_NAME = 'pererecario';
 const VERSION = 2;
-let dbp;
+let dbp = null;
 
+// Abre o banco (uma conexão só, reaproveitada). O celular pode fechar essa conexão sozinho: a aba foi
+// para o segundo plano (por exemplo, enquanto a tela do Google estava aberta), faltou memória ou outra
+// aba atualizou o banco. Quando isso acontece, esquecemos a conexão e a próxima operação abre outra.
 function open() {
   if (dbp) return dbp;
-  dbp = new Promise((resolve, reject) => {
+  const p = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -21,131 +24,151 @@ function open() {
         db.createObjectStore('history', { keyPath: 'hseq', autoIncrement: true }).createIndex('player', 'playerId');
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onclose = () => { if (dbp === p) dbp = null; };                           // fechada pelo navegador
+      db.onversionchange = () => { db.close(); if (dbp === p) dbp = null; };       // outra aba precisa atualizar
+      resolve(db);
+    };
+    req.onerror = () => { if (dbp === p) dbp = null; reject(req.error); };
   });
-  return dbp;
+  dbp = p;
+  return p;
 }
 
-const done = (tx) => new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+const done = (tx) => new Promise((res, rej) => {
+  tx.oncomplete = () => res();
+  tx.onerror = () => rej(tx.error);
+  tx.onabort = () => rej(tx.error || new DOMException('Transação interrompida', 'AbortError'));
+});
 const reqp = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 
-export async function kvGet(key, fallback = null) {
-  const db = await open();
-  const v = await reqp(db.transaction('kv').objectStore('kv').get(key));
-  return v === undefined ? fallback : v;
+// conexão fechada no meio do caminho ("The database connection is closing", transação interrompida)
+const lostConnection = (e) => !!e && (e.name === 'InvalidStateError' || e.name === 'AbortError' || e.name === 'UnknownError'
+  || /clos(ing|ed)/i.test(String(e.message || '')));
+
+// Roda uma transação inteira. Se a conexão tinha sido fechada, abre outra e tenta de novo (até 3 vezes).
+// Repetir é seguro: uma transação que não chegou ao fim não grava nada (é tudo ou nada).
+async function run(stores, mode, fn) {
+  for (let attempt = 1; ; attempt++) {
+    let db;
+    try {
+      db = await open();
+      const tx = db.transaction(stores, mode);
+      const fin = done(tx);
+      fin.catch(() => {});
+      const result = await fn(tx);
+      await fin;
+      return result;
+    } catch (e) {
+      if (attempt >= 3 || !lostConnection(e)) throw e;
+      try { db?.close(); } catch {}
+      dbp = null;
+      await new Promise((r) => setTimeout(r, 60 * attempt));
+    }
+  }
 }
 
-export async function kvSet(key, value) {
-  const db = await open();
-  const tx = db.transaction('kv', 'readwrite');
-  tx.objectStore('kv').put(value, key);
-  return done(tx);
+export function kvGet(key, fallback = null) {
+  return run('kv', 'readonly', async (tx) => {
+    const v = await reqp(tx.objectStore('kv').get(key));
+    return v === undefined ? fallback : v;
+  });
+}
+
+export function kvSet(key, value) {
+  return run('kv', 'readwrite', (tx) => { tx.objectStore('kv').put(value, key); });
 }
 
 export async function kvByPrefix(prefix) {
-  const db = await open();
-  const keys = await reqp(db.transaction('kv').objectStore('kv').getAllKeys());
-  const out = {};
-  for (const k of keys) if (typeof k === 'string' && k.startsWith(prefix)) out[k] = await kvGet(k);
-  return out;
+  return run('kv', 'readonly', async (tx) => {
+    const store = tx.objectStore('kv');
+    const keys = (await reqp(store.getAllKeys())).filter((k) => typeof k === 'string' && k.startsWith(prefix));
+    const values = await Promise.all(keys.map((k) => reqp(store.get(k))));
+    return Object.fromEntries(keys.map((k, i) => [k, values[i]]));
+  });
 }
 
-export async function kvDelete(key) {
-  const db = await open();
-  const tx = db.transaction('kv', 'readwrite');
-  tx.objectStore('kv').delete(key);
-  return done(tx);
+export function kvDelete(key) {
+  return run('kv', 'readwrite', (tx) => { tx.objectStore('kv').delete(key); });
 }
 
-export async function outboxAll() {
-  const db = await open();
-  return reqp(db.transaction('outbox').objectStore('outbox').getAll());
+export function outboxAll() {
+  return run('outbox', 'readonly', (tx) => reqp(tx.objectStore('outbox').getAll()));
 }
 
 // Grava a operação e (opcionalmente) valores no kv na MESMA transação:
 // ou os dois ficam salvos, ou nenhum.
-export async function enqueue(op, kvWrites = {}, { replaceSeq } = {}) {
-  const db = await open();
-  const tx = db.transaction(['outbox', 'kv'], 'readwrite');
-  const out = tx.objectStore('outbox');
-  if (replaceSeq != null) out.delete(replaceSeq);
-  const r = out.add(op);
-  for (const [k, v] of Object.entries(kvWrites)) tx.objectStore('kv').put(v, k);
-  const seq = await reqp(r);
-  await done(tx);
-  return seq;
+export function enqueue(op, kvWrites = {}, { replaceSeq } = {}) {
+  return run(['outbox', 'kv'], 'readwrite', (tx) => {
+    const out = tx.objectStore('outbox');
+    if (replaceSeq != null) out.delete(replaceSeq);
+    const r = out.add(op);
+    for (const [k, v] of Object.entries(kvWrites)) tx.objectStore('kv').put(v, k);
+    return reqp(r);
+  });
 }
 
 // Tira da fila o que o servidor confirmou e guarda no histórico, na MESMA transação
-export async function outboxRemove(seqs, kvWrites = {}, historyOps = []) {
-  const db = await open();
-  const tx = db.transaction(['outbox', 'kv', 'history'], 'readwrite');
-  for (const s of seqs) tx.objectStore('outbox').delete(s);
-  for (const op of historyOps) tx.objectStore('history').add(op);
-  for (const [k, v] of Object.entries(kvWrites)) tx.objectStore('kv').put(v, k);
-  return done(tx);
+export function outboxRemove(seqs, kvWrites = {}, historyOps = []) {
+  return run(['outbox', 'kv', 'history'], 'readwrite', (tx) => {
+    for (const s of seqs) tx.objectStore('outbox').delete(s);
+    for (const op of historyOps) tx.objectStore('history').add(op);
+    for (const [k, v] of Object.entries(kvWrites)) tx.objectStore('kv').put(v, k);
+  });
 }
 
-export async function historyCount(playerId) {
-  const db = await open();
-  return reqp(db.transaction('history').objectStore('history').index('player').count(playerId));
+export function historyCount(playerId) {
+  return run('history', 'readonly', (tx) => reqp(tx.objectStore('history').index('player').count(playerId)));
 }
 
-export async function historyAll(playerId) {
-  const db = await open();
-  return reqp(db.transaction('history').objectStore('history').index('player').getAll(playerId));
+export function historyAll(playerId) {
+  return run('history', 'readonly', (tx) => reqp(tx.objectStore('history').index('player').getAll(playerId)));
 }
 
 // Coloca operações na frente da fila (são mais antigas que as que já estão nela), numa transação só.
 // Devolve a fila nova, na ordem.
 export async function outboxPrepend(ops) {
-  const db = await open();
-  const tx = db.transaction('outbox', 'readwrite');
-  const out = tx.objectStore('outbox');
-  const current = await reqp(out.getAll());
-  const known = new Set(current.map((o) => o.opId));
-  out.clear();
-  for (const op of ops) if (!known.has(op.opId)) { known.add(op.opId); out.add(op); }
-  for (const { seq, ...op } of current) out.add(op);
-  await done(tx);
+  await run('outbox', 'readwrite', async (tx) => {
+    const out = tx.objectStore('outbox');
+    const current = await reqp(out.getAll());
+    const known = new Set(current.map((o) => o.opId));
+    out.clear();
+    for (const op of ops) if (!known.has(op.opId)) { known.add(op.opId); out.add(op); }
+    for (const { seq, ...op } of current) out.add(op);
+  });
   return outboxAll();
 }
 
-export async function outboxUpdate(ops) {
-  const db = await open();
-  const tx = db.transaction('outbox', 'readwrite');
-  for (const op of ops) tx.objectStore('outbox').put(op);
-  return done(tx);
+export function outboxUpdate(ops) {
+  return run('outbox', 'readwrite', (tx) => { for (const op of ops) tx.objectStore('outbox').put(op); });
 }
 
-export async function logAdd(entry) {
-  const db = await open();
-  const tx = db.transaction('log', 'readwrite');
-  const store = tx.objectStore('log');
-  store.add({ at: Date.now(), ...entry });
-  const keys = await reqp(store.getAllKeys());
-  if (keys.length > 150) for (const k of keys.slice(0, keys.length - 150)) store.delete(k);
-  return done(tx);
+export function logAdd(entry) {
+  return run('log', 'readwrite', async (tx) => {
+    const store = tx.objectStore('log');
+    store.add({ at: Date.now(), ...entry });
+    const keys = await reqp(store.getAllKeys());
+    if (keys.length > 150) for (const k of keys.slice(0, keys.length - 150)) store.delete(k);
+  });
 }
 
-export async function logAll() {
-  const db = await open();
-  return reqp(db.transaction('log').objectStore('log').getAll());
+export function logAll() {
+  return run('log', 'readonly', (tx) => reqp(tx.objectStore('log').getAll()));
 }
 
 // Limpa a sessão do aparelho. Nunca apaga o histórico, nem as filas guardadas de outras contas
 // ("parked:") e as marcas do histórico ("histBase:").
-export async function wipe({ keep = [], keepPrefix = ['parked:', 'histBase:'] } = {}) {
-  const db = await open();
-  const kept = {};
-  for (const k of keep) kept[k] = await kvGet(k);
-  const keys = await reqp(db.transaction('kv').objectStore('kv').getAllKeys());
-  for (const k of keys) if (typeof k === 'string' && keepPrefix.some((p) => k.startsWith(p))) kept[k] = await kvGet(k);
-  const tx = db.transaction(['kv', 'outbox', 'log'], 'readwrite');
-  tx.objectStore('kv').clear();
-  tx.objectStore('outbox').clear();
-  tx.objectStore('log').clear();
-  for (const [k, v] of Object.entries(kept)) if (v != null) tx.objectStore('kv').put(v, k);
-  return done(tx);
+export function wipe({ keep = [], keepPrefix = ['parked:', 'histBase:'] } = {}) {
+  // ler o que fica e apagar o resto na MESMA transação: ou limpa tudo certinho, ou nada muda
+  return run(['kv', 'outbox', 'log'], 'readwrite', async (tx) => {
+    const kv = tx.objectStore('kv');
+    const keys = await reqp(kv.getAllKeys());
+    const keepKeys = keys.filter((k) => keep.includes(k) || (typeof k === 'string' && keepPrefix.some((p) => k.startsWith(p))));
+    const values = await Promise.all(keepKeys.map((k) => reqp(kv.get(k))));
+    kv.clear();
+    tx.objectStore('outbox').clear();
+    tx.objectStore('log').clear();
+    keepKeys.forEach((k, i) => { if (values[i] != null) kv.put(values[i], k); });
+  });
 }
