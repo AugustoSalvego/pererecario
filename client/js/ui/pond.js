@@ -8,7 +8,7 @@ import { store } from '../store.js';
 import { icons } from './icons.js';
 import { coinBurst } from './jobs.js';
 import { openTrade } from './friends.js';
-import { $, $$, esc, toast, openSheet, closeSheet, fmtDate, fmtDateTime, fmtCm } from './common.js';
+import { $, $$, esc, setHtml, toast, openSheet, closeSheet, fmtDate, fmtDateTime, fmtCm } from './common.js';
 import { sfx, vibrate } from '../audio.js';
 
 let sort = 'recent';
@@ -83,27 +83,27 @@ export function renderPond(el) {
   $('.sub', el).textContent = `${bag.length} perereca${bag.length === 1 ? '' : 's'} na bolsa${pending ? ` · ${pending} aguardando sincronizar` : ''}`;
   const bv = $('.bag-value', el);
   bv.classList.toggle('hidden', !bag.length);
-  bv.innerHTML = `<span>Vale</span><b>${coin(worth)}</b>`;
+  setHtml(bv, `<span>Vale</span><b>${coin(worth)}</b>`);
   // vender repetidas
   const dupes = duplicatesOf(bag);
   const sd = $('.sell-dupes', el);
   sd.classList.toggle('hidden', !dupes.length);
   if (dupes.length) {
     const total = dupes.reduce((s, c) => s + priceOf(c), 0);
-    sd.innerHTML = `<div class="sd-frogs">${[...new Set(dupes.map((c) => c.speciesId))].slice(0, 3).map((id) => frogImg(id, 34)).join('')}</div>
+    setHtml(sd, `<div class="sd-frogs">${[...new Set(dupes.map((c) => c.speciesId))].slice(0, 3).map((id) => frogImg(id, 34)).join('')}</div>
       <div class="sd-txt"><b>${dupes.length} repetida${dupes.length === 1 ? '' : 's'}</b><small>Fica a maior de cada espécie</small></div>
-      <button class="btn small sun" data-act="dupes">Vender por ${coin(total)}</button>`;
+      <button class="btn small sun" data-act="dupes">Vender por ${coin(total)}</button>`);
   }
   const grid = $('.specimens', el);
   if (!list.length) {
     grid.style.display = 'block';
-    grid.innerHTML = `<div class="empty">${frogImg('frog_moss', 110)}<h3>${sort === 'fav' ? 'Nenhuma favorita ainda' : 'Seu brejo está vazio'}</h3>
-      <p>${sort === 'fav' ? 'Toque na estrela de uma perereca para favoritar. Favoritas ficam guardadas e não são vendidas.' : (v.sales.length ? 'Você vendeu todas! Vá até uma lagoinha ou procure no mato para pegar mais.' : 'Vá até uma lagoinha do mapa e capture sua primeira perereca!')}</p></div>`;
+    setHtml(grid, `<div class="empty">${frogImg('frog_moss', 110)}<h3>${sort === 'fav' ? 'Nenhuma favorita ainda' : 'Seu brejo está vazio'}</h3>
+      <p>${sort === 'fav' ? 'Toque na estrela de uma perereca para favoritar. Favoritas ficam guardadas e não são vendidas.' : (v.sales.length ? 'Você vendeu todas! Vá até uma lagoinha ou procure no mato para pegar mais.' : 'Vá até uma lagoinha do mapa e capture sua primeira perereca!')}</p></div>`);
     return;
   }
   grid.style.display = '';
   const cat = getCatalog();
-  grid.innerHTML = list.map((c) => {
+  setHtml(grid, list.map((c) => {
     const s = species(c.speciesId);
     const inTrade = v.reserved.has(c.id);
     return `<div class="card spec-card ${c.pending ? 'pending' : ''} ${inTrade ? 'in-trade' : ''}" data-spawn="${esc(c.spawnId)}" data-cap="${esc(c.id)}" style="--tier:${cat.tiers[s.tier].color}">
@@ -114,7 +114,7 @@ export function renderPond(el) {
       <div class="row"><div><div class="nm">${esc(s.name)}</div><div class="meta">${fmtCm(c.sizeCm)} · ${fmtDate(c.caughtAt)}</div></div>
       <button class="fav-btn ${c.favorite ? 'on' : ''}" data-fav="${esc(c.spawnId)}" aria-label="Favoritar">${icons.star}</button></div>
     </div>`;
-  }).join('');
+  }).join(''));
 }
 
 // animação da venda: as pererecas pulam para fora do cartão, as moedas sobem e o saldo do topo pisca

@@ -7,7 +7,7 @@ import { giftFor, dayOf, maskFromSpecies, frogPrice, BALANCO } from '../shared/g
 import { icons } from './icons.js';
 import { charHtml, lookOf } from './sprites.js';
 import { coinBurst } from './jobs.js';
-import { $, $$, h, esc, openSheet, closeSheet, toast, fmtDate, fmtCm } from './common.js';
+import { $, $$, h, esc, setHtml, openSheet, closeSheet, toast, fmtDate, fmtCm } from './common.js';
 import { sfx, vibrate } from '../audio.js';
 
 const PREFIX = 'PERERECARIO:1:';
@@ -77,7 +77,7 @@ export async function renderFriends(el) {
   const v = store.view;
   if (!v.player) return;
   $('.code-pill', el).textContent = v.player.friendCode || '······';
-  $('.qr-frog', el).innerHTML = frogImg(v.player.avatar || 'frog_leaf', 44);
+  setHtml($('.qr-frog', el), frogImg(v.player.avatar || 'frog_leaf', 44));
   try {
     await loadScript('vendor/qrcode.js');
     const qr = window.qrcode(0, 'M');
@@ -91,13 +91,13 @@ export async function renderFriends(el) {
   const past = v.trades.filter((t) => !v.activeTrades.includes(t)).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 3);
   $('.trades-box', el).classList.toggle('hidden', !v.activeTrades.length);
   $('.ntrades', el).textContent = v.tradeActions ? `${v.tradeActions} esperando você` : '';
-  $('.trades-box .trade-list', el).innerHTML = v.activeTrades.map(tradeRow).join('');
+  setHtml($('.trades-box .trade-list', el), v.activeTrades.map(tradeRow).join(''));
   $('.past-box', el).classList.toggle('hidden', !past.length);
-  $('.past-box .trade-list', el).innerHTML = past.map(tradeRow).join('');
+  setHtml($('.past-box .trade-list', el), past.map(tradeRow).join(''));
 
   $('.nfriends', el).textContent = v.friends.length ? `${v.friends.length}` : '';
   $('.friend-tip', el).classList.toggle('hidden', !v.friends.length);
-  $('.friend-list', el).innerHTML = v.friends.length ? v.friends.map((f) => {
+  setHtml($('.friend-list', el), v.friends.length ? v.friends.map((f) => {
     const giftTaken = v.capturedSpawns.has(`gift:${v.player.id}:${f.id}:${day}`);
     const active = v.activeTrades.find((t) => t.friendId === f.id);
     return `<div class="card list-item friend-row" data-friend="${esc(f.id)}">
@@ -106,7 +106,7 @@ export async function renderFriends(el) {
       <div class="s">${active ? '🔁 Troca em andamento' : giftTaken ? '🎁 Presente de hoje já recebido' : 'Escaneie o QR de novo para o presente de hoje'}</div></div>
       <div class="chev">${icons.back}</div>
     </div>`;
-  }).join('') : `<div class="empty">${frogImg('frog_guava', 90)}<h3>Nenhum parceiro ainda</h3><p>Escaneie o QR de outro jogador: vocês dois ganham <b>B$ ${BALANCO.porAmigo}</b> e você leva uma perereca-presente!</p></div>`;
+  }).join('') : `<div class="empty">${frogImg('frog_guava', 90)}<h3>Nenhum parceiro ainda</h3><p>Escaneie o QR de outro jogador: vocês dois ganham <b>B$ ${BALANCO.porAmigo}</b> e você leva uma perereca-presente!</p></div>`);
 }
 
 // ---------------- trocas ----------------

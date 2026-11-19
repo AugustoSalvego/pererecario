@@ -10,7 +10,7 @@ import { openWardrobe } from './wardrobe.js';
 import { isNightAt } from './daynight.js';
 import { geo } from '../geo.js';
 import { dayOf, findBrejo } from '../shared/game.js';
-import { $, $$, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
+import { $, $$, esc, setHtml, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
 import { sfx } from '../audio.js';
 import { renderGoogleButton } from './login.js';
 
@@ -109,12 +109,12 @@ function renderRanking(el) {
   const box = $('.rank', el);
   const board = boardOf('xp');
   $('.rank-all', el).classList.toggle('hidden', !board);
-  if (!board) { box.innerHTML = '<div class="card list-item"><div class="s">Conecte-se para ver o ranking.</div></div>'; return; }
+  if (!board) { setHtml(box, '<div class="card list-item"><div class="s">Conecte-se para ver o ranking.</div></div>'); return; }
   $('.rk-note', el).textContent = `${ranking.players} jogador${ranking.players === 1 ? '' : 'es'}`;
   const me = store.view.player?.id;
   const rows = board.top.slice(0, 5).map((r, i) => rankRow(r, i, 'xp', me));
   if (board.me && board.me.rank > 5) rows.push(`<div class="rank-gap">· · ·</div>${rankRow(board.me, board.me.rank - 1, 'xp', me)}`);
-  box.innerHTML = rows.join('');
+  setHtml(box, rows.join(''));
 }
 
 function openRanking(start = 'xp') {
@@ -159,7 +159,7 @@ export function renderProfile(el) {
   el.querySelectorAll('.staff-only').forEach((x) => x.classList.toggle('hidden', !v.player.staff));
   const cat = getCatalog();
   const lv = v.level;
-  $('.hero-slot', el).innerHTML = `<div class="profile-hero">
+  setHtml($('.hero-slot', el), `<div class="profile-hero">
       <div class="ph-info">
         <h2 class="${v.player.displayName.length > 14 ? 'long' : ''}">${esc(v.player.displayName)}</h2>
         <p>código de amigo ${esc(v.player.friendCode || '')}</p>
@@ -171,29 +171,29 @@ export function renderProfile(el) {
         <span class="ph-edit">${icons.shirt}</span>
         <span class="ph-cap">Trocar visual</span>
       </button>
-    </div>`;
+    </div>`);
 
   const caught = v.captures.filter((c) => c.kind !== 'trade');   // as recebidas em troca não contam como captura
   const huntDays = new Set(caught.map((c) => dayOf(c.caughtAt))).size;
-  $('.stats', el).innerHTML = [
+  setHtml($('.stats', el), [
     ['book', '#4cb944', `${v.discovered.size}/${cat.species.length}`, 'espécies'],
     ['pond', '#3bb5cf', caught.length, 'capturas'],
     ['route', '#ff7a5c', fmtDist(v.totalMeters), 'caminhados'],
     ['flag', '#9b67e0', huntDays, huntDays === 1 ? 'dia de caçada' : 'dias de caçada'],
-  ].map(([ic, c, b, s]) => `<div class="card stat"><div class="ico" style="background:${c}">${icons[ic]}</div><div><b>${b}</b><span>${s}</span></div></div>`).join('');
+  ].map(([ic, c, b, s]) => `<div class="card stat"><div class="ico" style="background:${c}">${icons[ic]}</div><div><b>${b}</b><span>${s}</span></div></div>`).join(''));
 
   const cur = store.currentExpedition();
-  $('.exp-slot', el).innerHTML = `<div class="card exp-now">
+  setHtml($('.exp-slot', el), `<div class="card exp-now">
       <div style="display:flex;justify-content:space-between;align-items:center"><b>${fmtDay(dayOf(store.now()))}</b><span class="s" style="font-size:13px;color:var(--ink-soft)">salva sozinha, mesmo offline</span></div>
       <div class="row"><div><b>${cur?.captures.length || 0}</b><span>pererecas</span></div><div><b>${cur?.xp || 0}</b><span>XP</span></div><div><b>${fmtDist(cur?.meters || 0)}</b><span>caminhados</span></div></div>
       <div class="frogs-row">${(cur?.captures || []).slice(0, 12).map((c) => frogImg(c.speciesId, 30)).join('') || '<span class="s" style="font-size:13px;color:var(--ink-soft)">Nenhuma perereca hoje ainda. Bora caçar!</span>'}</div>
-    </div>`;
+    </div>`);
 
   const recent = v.captures.slice(0, DIARY_SHOWN);
-  $('.history', el).innerHTML = recent.length
+  setHtml($('.history', el), recent.length
     ? recent.map((c) => diaryRow(c)).join('') + (v.captures.length > DIARY_SHOWN
       ? `<button class="btn ghost block see-all" data-act="diary">Ver todas as capturas</button>` : '')
-    : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>';
+    : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>');
 
   renderSyncCard(el);
   renderAccount(el);
@@ -430,13 +430,13 @@ function openPassword() {
 
 export function renderSyncCard(el) {
   const label = { online: store.outbox.length ? '🟢 Online' : '🟢 Online · tudo salvo', offline: '🔴 Offline', 'server-down': '🟠 Servidor fora do ar', syncing: '🔵 Sincronizando', starting: '…' }[sync.status];
-  $('.sync-card', el).innerHTML = `
+  setHtml($('.sync-card', el), `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div><b>${label}</b><div class="s" style="font-size:13px;color:var(--ink-soft);font-weight:500;margin-top:3px">
         ${store.outbox.length} operaç${store.outbox.length === 1 ? 'ão' : 'ões'} na fila · última sincronização ${sync.lastSyncAt ? ago(sync.lastSyncAt) : 'nunca nesta sessão'}<br>
         Este aparelho: <b>${esc(store.deviceId)}</b></div></div>
       <button class="icon-btn" data-act="sync-now" aria-label="Sincronizar agora">${icons.sync}</button>
-    </div>`;
+    </div>`);
 }
 
 function fmtDay(day) {

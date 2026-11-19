@@ -57,6 +57,16 @@ export function toast(msg, kind = '', icon = null, ms = 3200) {
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, ms);
 }
 
+// Troca o conteúdo só se ele mudou de verdade. As telas são redesenhadas a cada mudança do jogo
+// (inclusive a cada passo do boneco); reescrever o mesmo HTML reinicia as animações de entrada e
+// faz a lista "piscar".
+export function setHtml(el, html) {
+  if (!el || el.__html === html) return false;
+  el.innerHTML = html;
+  el.__html = html;
+  return true;
+}
+
 // ---------- bottom sheet ----------
 let sheetClose = null;
 export function openSheet(html, { onClose, cls = '' } = {}) {
