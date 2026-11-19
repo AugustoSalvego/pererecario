@@ -61,13 +61,15 @@ export class GameMap {
     if (!tilt) el.classList.add('flat');
     el.innerHTML = `<div class="map-sky"><div class="cloud" style="left:10%"></div><div class="cloud" style="left:60%;animation-delay:-30s;width:60px"></div></div>
       <div class="map-plane"><div class="map-ground"></div><div class="map-tiles"></div><div class="map-features"></div></div>
-      <div class="map-objects"></div><div class="map-night"></div>
-      <div class="fireflies">${Array.from({ length: 14 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--y:${(i * 61 + 13) % 100}%;--t:${6 + (i % 5) * 1.7}s;--dl:${-i * 1.3}s"></i>`).join('')}</div>
+      <div class="map-objects"></div><div class="map-night"><i class="night-light"></i></div>
+      <div class="fireflies">${Array.from({ length: 8 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--y:${(i * 61 + 13) % 100}%;--t:${6 + (i % 5) * 1.7}s;--dl:${-i * 1.3}s"></i>`).join('')}</div>
       <div class="map-fog"></div><div class="map-attrib">${provider.attribution}</div>`;
     this.plane = el.querySelector('.map-plane');
     this.tileLayer = el.querySelector('.map-tiles');
     this.featLayer = el.querySelector('.map-features');
     this.objLayer = el.querySelector('.map-objects');
+    this.light = el.querySelector('.night-light');
+    this.tileOrigin = null;
     this.sinT = Math.sin(rad(tilt));
     this.cosT = Math.cos(rad(tilt));
     this.measure();
@@ -137,10 +139,11 @@ export class GameMap {
       f = { el };
       this.features.set(key, f);
     }
+    const moved = f.lat !== lat || f.lng !== lng || f.radiusM !== radiusM;
     Object.assign(f, { lat, lng, radiusM });
     if (f.className !== className) { f.el.className = className; f.className = className; }
     if (f.html !== html) { f.el.innerHTML = html; f.html = html; }
-    this.invalidate();
+    if (moved) this.invalidate();
     return f.el;
   }
   removeFeature(key) { const f = this.features.get(key); if (f) { f.el.remove(); this.features.delete(key); } }
@@ -155,21 +158,43 @@ export class GameMap {
       o = { el };
       this.objects.set(key, o);
     }
+    // só pede um redesenho do mapa se o objeto andou (o laço dos outros jogadores chama isto
+    // 10 vezes por segundo; redesenhar sem mudança nenhuma esquentava o celular)
+    const moved = o.lat !== lat || o.lng !== lng || o.depthScale !== depthScale || o.ground !== ground || o.top !== top;
     Object.assign(o, { lat, lng, depthScale, ground, top, data });
     const cls = `mobj ${className}`;
     if (o.cls !== cls) { o.el.className = cls; o.cls = cls; }
     if (html != null && o.html !== html) { o.el.innerHTML = html; o.html = html; }
-    this.invalidate();
+    if (moved) { o.tf = null; this.invalidate(); }
     return o.el;
   }
   removeObject(key) { const o = this.objects.get(key); if (o) { o.el.remove(); this.objects.delete(key); } }
   objectKeys() { return [...this.objects.keys()]; }
+
+  // Luz em volta do jogador à noite: um elemento grande, só deslocado (o celular move sem redesenhar).
+  setLight(x, y) {
+    const cx = Math.round(Math.max(-this.W * 0.5, Math.min(this.W * 1.5, x)));
+    const cy = Math.round(Math.max(-this.H * 0.5, Math.min(this.H * 1.5, y)));
+    const tf = `translate(${cx - 2000}px, ${cy - 2000}px)`;
+    if (this.light && this.light.__tf !== tf) { this.light.style.transform = tf; this.light.__tf = tf; }
+  }
 
   render() {
     const { W, H, O } = this;
     const L = Math.min(Math.floor(this.zoom), provider.maxZoom); // acima do máximo, amplia o último nível
     const scale = 2 ** (this.zoom - L);
     const c = worldPx(this.center.lat, this.center.lng, L);
+    // Os tiles ficam parados dentro de um contêiner, a partir de uma origem fixa; andar e dar zoom
+    // só move/escala o contêiner inteiro (uma transformação só, feita pela placa de vídeo, sem
+    // redesenhar os tiles). A origem muda quando troca o nível de zoom ou o jogador vai muito longe.
+    const org = this.tileOrigin;
+    if (!org || org.L !== L || Math.abs(c.x - org.x) > 60000 || Math.abs(c.y - org.y) > 60000) {
+      this.tileOrigin = { L, x: Math.floor(c.x / TILE) * TILE, y: Math.floor(c.y / TILE) * TILE };
+      for (const img of this.tiles.values()) img.__tf = null;
+    }
+    const ox = this.tileOrigin.x, oy = this.tileOrigin.y;
+    const ltf = `translate(${O.x + (ox - c.x) * scale}px, ${O.y + (oy - c.y) * scale}px) scale(${scale})`;
+    if (this.tileLayer.__tf !== ltf) { this.tileLayer.style.transform = ltf; this.tileLayer.__tf = ltf; }
     // região do plano visível (inversa da perspectiva nos cantos da tela)
     const corners = [[0, this.tilt ? H * 0.08 : 0], [W, this.tilt ? H * 0.08 : 0], [0, H], [W, H]].map(([x, y]) => this.screenToPlane(x, y));
     const minX = Math.min(...corners.map((p) => p.x)), maxX = Math.max(...corners.map((p) => p.x));
@@ -194,8 +219,8 @@ export class GameMap {
           this.tileLayer.appendChild(img);
           this.tiles.set(key, img);
         }
-        const px = (tx * TILE - c.x) * scale, py = (ty * TILE - c.y) * scale;
-        img.style.transform = `translate(${O.x + px}px, ${O.y + py}px) scale(${scale * 1.004})`;
+        const tf = `translate(${tx * TILE - ox}px, ${ty * TILE - oy}px)`;
+        if (img.__tf !== tf) { img.style.transform = tf; img.__tf = tf; }
       }
     }
     for (const [key, img] of this.tiles) if (!keep.has(key)) { img.remove(); this.tiles.delete(key); }
@@ -204,6 +229,9 @@ export class GameMap {
     for (const f of this.features.values()) {
       const p = this.toPlane(f.lat, f.lng);
       const d = (2 * f.radiusM) / mpp;
+      const key = `${d.toFixed(1)}|${(O.x + p.x - d / 2).toFixed(1)}|${(O.y + p.y - d / 2).toFixed(1)}`;
+      if (f.key === key) continue;
+      f.key = key;
       f.el.style.width = `${d}px`;
       f.el.style.height = `${d}px`;
       f.el.style.transform = `translate(${O.x + p.x - d / 2}px, ${O.y + p.y - d / 2}px)`;
@@ -216,8 +244,10 @@ export class GameMap {
       if (o.off) { o.el.style.display = ''; o.off = false; }
       const zk = Math.max(0.55, Math.min(1.35, 2 ** ((this.zoom - BASE_ZOOM) * 0.7)));
       const k = o.depthScale ? Math.max(0.45, Math.min(1.25, s.s)) * zk : 1;
-      o.el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${k})`;
-      o.el.style.zIndex = String(o.ground ? 1 : o.top ? 100000 : 1000 + Math.round(s.y));
+      const tf = `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) scale(${k.toFixed(3)})`;
+      if (o.tf !== tf) { o.el.style.transform = tf; o.tf = tf; }
+      const z = String(o.ground ? 1 : o.top ? 100000 : 1000 + Math.round(s.y));
+      if (o.z !== z) { o.el.style.zIndex = z; o.z = z; }
     }
     this.cb.onRender?.();
   }

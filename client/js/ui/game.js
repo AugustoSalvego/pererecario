@@ -387,8 +387,7 @@ function applySky() {
 function placeLight() {
   const pos = geo.pos;
   const p = pos ? map.latLngToScreen(pos.lat, pos.lng) : { x: map.W / 2, y: map.H / 2 };
-  map.el.style.setProperty('--lx', `${Math.round(p.x)}px`);
-  map.el.style.setProperty('--ly', `${Math.round(p.y - 22)}px`);
+  map.setLight(p.x, p.y - 22);
 }
 
 function renderExpedition() {
@@ -478,9 +477,11 @@ function refreshObjects() {
     keep.add(`pond:${b.id}`);
   }
   const range = captureRange(pos);
+  const STILL_M = 40;   // longe disso, a perereca/matinho fica parado (economiza bateria)
   for (const s of spawns) {
     const hidden = isHidden(s);
     const d = pos ? distanceM(pos, s) : Infinity;
+    const still = d > STILL_M ? ' still' : '';
     const key = `frog:${s.id}`;
     keep.add(key);
     let html, cls;
@@ -490,13 +491,13 @@ function refreshObjects() {
         cls = 'mbush peek';
         html = `<div class="body">${img('bush-peek.png', 60, 'bush')}</div>`;
       } else {
-        cls = 'mbush';
+        cls = `mbush${still}`;
         html = `<div class="body" style="--qd:${qDelay}s">${img('bush.png', 56, 'bush')}${img('bubble-q.png', 26, 'bubble')}</div>`;
       }
     } else {
       const fresh = justRevealed.has(s.id);
       const delay = -((hash32(s.id) % 5000) / 1000);
-      cls = `mfrog ${d <= range ? 'near' : 'far'}`;
+      cls = `mfrog ${d <= range ? 'near' : 'far'}${still}`;
       html = `<div class="body" style="--d:${delay}s">${fresh ? img('bubble-ex.png', 22, 'ex') + sparkleHtml(4) : ''}${frogImg(s.speciesId, 38)}<div class="shadow"></div></div>`;
     }
     map.setObject(key, { lat: s.lat, lng: s.lng, html, className: cls, data: s });

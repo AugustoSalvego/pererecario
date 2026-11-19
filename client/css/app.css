@@ -164,8 +164,8 @@ svg { display: block; }
     radial-gradient(circle at 70% 60%, rgba(60,140,60,.18) 0 10px, transparent 11px),
     radial-gradient(circle at 40% 80%, rgba(60,140,60,.12) 0 6px, transparent 7px);
   background-size: 120px 120px, 160px 160px, 90px 90px; }
-.map-tiles { position: absolute; left: 0; top: 0; }
-.map-tiles img { position: absolute; width: 256px; height: 256px; transform-origin: 0 0; filter: saturate(1.35) hue-rotate(-6deg) brightness(1.04) contrast(.95); opacity: 0; transition: opacity .35s; image-rendering: auto; }
+.map-tiles { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.map-tiles img { position: absolute; width: 257px; height: 257px; transform-origin: 0 0; filter: saturate(1.35) hue-rotate(-6deg) brightness(1.04) contrast(.95); opacity: 0; transition: opacity .35s; image-rendering: auto; }
 .map-tiles img.ok { opacity: 1; }
 .map-features { position: absolute; left: 0; top: 0; }
 .brejo-water {
@@ -190,7 +190,7 @@ svg { display: block; }
 .mobj { position: absolute; left: 0; top: 0; pointer-events: auto; will-change: transform; }
 .mfrog { width: 0; height: 0; }
 .mfrog .body { position: absolute; left: 0; bottom: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: opacity .3s; }
-.mfrog .frog { display: block; animation: idleHop 2.4s ease-in-out infinite; animation-delay: var(--d, 0s); filter: drop-shadow(0 3px 0 rgba(0,0,0,.18)); }
+.mfrog .frog { display: block; animation: idleHop 2.4s ease-in-out infinite; animation-delay: var(--d, 0s); }
 .mfrog .shadow { width: 46px; height: 12px; margin-top: -6px; border-radius: 50%; background: rgba(0,0,0,.2); animation: shadowHop 2.4s ease-in-out infinite; animation-delay: var(--d, 0s); }
 .mfrog.far .body { opacity: .78; }
 .mfrog.near .frog { animation-duration: 1.2s; }
@@ -239,7 +239,7 @@ svg { display: block; }
 .avatar-wrap { position: relative; }
 
 .status-pill { display: flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 99px; background: rgba(255,255,255,.96); color: var(--ink); font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 rgba(23,53,42,.15); white-space: nowrap; transition: background .3s, color .3s; }
-.status-pill .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #34b44a; box-shadow: 0 0 0 0 rgba(52,180,74,.5); animation: dotPulse 2.4s ease-out infinite; }
+.status-pill .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #34b44a; box-shadow: 0 0 0 3px rgba(52,180,74,.2); }
 @keyframes dotPulse { 0% { box-shadow: 0 0 0 0 rgba(52,180,74,.5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(52,180,74,0); } }
 .status-pill.offline .dot { background: #e5484d; animation: none; box-shadow: 0 0 0 3px rgba(229,72,77,.18); }
 .status-pill.server-down .dot { background: #f08c00; animation: blink 1.2s infinite; box-shadow: 0 0 0 3px rgba(240,140,0,.2); }
@@ -605,8 +605,11 @@ svg { display: block; }
 .map.flat .map-ground { background: #efeee9; }
 .map.flat .map-tiles img { filter: saturate(.92) brightness(1.02); }
 .map.flat .map-attrib { background: rgba(255,255,255,.75); }
-.range-ring { border: 3px solid rgba(70, 190, 60, .95); background: rgba(120, 230, 90, .16); box-shadow: 0 0 12px rgba(110, 230, 80, .85), inset 0 0 14px rgba(110, 230, 80, .55); border-style: solid; animation: ringPulse 2.2s ease-in-out infinite; }
-@keyframes ringPulse { 50% { box-shadow: 0 0 20px rgba(110, 230, 80, .95), inset 0 0 20px rgba(110, 230, 80, .7); } }
+/* o anel "respira": o brilho extra fica num elemento à parte e só a transparência dele muda
+   (a placa de vídeo faz sozinha; animar a sombra redesenhava a tela inteira a cada quadro) */
+.range-ring { border: 3px solid rgba(70, 190, 60, .95); background: rgba(120, 230, 90, .16); box-shadow: 0 0 12px rgba(110, 230, 80, .85), inset 0 0 14px rgba(110, 230, 80, .55); border-style: solid; }
+.range-ring::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 22px rgba(110, 230, 80, .9), inset 0 0 20px rgba(110, 230, 80, .6); opacity: 0; animation: ringGlow 2.2s ease-in-out infinite; will-change: opacity; }
+@keyframes ringGlow { 50% { opacity: 1; } }
 .shake-wave { border: 5px solid rgba(255, 255, 255, .95); box-shadow: 0 0 16px rgba(255, 216, 74, .9); }
 
 .mpond { pointer-events: auto; }
@@ -719,7 +722,7 @@ svg { display: block; }
 .mode-btn.controle svg { color: #4a7fd6; }
 .mode-btn:not(.controle) svg { color: var(--leaf-dark); }
 .joystick { position: absolute; left: 16px; bottom: calc(var(--safe-bottom) + 104px); z-index: 6; }
-.joy-base { width: 116px; height: 116px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.55), rgba(255,255,255,.3)); border: 3px solid rgba(255,255,255,.85); box-shadow: 0 4px 0 rgba(23,53,42,.18), inset 0 0 0 10px rgba(255,255,255,.12); display: grid; place-items: center; touch-action: none; backdrop-filter: blur(2px); }
+.joy-base { width: 116px; height: 116px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.55), rgba(255,255,255,.3)); border: 3px solid rgba(255,255,255,.85); box-shadow: 0 4px 0 rgba(23,53,42,.18), inset 0 0 0 10px rgba(255,255,255,.12); display: grid; place-items: center; touch-action: none; }
 .joy-knob { width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8ee07a, var(--leaf) 60%, var(--leaf-dark)); box-shadow: 0 4px 0 rgba(23,53,42,.3); transition: transform .12s ease-out; pointer-events: none; }
 .joy-base.on .joy-knob { transition: none; }
 #game.controle .hud-expedition { bottom: calc(var(--safe-bottom) + 232px); }
@@ -734,7 +737,8 @@ svg { display: block; }
 
 /* ---------- dia e noite ---------- */
 .map-night, .fireflies { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.6s ease; }
-.map-night { z-index: 2; mix-blend-mode: multiply; background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%), #fff 0 60px, #f0f2ff 95px, #b9c1f2 180px, #7f8bd2 300px, #6470b8 100%); }
+.map-night { z-index: 2; overflow: hidden; }
+.night-light { position: absolute; left: 0; top: 0; width: 4000px; height: 4000px; will-change: transform; background: radial-gradient(circle 2000px at 50% 50%, rgba(8,20,120,0) 0 60px, rgba(8,20,120,.07) 95px, rgba(8,22,125,.28) 180px, rgba(8,22,120,.48) 300px, rgba(8,20,110,.6) 900px); }
 .map-objects { z-index: 1; }
 .map.night .map-night { opacity: 1; }
 .fireflies { z-index: 3; }
@@ -747,7 +751,7 @@ svg { display: block; }
   70% { opacity: 1; }
   100% { transform: translate(-10px, -60px); opacity: 0; }
 }
-.map.night .oname, .map.night .range-ring { filter: brightness(1.1); }
+.map.night .oname { filter: brightness(1.1); }
 .map-attrib { z-index: 4; }
 .sky-chip { font-size: 15px; }
 .capture .cap-night, .capture .cap-stars { position: absolute; inset: 0; pointer-events: none; display: none; }
@@ -1172,3 +1176,7 @@ form.login-card > button[type=submit] { margin-top: auto; }
 .mfrog .body::after, .mbush .body::after { content: ''; position: absolute; left: -18px; right: -18px; top: -16px; bottom: -12px; border-radius: 22px; }
 .hint-bubble.act { cursor: pointer; pointer-events: auto; }
 .hint-bubble.act b { text-decoration: underline; text-underline-offset: 2px; }
+
+/* economia de bateria: pererecas e matinhos longe ficam parados (cada animação infinita obriga o
+   celular a desenhar a tela o tempo todo); perto do jogador eles continuam pulando */
+.mfrog.still .frog, .mfrog.still .shadow, .mbush.still .bush, .mbush.still .bubble { animation: none; }
