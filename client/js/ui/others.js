@@ -91,11 +91,11 @@ export function mountOthers(map, { onTap } = {}) {
       const key = `other:${p.id}`;
       const o = map.objects.get(key);
       map.setObject(key, {
-        lat: ll.lat, lng: ll.lng, className: 'mother', depthScale: false, data: { id: p.id, name: s.name, mode: s.mode },
+        lat: ll.lat, lng: ll.lng, className: 'mother', data: { id: p.id, name: s.name, mode: s.mode },
         html: (!o || o.sig !== sig)
           ? (s.vehicle
-            ? `<div class="cwrap other">${faceBubble(s.look, s.name)}${carSprite(s.vehicle, { dir: s.dir, moving: walking })}</div>`
-            : `<div class="owrap"><div class="pshadow"></div>${charHtml(s.look, { dir: s.dir, walking, scale: 2.3 })}<span class="oname">${esc(s.name)}</span></div>`)
+            ? `<div class="cwrap other">${faceBubble(s.look, s.name)}${carSprite(s.vehicle, { dir: s.dir, moving: walking, scale: 1.65 })}</div>`
+            : `<div class="owrap"><div class="pshadow"></div>${charHtml(s.look, { dir: s.dir, walking, scale: 1.95 })}<span class="oname">${esc(s.name)}</span></div>`)
           : null,
       });
       map.objects.get(key).sig = sig;

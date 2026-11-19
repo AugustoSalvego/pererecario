@@ -15,7 +15,7 @@ import { openJobTalk, runJobGame, startDelivery, deliveryState, cancelDelivery, 
 import { openShop, carSprite, faceBubble } from './shop.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
-import { $, $$, esc, toast, openSheet, closeSheet, fmtDist, ago, termsAlert } from './common.js';
+import { $, $$, esc, toast, openSheet, closeSheet, fmtDist, ago, termsAlert, setHtml } from './common.js';
 import { getCatalog, frogImg, species } from '../catalog.js';
 import { store } from '../store.js';
 import { sync } from '../sync.js';
@@ -104,6 +104,9 @@ export function startGame({ firstTime = false } = {}) {
     onTapObject: onTapObject,
     onTapGround: (ll) => {
       unlockAudio();
+      // tocou do ladinho de uma perereca (ou matinho) que dá para pegar: vale como tocar nela
+      const hit = frogNearTap(ll);
+      if (hit) return onTapObject(hit.key, hit.data);
       if (geo.mode === 'sim') { geo.walkTo(ll.lat, ll.lng); sfx.tap(); }
     },
     onUserMove: () => $('.recenter', root).classList.remove('hidden'),
@@ -274,17 +277,24 @@ function renderHud() {
 // guardadas no celular), "Sincronizando…" ao voltar e "Tudo salvo" quando o servidor confirma.
 // O "Sincronizando" fica pelo menos 1,2 s na tela, para dar para ver mesmo quando é rápido.
 const pillState = { view: null, since: 0, timer: null, savedUntil: 0, worth: false };
+// Operações de fundo (a distância andada na caçada do dia) sobem sozinhas a cada minuto enquanto o
+// jogador anda: elas não mudam o indicador para "Sincronizando…" (senão ele piscaria ao andar).
+const QUIET_OPS = new Set(['expedition.start', 'expedition.progress', 'expedition.end']);
+
 function renderStatus() {
   const pill = $('.status-pill');
   if (!pill) return;
   const n = store.outbox.length;
+  const loud = store.outbox.some((o) => !QUIET_OPS.has(o.type));
   let st = sync.status === 'starting' ? (api.isOffline() ? 'offline' : 'syncing') : sync.status;
   const t = Date.now();
   clearTimeout(pillState.timer);
+  // sincronização só de fundo, já estando online: continua mostrando "Online"
+  if (st === 'syncing' && !loud && pillState.view !== 'offline' && pillState.view !== 'server-down' && pillState.view !== 'syncing') st = 'online';
   if (st === 'syncing') {
     if (pillState.view !== 'syncing') {
       // vale mostrar "Tudo salvo" no fim se havia algo para mandar ou se a internet acabou de voltar
-      pillState.worth = n > 0 || pillState.view === 'offline' || pillState.view === 'server-down';
+      pillState.worth = loud || pillState.view === 'offline' || pillState.view === 'server-down';
       pillState.since = t;
     }
   } else if (st === 'online' && pillState.view === 'syncing') {
@@ -297,19 +307,22 @@ function renderStatus() {
     pillState.timer = setTimeout(renderStatus, pillState.savedUntil - t + 20);
   } else if (st !== 'online' && st !== 'saved') pillState.savedUntil = 0;
   pillState.view = st === 'saved' ? 'online' : st;
-  pill.className = `status-pill ${st}`;
+  // só mexe na tela se mudou: reescrever a cada passo reiniciava as animações e o indicador "travava"
+  const cls = `status-pill ${st}`;
+  if (pill.className !== cls) pill.className = cls;
   const kept = n ? `<span class="count" title="guardadas no celular">${n}</span>` : '';
-  pill.innerHTML = {
+  setHtml(pill, {
     online: '<span class="dot"></span><span class="lbl">Online</span>',
     saved: `<span class="ok">${icons.check}</span><span class="lbl">Tudo salvo</span>`,
     syncing: `<span class="spin"></span><span class="lbl">Sincronizando…</span>${kept}`,
     offline: `<span class="dot"></span><span class="lbl">Offline</span>${kept}`,
     'server-down': `<span class="dot"></span><span class="lbl">Servidor fora</span>${kept}`,
-  }[st] || st;
-  pill.setAttribute('aria-label', {
+  }[st] || st);
+  const label = ({
     online: 'Online: tudo salvo no servidor', saved: 'Tudo salvo no servidor', syncing: 'Sincronizando com o servidor',
     offline: `Offline: ${n} ações guardadas no celular`, 'server-down': `Servidor fora do ar: ${n} ações guardadas no celular`,
   }[st] || st);
+  if (pill.getAttribute('aria-label') !== label) pill.setAttribute('aria-label', label);
 }
 
 function renderGpsChip() {
@@ -325,6 +338,7 @@ function renderGpsChip() {
   $('#game').classList.toggle('controle', ctl);
   $('.joystick').classList.toggle('hidden', !ctl);
   $('.shake-btn').classList.toggle('hidden', !(ctl || !sensors.hasMotion));
+  placeTopStack();
 }
 
 // GPS: anda de verdade e aparecem todas as pererecas. Controle: joystick, menos raras.
@@ -399,10 +413,23 @@ function renderHint() {
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
   else if (driving) msg = '🚗 Parece que você está num veículo. Por segurança, capturas e trabalhos ficam pausados.';
   else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
-  el.innerHTML = msg;
+  setHtml(el, msg);
   renderCompass();
   el.classList.toggle('shake', shake);
   el.classList.toggle('hidden', !msg || current !== 'map');
+  placeTopStack();
+}
+
+// O aviso amarelo e a setinha da lagoinha ficam um embaixo do outro, logo abaixo dos botões do canto
+// (Online, GPS/Controle, B$). Antes eles tinham alturas fixas e, com o aviso em 3 linhas, um cobria o outro.
+function placeTopStack() {
+  const hint = $('.hint-bubble'), compass = $('.compass'), col = $('.status-col');
+  if (!hint || !compass || !col) return;
+  const base = hint.offsetParent?.getBoundingClientRect().top || 0;
+  let y = col.getBoundingClientRect().bottom - base + 10;
+  hint.style.top = `${y}px`;
+  if (!hint.classList.contains('hidden')) y += hint.offsetHeight + 8;
+  compass.style.top = `${y}px`;
 }
 
 // ---------- mapa: lagoinhas, matinhos, pererecas e jogador ----------
@@ -504,11 +531,11 @@ function drawPlayer(force = false) {
   const o = map.objects.get('player');
   // o próprio nome aparece em verde (os dos outros jogadores ficam em branco)
   map.setObject('player', {
-    lat: pos.lat, lng: pos.lng, className: `mplayer ${car ? 'incar' : ''}`, depthScale: false, top: true,
+    lat: pos.lat, lng: pos.lng, className: `mplayer ${car ? 'incar' : ''}`, top: true,   // acompanha o zoom, como o anel de alcance
     html: (!o || o.sig !== sig || force)
       ? (car
-        ? `<div class="cwrap me">${faceBubble(look, name)}${carSprite(car, { dir: playerDir, moving: walking })}</div>`
-        : `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.6 })}<span class="oname me">${esc(name)}</span></div>`)
+        ? `<div class="cwrap me">${faceBubble(look, name)}${carSprite(car, { dir: playerDir, moving: walking, scale: 1.8 })}</div>`
+        : `<div class="pwrap"><div class="pshadow"></div>${charHtml(look, { dir: playerDir, walking, scale: 2.15 })}<span class="oname me">${esc(name)}</span></div>`)
       : null,
   });
   map.objects.get('player').sig = sig;
@@ -590,6 +617,29 @@ function tick() {
 }
 
 // ---------- interações ----------
+// Perereca ou matinho perto do ponto tocado (até 60 px do centro do desenho). No modo controle, só
+// conta se ela já está ao alcance (senão o toque no chão continua sendo "andar até ali"); no GPS, sempre.
+function frogNearTap(ll) {
+  const pos = geo.pos;
+  if (!map || !pos) return null;
+  const p = map.latLngToScreen(ll.lat, ll.lng);
+  const box = map.el.getBoundingClientRect();
+  let best = null, bestD = 60;
+  for (const [key, o] of map.objects) {
+    if (!key.startsWith('frog:') || o.off || !o.data) continue;
+    // centro do desenho como ele está na tela agora (com o zoom e o pulinho)
+    const r = (o.el.querySelector('.frog, .bush') || o.el).getBoundingClientRect();
+    const d = Math.hypot(r.left + r.width / 2 - box.left - p.x, r.top + r.height / 2 - box.top - p.y);
+    if (d >= bestD) continue;
+    const dist = distanceM(pos, o.data);
+    const reach = isHidden(o.data) ? revealRange() : captureRange(pos);
+    if (geo.mode === 'sim' && dist > reach) continue;
+    best = { key, data: o.data };
+    bestD = d;
+  }
+  return best;
+}
+
 function onTapObject(key, data) {
   unlockAudio();
   if (key.startsWith('pond:')) return brejoSheet(data);

@@ -18,7 +18,9 @@ export function setTileProvider({ cartoKey } = {}) {
 setTileProvider();
 export const tileProvider = () => provider;
 const TILE_URL = (z, x, y) => provider.template.replace('{s}', 'abcd'[(x + y) % 4]).replace('{z}', z).replace('{x}', x).replace('{y}', y);
-export const BASE_ZOOM = 19.2;
+// zoom inicial: perto o bastante para o anel de alcance (10 m) ficar bem maior que o boneco
+export const BASE_ZOOM = 19.55;
+const MIN_ZOOM = 17.4, MAX_ZOOM = 20.8;
 const rad = (d) => (d * Math.PI) / 180;
 
 export function worldPx(lat, lng, z) {
@@ -221,27 +223,34 @@ export class GameMap {
   }
 
   // ----- gestos: arrastar, pinça, roda do mouse, toque -----
+  // Cada dedo é "capturado" pelo mapa (setPointerCapture): mesmo passando por cima de um botão,
+  // o mapa continua recebendo o movimento e a hora em que o dedo sai. Sem isso, um dedo que
+  // saía em cima de um botão ficava "preso" na lista e a pinça seguinte não funcionava direito.
   bindGestures() {
     const pts = new Map();
     let start = null, last = null, pinch = null, moved = 0;
     const el = this.el;
+    const TAP_SLOP = 12;   // um toque com o dedo mexe um pouco: até 12 px ainda é toque
+    const local = (p) => { const r = el.getBoundingClientRect(); return { x: p.x - r.left, y: p.y - r.top }; };
+    const startPinch = () => {
+      const [a, b] = [...pts.values()];
+      pinch = { d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), zoom: this.zoom };
+      moved = 99;   // depois de uma pinça, não vale como toque
+    };
     el.addEventListener('pointerdown', (e) => {
+      if (pts.size >= 2) return;   // um terceiro dedo é ignorado
+      try { el.setPointerCapture(e.pointerId); } catch {}
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const r = el.getBoundingClientRect();
       if (pts.size === 1) {
-        start = { x: e.clientX - r.left, y: e.clientY - r.top, t: performance.now(), target: e.target };
-        last = { ...start };
+        const p = local({ x: e.clientX, y: e.clientY });
+        start = { ...p, t: performance.now(), target: e.target };
+        last = { ...p };
         moved = 0;
-      } else if (pts.size === 2) {
-        const [a, b] = [...pts.values()];
-        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.zoom };
-        moved = 99;
-      }
+      } else startPinch();
     });
     el.addEventListener('pointermove', (e) => {
       if (!pts.has(e.pointerId)) return;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const r = el.getBoundingClientRect();
       if (pts.size === 2 && pinch) {
         const [a, b] = [...pts.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
@@ -249,9 +258,9 @@ export class GameMap {
         return;
       }
       if (pts.size !== 1 || !last) return;
-      const cur = { x: e.clientX - r.left, y: e.clientY - r.top };
+      const cur = local({ x: e.clientX, y: e.clientY });
       moved += Math.hypot(cur.x - last.x, cur.y - last.y);
-      if (moved < 8) return;
+      if (moved < TAP_SLOP) return;
       if (this.follow) { this.follow = false; this.cb.onUserMove?.(); }
       const p0 = this.screenToPlane(last.x, last.y), p1 = this.screenToPlane(cur.x, cur.y);
       const c = worldPx(this.center.lat, this.center.lng, this.zoom);
@@ -263,7 +272,10 @@ export class GameMap {
       if (!pts.has(e.pointerId)) return;
       pts.delete(e.pointerId);
       if (pts.size < 2) pinch = null;
-      if (pts.size === 0 && start && moved < 8 && performance.now() - start.t < 500) {
+      // tirou um dedo da pinça: o que ficou continua arrastando a partir de onde ele está agora
+      // (antes ele "pulava" para a posição antiga e o mapa dava um tranco)
+      if (pts.size === 1) { last = local([...pts.values()][0]); }
+      if (pts.size === 0 && start && moved < TAP_SLOP && performance.now() - start.t < 500) {
         const obj = start.target.closest?.('.mobj[data-key]');
         if (obj && this.objects.has(obj.dataset.key)) this.cb.onTapObject?.(obj.dataset.key, this.objects.get(obj.dataset.key).data);
         else this.cb.onTapGround?.(this.screenToLatLng(start.x, start.y));
@@ -272,11 +284,12 @@ export class GameMap {
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
+    el.addEventListener('lostpointercapture', end);
     el.addEventListener('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom - e.deltaY * 0.002); }, { passive: false });
   }
 
   setZoom(z) {
-    this.zoom = Math.max(17.4, Math.min(20.2, z));
+    this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
     this.invalidate();
   }
 }
