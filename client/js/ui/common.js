@@ -11,22 +11,42 @@ export function h(html) {
 }
 
 // ---------- toast ----------
-// Balãozinho em cima da caixinha "Li e concordo", apontando para ela (some ao marcar ou depois de uns segundos)
-export function termsTip(card, text = 'Marque aqui para continuar') {
-  const box = card.querySelector('.terms-check');
-  if (!box) return;
-  box.querySelector('.terms-tip')?.remove();
-  const tip = document.createElement('span');
-  tip.className = 'terms-tip';
-  tip.textContent = text;
-  box.appendChild(tip);
-  box.classList.remove('shake');
-  void box.offsetWidth;
-  box.classList.add('shake');
-  const input = box.querySelector('input');
-  const bye = () => { tip.classList.add('out'); setTimeout(() => tip.remove(), 250); input.removeEventListener('change', bye); };
-  input.addEventListener('change', bye);
-  setTimeout(bye, 4000);
+// Aviso em balão no meio da tela para quem tenta seguir sem marcar "Li e concordo":
+// mensagem, links para os termos, botão OK embaixo e X no canto. Ao fechar, a caixinha treme.
+export function termsAlert(card, { what = 'criar a sua conta' } = {}) {
+  document.querySelector('.alert-root')?.remove();
+  const root = h(`<div class="alert-root">
+    <div class="alert-backdrop"></div>
+    <div class="alert-box" role="alertdialog" aria-modal="true" aria-labelledby="alert-t" aria-describedby="alert-m">
+      <button type="button" class="alert-x" aria-label="Fechar">${icons.close}</button>
+      <div class="alert-ico">📄</div>
+      <h3 id="alert-t">Falta aceitar os termos</h3>
+      <p id="alert-m">Para ${esc(what)}, você precisa ler e concordar com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> do Pererecário.</p>
+      <p class="alert-hint">Marque a caixinha <b>"Li e concordo"</b> e toque no botão de novo.</p>
+      <button type="button" class="btn alert-ok">OK</button>
+    </div>
+  </div>`);
+  document.body.appendChild(root);
+  let closed = false;
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  function close() {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener('keydown', onKey);
+    root.classList.add('out');
+    setTimeout(() => root.remove(), 200);
+    const box = card?.querySelector('.terms-check');
+    if (!box) return;
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    box.classList.remove('shake');
+    void box.offsetWidth;
+    box.classList.add('shake');
+  }
+  document.addEventListener('keydown', onKey);
+  root.querySelector('.alert-x').addEventListener('click', close);
+  root.querySelector('.alert-ok').addEventListener('click', close);
+  root.querySelector('.alert-backdrop').addEventListener('click', close);
+  setTimeout(() => root.querySelector('.alert-ok')?.focus({ preventScroll: true }), 60);
 }
 
 export function toast(msg, kind = '', icon = null, ms = 3200) {

@@ -3,7 +3,7 @@ import { store } from '../store.js';
 import { frogImg } from '../catalog.js';
 import { icons } from './icons.js';
 import { img } from './sprites.js';
-import { $, h, esc, toast, termsTip } from './common.js';
+import { $, h, esc, toast, termsAlert } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
 const hills = `
@@ -255,7 +255,7 @@ export function renderLogin(onDone, config = {}) {
     const nick = $('input[name=nick]', nickCard).value.trim();
     const nerr = $('.nick-error', nickCard);
     if (nick.length < 2) { nerr.textContent = 'O apelido precisa de pelo menos 2 letras.'; sfx.error(); return; }
-    if (!$('input[name=terms]', nickCard).checked) { nerr.textContent = ''; termsTip(nickCard); sfx.error(); return; }
+    if (!$('input[name=terms]', nickCard).checked) { nerr.textContent = ''; termsAlert(nickCard); sfx.error(); return; }
     btn.disabled = true;
     btn.textContent = 'Um instante…';
     try {
@@ -503,7 +503,7 @@ export function renderLogin(onDone, config = {}) {
       if (displayName.length < 2) { err.textContent = 'Escolha um apelido (pelo menos 2 letras).'; sfx.error(); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = 'Esse e-mail não parece certo.'; sfx.error(); return; }
       if (password.length < 8) { err.textContent = 'A senha precisa de pelo menos 8 caracteres.'; sfx.error(); return; }
-      if (!form.terms.checked) { termsTip(form); sfx.error(); return; }
+      if (!form.terms.checked) { termsAlert(form); sfx.error(); return; }
     }
     submit.disabled = true;
     submit.textContent = 'Um instante…';
