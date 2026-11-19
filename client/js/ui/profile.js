@@ -147,45 +147,76 @@ const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const ymOf = (day) => { const d = new Date(day * 86400000); return { y: d.getUTCFullYear(), m: d.getUTCMonth() }; };
 const dayFromYmd = (y, m, d) => Math.round(Date.UTC(y, m, d) / 86400000);
 
+const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
 function openDiary() {
   const byDay = new Map();
+  const byMonth = new Map(); // ano*12+mês -> quantidade
+  const byYear = new Map();
   for (const c of store.view.captures) {
     const d = dayOf(c.caughtAt);
     if (!byDay.has(d)) byDay.set(d, []);
     byDay.get(d).push(c);
   }
+  for (const [d, list] of byDay) {
+    const { y, m } = ymOf(d);
+    byMonth.set(y * 12 + m, (byMonth.get(y * 12 + m) || 0) + list.length);
+    byYear.set(y, (byYear.get(y) || 0) + list.length);
+  }
   const days = [...byDay.keys()].sort((a, b) => b - a);
-  // meses que têm alguma captura (as setas pulam direto entre eles)
-  const months = [...new Set(days.map((d) => { const { y, m } = ymOf(d); return y * 12 + m; }))].sort((a, b) => a - b);
   const today = dayOf(store.now());
-  let sel = days[0];
+  const nowYM = (() => { const { y, m } = ymOf(today); return y * 12 + m; })();
+  const firstYM = Math.min(nowYM, ...[...byMonth.keys()]);
+  let sel = days[0] ?? today;
   let ym = (() => { const { y, m } = ymOf(sel); return y * 12 + m; })();
+  let view = 'days'; // 'days' | 'months' | 'years'
 
-  openSheet(`<h3>Diário de campo</h3><p class="lead">Toque num dia marcado, ou toque no mês para digitar uma data.</p>
+  openSheet(`<h3>Diário de campo</h3><p class="lead">Toque no mês ou no ano para escolher outro.</p>
     <div class="cal">
-      <div class="cal-head"><button class="cal-nav" data-nav="-1" aria-label="Mês anterior">${icons.back}</button>
-        <button class="cal-title" aria-label="Digitar uma data"></button>
-        <button class="cal-nav next" data-nav="1" aria-label="Próximo mês">${icons.back}</button></div>
-      <form class="cal-jump hidden">
-        <input class="cal-input" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="dia/mês (ex.: 17/11)" aria-label="Data">
-        <button class="btn small" type="submit">Ir</button>
-      </form>
-      <div class="cal-week">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w) => `<span>${w}</span>`).join('')}</div>
-      <div class="cal-grid"></div>
+      <div class="cal-head"><button class="cal-nav" data-step="-1" aria-label="Anterior">${icons.back}</button>
+        <div class="cal-pick"><button class="cal-m" data-view="months"></button><button class="cal-y" data-view="years"></button></div>
+        <button class="cal-nav next" data-step="1" aria-label="Próximo">${icons.back}</button></div>
+      <div class="cal-body"></div>
     </div>
     <div class="day-title"></div><div class="day-sum"></div><div class="list diary-all"></div>`, { cls: 'diary-sheet' });
   const sheet = $('.diary-sheet');
-  const jump = $('.cal-jump', sheet), input = $('.cal-input', sheet);
-  const prevMonth = () => [...months].reverse().find((x) => x < ym);
-  const nextMonth = () => months.find((x) => x > ym);
+  const chev = `<span class="chev">${icons.back}</span>`;
 
-  function renderMonth() {
+  function render() {
     const y = Math.floor(ym / 12), m = ym % 12;
-    $('.cal-title', sheet).innerHTML = `${cap(MONTHS[m])} de ${y} <span class="cal-edit">${icons.calendar}</span>`;
-    $$('.cal-nav', sheet).forEach((b) => { b.disabled = Number(b.dataset.nav) < 0 ? prevMonth() == null : nextMonth() == null; });
+    const mBtn = $('.cal-m', sheet), yBtn = $('.cal-y', sheet);
+    mBtn.innerHTML = `${cap(MONTHS[m])}${chev}`;
+    yBtn.innerHTML = `${y}${chev}`;
+    mBtn.classList.toggle('open', view === 'months');
+    yBtn.classList.toggle('open', view === 'years');
+    const [prev, next] = $$('.cal-nav', sheet);
+    if (view === 'days') { prev.disabled = ym <= firstYM; next.disabled = ym >= nowYM; }
+    if (view === 'months') { prev.disabled = y <= Math.floor(firstYM / 12); next.disabled = y >= Math.floor(nowYM / 12); }
+    if (view === 'years') { prev.disabled = true; next.disabled = true; }
+    const body = $('.cal-body', sheet);
+
+    if (view === 'months') {
+      body.innerHTML = `<div class="cal-months">${MONTHS_SHORT.map((name, i) => {
+        const key = y * 12 + i;
+        const n = byMonth.get(key) || 0;
+        const future = key > nowYM;
+        return `<button class="cal-cell ${n ? 'has' : ''} ${key === ym ? 'on' : ''}" data-month="${key}" ${future ? 'disabled' : ''}><b>${name}</b><small>${n ? `${n} 🐸` : '—'}</small></button>`;
+      }).join('')}</div>`;
+      return;
+    }
+    if (view === 'years') {
+      const years = [];
+      for (let yy = Math.floor(nowYM / 12); yy >= Math.floor(firstYM / 12); yy--) years.push(yy);
+      body.innerHTML = `<div class="cal-years">${years.map((yy) => {
+        const n = byYear.get(yy) || 0;
+        return `<button class="cal-cell ${n ? 'has' : ''} ${yy === y ? 'on' : ''}" data-year="${yy}"><b>${yy}</b><small>${n ? `${n} 🐸` : '—'}</small></button>`;
+      }).join('')}</div>`;
+      return;
+    }
     const first = new Date(Date.UTC(y, m, 1)).getUTCDay();
     const total = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-    let html = '<span class="cal-blank"></span>'.repeat(first);
+    let html = `<div class="cal-week">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w) => `<span>${w}</span>`).join('')}</div><div class="cal-grid">`;
+    html += '<span class="cal-blank"></span>'.repeat(first);
     for (let d = 1; d <= total; d++) {
       const day = dayFromYmd(y, m, d);
       const n = byDay.get(day)?.length || 0;
@@ -194,10 +225,17 @@ function openDiary() {
         ? `<button class="cal-day ${cls}" data-day="${day}"><b>${d}</b><small>${n}</small></button>`
         : `<span class="cal-day ${cls}"><b>${d}</b></span>`;
     }
-    $('.cal-grid', sheet).innerHTML = html;
+    body.innerHTML = `${html}</div>`;
   }
 
   function showDay() {
+    const inMonth = sel != null && (() => { const { y, m } = ymOf(sel); return y * 12 + m === ym; })();
+    if (!inMonth) {
+      $('.day-title', sheet).textContent = '';
+      $('.day-sum', sheet).innerHTML = '';
+      $('.diary-all', sheet).innerHTML = '<div class="card list-item"><div class="s">Nenhuma perereca capturada neste mês.</div></div>';
+      return;
+    }
     const list = byDay.get(sel) || [];
     const xp = list.reduce((t, c) => t + (store.view.perCapture.get(c.id)?.xp || 0), 0);
     const kinds = new Set(list.map((c) => c.speciesId)).size;
@@ -209,65 +247,32 @@ function openDiary() {
       : '<div class="card list-item"><div class="s">Nenhuma perereca capturada neste dia.</div></div>';
   }
 
-  // "17/11", "17/11/2026", "1711" ou "17112026". Sem ano: o mais recente que não está no futuro.
-  function parseDate(text) {
-    const digits = text.replace(/\D/g, '');
-    const parts = text.includes('/') || text.includes('-') || text.includes('.')
-      ? text.split(/[/.-]/).map((x) => x.trim()).filter(Boolean)
-      : [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean);
-    const d = Number(parts[0]), m = Number(parts[1]) - 1;
-    let y = parts[2] ? Number(parts[2].length === 2 ? `20${parts[2]}` : parts[2]) : ymOf(today).y;
-    if (!(d >= 1 && d <= 31 && m >= 0 && m <= 11 && y > 2000)) return null;
-    if (new Date(Date.UTC(y, m, d)).getUTCMonth() !== m) return null; // ex.: 31/02
-    let day = dayFromYmd(y, m, d);
-    if (!parts[2] && day > today) day = dayFromYmd(--y, m, d);
-    return day;
+  // ao trocar de mês, já mostra o dia mais recente com captura daquele mês
+  function goMonth(key) {
+    ym = Math.max(firstYM, Math.min(nowYM, key));
+    const inMonth = days.find((d) => { const { y, m } = ymOf(d); return y * 12 + m === ym; });
+    sel = inMonth ?? null;
+    view = 'days';
+    render();
+    showDay();
   }
 
-  // máscara: coloca as barras sozinho enquanto digita
-  input.addEventListener('input', () => {
-    let parts = input.value.split(/[/.-]/).map((x) => x.replace(/\D/g, ''));
-    if (parts.length === 1 && parts[0].length > 2) parts = [parts[0].slice(0, 2), parts[0].slice(2)];
-    if (parts.length === 2 && parts[1].length > 2) parts = [parts[0], parts[1].slice(0, 2), parts[1].slice(2)];
-    parts = parts.slice(0, 3).map((x, i) => x.slice(0, i === 2 ? 4 : 2));
-    input.value = parts.join('/');
-  });
-  jump.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const day = parseDate(input.value);
-    if (day == null) { sfx.error(); toast('Data inválida. Digite assim: 17/11 ou 17/11/2026.', 'warn', null, 2500); return; }
-    sel = day;
-    const { y, m } = ymOf(day);
-    ym = y * 12 + m;
-    sfx.tap();
-    jump.classList.add('hidden');
-    input.blur();
-    renderMonth();
-    showDay();
-  });
-
   $('.cal', sheet).addEventListener('click', (e) => {
-    if (e.target.closest('.cal-title')) {
-      jump.classList.toggle('hidden');
-      if (!jump.classList.contains('hidden')) { input.value = ''; input.focus(); }
-      sfx.tap();
-      return;
-    }
-    const nav = e.target.closest('.cal-nav');
-    if (nav && !nav.disabled) {
-      ym = Number(nav.dataset.nav) < 0 ? prevMonth() : nextMonth();
-      sfx.tap();
-      renderMonth();
-      return;
-    }
-    const b = e.target.closest('[data-day]');
-    if (!b) return;
-    sel = Number(b.dataset.day);
+    const t = e.target.closest('button');
+    if (!t || t.disabled) return;
     sfx.tap();
-    renderMonth();
-    showDay();
+    if (t.dataset.view) { view = view === t.dataset.view ? 'days' : t.dataset.view; render(); return; }
+    if (t.dataset.step) {
+      const dir = Number(t.dataset.step);
+      if (view === 'days') goMonth(ym + dir);
+      else if (view === 'months') { ym = Math.max(firstYM, Math.min(nowYM, ym + dir * 12)); render(); }
+      return;
+    }
+    if (t.dataset.month) { goMonth(Number(t.dataset.month)); return; }
+    if (t.dataset.year) { goMonth(Number(t.dataset.year) * 12 + (ym % 12)); return; }
+    if (t.dataset.day) { sel = Number(t.dataset.day); render(); showDay(); }
   });
-  renderMonth();
+  render();
   showDay();
 }
 
