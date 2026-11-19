@@ -5,7 +5,8 @@ import { sync } from '../sync.js';
 import { api } from '../api.js';
 import * as db from '../db.js';
 import { icons } from './icons.js';
-import { headHtml, lookOf } from './sprites.js';
+import { headHtml, charHtml, lookOf, lookName } from './sprites.js';
+import { openWardrobe } from './wardrobe.js';
 import { dayOf, findBrejo } from '../shared/game.js';
 import { $, esc, openSheet, closeSheet, toast, fmtDist, fmtTime, ago } from './common.js';
 import { sfx } from '../audio.js';
@@ -29,7 +30,7 @@ export function mountProfile(el, context) {
       <div class="section-title">Opções</div>
       <div class="list settings-list">
         <div class="card list-item tog" data-act="visible">${icons.people}<div class="grow"><div class="t">Aparecer no mapa dos outros</div><div class="s">Quem estiver a até 300 m vê o seu boneco e o seu nome</div></div><div class="switch ${store.settings.hidePresence ? '' : 'on'}"></div></div>
-        <div class="card list-item" data-act="howto">${icons.sparkle}<div class="grow"><div class="t">Como jogar</div><div class="s">Rever o tutorial e trocar o seu explorador</div></div></div>
+        <div class="card list-item" data-act="howto">${icons.sparkle}<div class="grow"><div class="t">Como jogar</div><div class="s">Rever as dicas do jogo</div></div></div>
         <div class="card list-item" data-act="demo">${icons.bug}<div class="grow"><div class="t">Painel de demonstração</div><div class="s">Testes de conexão, modo controle, céu, conflitos</div></div></div>
         <div class="card list-item" data-act="logout">${icons.logout}<div class="grow"><div class="t">Sair da conta</div><div class="s">Seu progresso continua salvo no servidor</div></div></div>
       </div>
@@ -41,6 +42,8 @@ export function mountProfile(el, context) {
     if (act === 'demo') ctx.openDemo();
     if (act === 'logout') confirmLogout();
     if (act === 'howto') ctx.openTutorial();
+    if (act === 'look') openWardrobe();
+    if (act === 'diary') openDiary();
     if (act === 'visible') {
       await store.saveSettings({ hidePresence: !store.settings.hidePresence });
       e.target.closest('[data-act]').querySelector('.switch').classList.toggle('on', !store.settings.hidePresence);
@@ -79,8 +82,9 @@ export function renderProfile(el) {
   const cat = getCatalog();
   const lv = v.level;
   $('.hero-slot', el).innerHTML = `<div class="profile-hero">
-      <div class="avatar-wrap"><div class="avatar">${headHtml(lookOf(v.player), 4)}</div><span class="lvl">${lv.level}</span></div>
-      <div><h2>${esc(v.player.displayName)}</h2><p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p></div>
+      <button class="avatar-wrap" data-act="look" aria-label="Trocar visual"><div class="avatar">${headHtml(lookOf(v.player), 4)}</div><span class="lvl">${lv.level}</span></button>
+      <div class="grow"><h2>${esc(v.player.displayName)}</h2><p>@${esc(v.player.username)} · código ${esc(v.player.friendCode || '')}</p>
+        <button class="look-btn" data-act="look">${icons.shirt}Trocar visual <small>${esc(lookName(lookOf(v.player)))}</small></button></div>
     </div>
     <div class="xpline">Nível ${lv.level} · ${lv.into}/${lv.need} XP para o próximo<div class="progress"><i style="width:${(lv.into / lv.need) * 100}%"></i></div></div>`;
 
@@ -99,20 +103,52 @@ export function renderProfile(el) {
       <div class="frogs-row">${(cur?.captures || []).slice(0, 12).map((c) => frogImg(c.speciesId, 30)).join('') || '<span class="s" style="font-size:13px;color:var(--ink-soft)">Nenhuma perereca hoje ainda. Bora caçar!</span>'}</div>
     </div>`;
 
-  const recent = v.captures.slice(0, 12);
-  $('.history', el).innerHTML = recent.length ? recent.map((c) => {
-    const sp = species(c.speciesId);
-    const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
-    const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha');
-    return `<div class="card list-item diary">
-      <div class="avatar" style="width:46px;height:46px">${frogImg(c.speciesId, 36)}</div>
-      <div class="grow"><div class="t">${esc(sp.name)} ${rarityBadge(c.speciesId)}</div>
-      <div class="s">${fmtDay(dayOf(c.caughtAt))} às ${fmtTime(c.caughtAt)} · ${where}${c.pending ? ' · ☁️ pendente' : ''}</div></div>
-      <span class="pill-xp">+${v.perCapture.get(c.id)?.xp || 0} XP</span></div>`;
-  }).join('') : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>';
+  const recent = v.captures.slice(0, DIARY_SHOWN);
+  $('.history', el).innerHTML = recent.length
+    ? recent.map((c) => diaryRow(c)).join('') + (v.captures.length > DIARY_SHOWN
+      ? `<button class="btn ghost block see-all" data-act="diary">Ver todas as ${v.captures.length} capturas</button>` : '')
+    : '<div class="card list-item"><div class="s">Suas capturas aparecem aqui, da mais recente para a mais antiga.</div></div>';
 
   renderSyncCard(el);
   if (ranking) renderRanking(el);
+}
+
+const DIARY_SHOWN = 5;
+
+function diaryRow(c, withDay = true) {
+  const sp = species(c.speciesId);
+  const brejo = c.brejoId ? findBrejo(c.brejoId, store.brejos, store.view.player?.id || '') : null;
+  const where = c.kind === 'gift' ? '🎁 presente de amigo' : esc(brejo?.name || 'lagoinha');
+  return `<div class="card list-item diary">
+    <div class="avatar" style="width:46px;height:46px">${frogImg(c.speciesId, 36)}</div>
+    <div class="grow"><div class="t">${esc(sp.name)} ${rarityBadge(c.speciesId)}</div>
+    <div class="s">${withDay ? `${fmtDay(dayOf(c.caughtAt))} às ` : ''}${fmtTime(c.caughtAt)} · ${where}${c.pending ? ' · ☁️ pendente' : ''}</div></div>
+    <span class="pill-xp">+${store.view.perCapture.get(c.id)?.xp || 0} XP</span></div>`;
+}
+
+// diário completo, separado por dia, carregando aos poucos (40 por vez)
+function openDiary() {
+  const all = store.view.captures;
+  let shown = 0;
+  openSheet(`<h3>Diário de campo</h3><p class="lead">${all.length} capturas, da mais recente para a mais antiga.</p><div class="list diary-all"></div>
+    <button class="btn ghost block more hidden" style="margin-top:10px">Mostrar mais</button>`, { cls: 'diary-sheet' });
+  const sheet = $('.diary-sheet');
+  const box = $('.diary-all', sheet), more = $('.more', sheet);
+  let lastDay = null;
+  function page() {
+    const chunk = all.slice(shown, shown + 40);
+    let html = '';
+    for (const c of chunk) {
+      const d = dayOf(c.caughtAt);
+      if (d !== lastDay) { html += `<div class="section-title diary-day">${fmtDay(d)}</div>`; lastDay = d; }
+      html += diaryRow(c, false);
+    }
+    box.insertAdjacentHTML('beforeend', html);
+    shown += chunk.length;
+    more.classList.toggle('hidden', shown >= all.length);
+  }
+  more.addEventListener('click', page);
+  page();
 }
 
 export function renderSyncCard(el) {

@@ -2,14 +2,12 @@
 import { store } from '../store.js';
 import { sensors } from '../sensors.js';
 import { frogImg } from '../catalog.js';
-import { LOOK_MODELS, LOOK_GENDERS, LOOK_SKINS } from '../shared/game.js';
-import { charHtml, img, lookOf, lookName } from './sprites.js';
+import { charHtml, img, lookOf } from './sprites.js';
+import { mountLookPicker } from './wardrobe.js';
 import { icons } from './icons.js';
 import { $, $$, h, esc } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
-const GENDER_NAME = { masculino: 'Masculino', feminino: 'Feminino' };
-const SKIN_COLOR = { clara: '#f6cfa3', media: '#d49a6a', escura: '#8f5a37' };
 
 function slides(look) {
   return [
@@ -41,7 +39,7 @@ function slides(look) {
       art: `<div style="left:40px;top:150px">${img('lilypad.png', 150)}</div>
         <div style="left:62px;top:56px">${frogImg('frog_ember', 106)}</div>
         <div style="left:140px;top:80px" class="tut-tap"></div>
-        <div style="left:210px;top:90px;font-size:44px">🫙</div>`,
+        `,
     },
     {
       title: 'Funciona sem internet',
@@ -53,13 +51,15 @@ function slides(look) {
   ];
 }
 
+// first = primeira vez (termina na escolha do visual). Em "Como jogar" são só as dicas;
+// o visual se troca no Perfil (guarda-roupa).
 export function openTutorial({ first = false, firstTime = false, onDone } = {}) {
   document.querySelector('.tutorial')?.remove();
-  const [m0, g0, s0] = lookOf(store.view.player).split('-');
-  let model = m0, gender = g0, skin = s0, idx = 0;
-  const cur = () => `${model}-${gender}-${skin}`;
-  const list = slides(cur());
-  const total = list.length + 1;
+  const startLook = lookOf(store.view.player);
+  let idx = 0, picker = null;
+  const list = slides(startLook);
+  const total = list.length + (first ? 1 : 0);
+  const last = total - 1;
   const el = h(`<div class="tutorial">
     <button class="skip">Pular</button>
     <div class="tut-stage"></div>
@@ -70,54 +70,34 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
   const stage = $('.tut-stage', el);
   const next = $('.next', el);
 
-  function picker() {
-    return `<div class="look-picker">
-      <div class="lp-hero">${charHtml(cur(), { dir: 'down', walking: true, scale: 4.4 })}</div>
-      <div class="lp-name">${esc(lookName(cur()))}</div>
-      <div class="lp-styles">${LOOK_MODELS.map((m) => `<button data-model="${m}" class="${m === model ? 'on' : ''}" aria-label="${esc(lookName(`${m}-${gender}-${skin}`))}">${charHtml(`${m}-${gender}-${skin}`, { scale: 1.7 })}</button>`).join('')}</div>
-      <div class="lp-row">
-        <div class="lp-gender">${LOOK_GENDERS.map((g) => `<button data-gender="${g}" class="${g === gender ? 'on' : ''}">${GENDER_NAME[g]}</button>`).join('')}</div>
-        <div class="lp-skins">${LOOK_SKINS.map((s) => `<button data-skin="${s}" class="${s === skin ? 'on' : ''}" style="--c:${SKIN_COLOR[s]}" aria-label="Tom de pele ${s}"></button>`).join('')}</div>
-      </div>
-    </div>`;
-  }
-
   function render() {
     $$('.tut-dots i', el).forEach((d, i) => d.classList.toggle('on', i === idx));
-    const isPicker = idx === list.length;
-    $('.skip', el).classList.toggle('hidden', isPicker);
+    const isPicker = first && idx === list.length;
+    $('.skip', el).classList.toggle('hidden', idx === last);
+    el.querySelector('.tut-text')?.remove();
+    picker?.destroy();
+    picker = null;
     if (isPicker) {
-      stage.innerHTML = `<div style="width:100%">${picker()}</div>`;
-      next.textContent = first ? 'Começar a caçar!' : 'Pronto';
-      el.querySelector('.tut-text')?.remove();
-      if (!el.querySelector('.tut-text')) stage.insertAdjacentHTML('afterend', `<div class="tut-text"><h2>${first && firstTime ? `Oi, ${esc(store.view.player?.displayName || '')}!` : 'Escolha seu explorador'}</h2><p>${first && firstTime ? 'Escolha seu explorador. Dá para trocar depois em Perfil → Como jogar.' : 'Ele aparece no mapa e anda com você.'}</p></div>`);
+      stage.innerHTML = '<div style="width:100%" class="tut-picker"></div>';
+      picker = mountLookPicker($('.tut-picker', stage), startLook);
+      next.textContent = 'Começar a caçar!';
+      stage.insertAdjacentHTML('afterend', `<div class="tut-text"><h2>${firstTime ? `Oi, ${esc(store.view.player?.displayName || '')}!` : 'Seu visual'}</h2><p>Escolha como você aparece no mapa. Dá para trocar quando quiser em <b>Perfil → Trocar visual</b>.</p></div>`);
     } else {
       const s = list[idx];
       stage.innerHTML = `<div class="tut-art" style="${s.artStyle || ''}">${s.art}</div>`;
-      el.querySelector('.tut-text')?.remove();
       stage.insertAdjacentHTML('afterend', `<div class="tut-text"><h2>${s.title}</h2><p>${s.text}</p></div>`);
-      next.textContent = 'Próximo';
+      next.textContent = idx === last ? 'Entendi!' : 'Próximo';
     }
   }
 
-  stage.addEventListener('click', (e) => {
-    const mb = e.target.closest('[data-model]');
-    const sb = e.target.closest('[data-skin]');
-    const gb = e.target.closest('[data-gender]');
-    const keep = $('.lp-styles', stage)?.scrollLeft || 0;
-    if (gb) { gender = gb.dataset.gender; sfx.tap(); render(); }
-    if (mb) { model = mb.dataset.model; sfx.tap(); render(); }
-    if (sb) { skin = sb.dataset.skin; sfx.tap(); render(); }
-    const strip = $('.lp-styles', stage);
-    if (strip) strip.scrollLeft = keep;
-  });
-  $('.skip', el).addEventListener('click', () => { idx = list.length; sfx.tap(); render(); });
+  $('.skip', el).addEventListener('click', () => { idx = last; sfx.tap(); render(); });
   next.addEventListener('click', async () => {
     unlockAudio();
     sfx.tap();
-    if (idx < list.length) { idx++; render(); return; }
-    const look = cur();
-    if (look !== lookOf(store.view.player)) await store.setLook(look);
+    if (idx < last) { idx++; render(); return; }
+    const look = picker?.look;
+    picker?.destroy();
+    if (look && look !== lookOf(store.view.player)) await store.setLook(look);
     await store.saveSettings({ tutorialDone: true, onboarded: true });
     if (first) await sensors.request();
     el.style.transition = 'opacity .25s';
@@ -132,7 +112,7 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
     if (x0 == null) return;
     const dx = e.changedTouches[0].clientX - x0;
     x0 = null;
-    if (dx < -60 && idx < list.length) { idx++; render(); }
+    if (dx < -60 && idx < last) { idx++; render(); }
     if (dx > 60 && idx > 0) { idx--; render(); }
   });
   render();

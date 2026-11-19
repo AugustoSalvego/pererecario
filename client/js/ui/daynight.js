@@ -1,8 +1,7 @@
 // Dia e noite no mapa (computação ciente de contexto): calcula a altura do sol no lugar onde o
 // jogador está, na hora atual, e escolhe o céu do mapa. Não depende de internet.
-//   sol acima de 6°            -> dia
-//   entre -4° e 6°             -> entardecer / amanhecer
-//   abaixo de -4°              -> noite (mapa azulado, luz em volta do boneco e vaga-lumes)
+//   sol acima de -4°   -> dia (mapa nas cores normais)
+//   abaixo de -4°      -> noite (mapa azulado, luz em volta do boneco e vaga-lumes)
 // No painel de demonstração dá para forçar "dia" ou "noite" (store.settings.sky).
 import { store } from '../store.js';
 
@@ -28,10 +27,7 @@ export function skyPhase(date, pos) {
   if (forced === 'noite') return 'night';
   if (!pos) {
     const h = date.getHours();
-    return h >= 19 || h < 5 ? 'night' : h < 7 || h >= 18 ? 'dusk' : 'day';
+    return h >= 19 || h < 5 ? 'night' : 'day';
   }
-  const el = sunElevation(date, pos.lat, pos.lng);
-  return el > 6 ? 'day' : el > -4 ? 'dusk' : 'night';
+  return sunElevation(date, pos.lat, pos.lng) > -4 ? 'day' : 'night';
 }
-
-export const SKY_LABEL = { day: 'Dia', dusk: 'Entardecer', night: 'Noite' };

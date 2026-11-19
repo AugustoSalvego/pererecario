@@ -60,7 +60,7 @@ export function openCapture(spawn, { onClose, onOpenAlbum } = {}) {
   const view = 0;
 
   const sky = skyPhase(new Date(), geo.pos);
-  const el = h(`<div class="capture ${sky === 'day' ? '' : sky}">
+  const el = h(`<div class="capture ${sky === 'night' ? 'night' : ''}">
     <div class="cap-world" style="width:${W}px">
       <div class="cap-sky"></div>
       ${treeline(W, Math.round(H * 0.18))}

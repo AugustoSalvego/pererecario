@@ -345,6 +345,15 @@ svg { display: block; }
 .profile-hero .avatar { width: 84px; height: 84px; border-width: 4px; box-shadow: 0 0 0 3px rgba(255,255,255,.5), 0 6px 0 rgba(0,0,0,.12); }
 .profile-hero .lvl { font-size: 14px; min-width: 30px; height: 30px; border-radius: 15px; right: -4px; bottom: -4px; }
 .profile-hero h2 { font-size: 26px; }
+.profile-hero .grow { min-width: 0; }
+.profile-hero button.avatar-wrap { padding: 0; background: none; border: 0; }
+.look-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 12px 6px 9px; border-radius: 99px; background: rgba(255,255,255,.92); color: var(--ink); font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 rgba(0,0,0,.12); max-width: 100%; }
+.look-btn svg { width: 17px; height: 17px; flex: none; }
+.look-btn small { font-weight: 600; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.see-all { margin-top: 4px; }
+.diary-day { margin: 14px 0 6px; }
+.wardrobe-sheet .lp-hero { height: 140px; }
+.tut-picker .lp-hero { height: 128px; }
 .xpline { margin-top: 8px; position: relative; z-index: 1; font-size: 13px; font-weight: 600; }
 .xpline .progress { margin-top: 5px; height: 12px; }
 
@@ -582,8 +591,8 @@ svg { display: block; }
 .look-picker { display: flex; flex-direction: column; align-items: center; width: 100%; gap: 8px; }
 .lp-hero { height: 150px; display: grid; place-items: center; }
 .lp-name { font-weight: 700; font-size: 18px; color: var(--ink); margin-top: -6px; }
-.lp-styles { display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 72px); grid-auto-columns: 58px; gap: 8px; width: 100%; max-width: 360px; overflow-x: auto; padding: 4px 2px 8px; scroll-snap-type: x proximity; }
-.lp-styles button { background: #fff; border-radius: 14px; display: grid; place-items: center; box-shadow: 0 3px 0 #dfe9d8; border: 3px solid transparent; scroll-snap-align: start; overflow: hidden; }
+.lp-styles { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 66px; gap: 6px; width: 100%; max-width: 380px; padding: 2px 0 6px; }
+.lp-styles button { background: #fff; border-radius: 14px; display: grid; place-items: center; box-shadow: 0 3px 0 #dfe9d8; border: 3px solid transparent; overflow: hidden; min-width: 0; }
 .lp-styles button.on { border-color: var(--leaf); box-shadow: 0 3px 0 var(--leaf-dark); }
 .lp-row { display: flex; gap: 10px; width: 100%; max-width: 360px; align-items: center; justify-content: space-between; }
 .lp-gender { display: flex; gap: 6px; }
@@ -641,7 +650,8 @@ svg { display: block; }
 /* ---------- modo de andar (GPS / controle) ---------- */
 .mode-btn { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 99px; background: rgba(255,255,255,.95); font-weight: 700; font-size: 12.5px; box-shadow: 0 4px 0 rgba(23,53,42,.15); color: var(--ink); white-space: nowrap; }
 .mode-btn svg { width: 17px; height: 17px; }
-.mode-btn.controle { background: #fff4d6; color: #8a5a00; }
+.mode-btn.controle svg { color: #4a7fd6; }
+.mode-btn:not(.controle) svg { color: var(--leaf-dark); }
 .joystick { position: absolute; left: 16px; bottom: calc(var(--safe-bottom) + 104px); z-index: 6; }
 .joy-base { width: 116px; height: 116px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.55), rgba(255,255,255,.3)); border: 3px solid rgba(255,255,255,.85); box-shadow: 0 4px 0 rgba(23,53,42,.18), inset 0 0 0 10px rgba(255,255,255,.12); display: grid; place-items: center; touch-action: none; backdrop-filter: blur(2px); }
 .joy-knob { width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8ee07a, var(--leaf) 60%, var(--leaf-dark)); box-shadow: 0 4px 0 rgba(23,53,42,.3); transition: transform .12s ease-out; pointer-events: none; }
@@ -658,10 +668,9 @@ svg { display: block; }
 
 /* ---------- dia e noite ---------- */
 .map-night, .fireflies { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.6s ease; }
-.map-night { z-index: 2; mix-blend-mode: multiply; background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%), #fff 0 46px, #e9ecff 70px, #8f9be0 140px, #3b4685 240px, #222a5c 100%); }
+.map-night { z-index: 2; mix-blend-mode: multiply; background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%), #fff 0 60px, #f0f2ff 95px, #b9c1f2 180px, #7f8bd2 300px, #6470b8 100%); }
 .map-objects { z-index: 1; }
-.map.dusk .map-night { opacity: .6; background: radial-gradient(circle at var(--lx, 50%) var(--ly, 50%), #fff 0 90px, #fff0dc 180px, #ffc994 320px, #e8a07a 100%); }
-.map.night .map-night { opacity: .94; }
+.map.night .map-night { opacity: 1; }
 .fireflies { z-index: 3; }
 .map.night .fireflies { opacity: 1; }
 .fireflies i { position: absolute; left: var(--x); top: var(--y); width: 5px; height: 5px; border-radius: 50%; background: #f4ff9a; box-shadow: 0 0 6px 3px rgba(226,255,120,.75); animation: firefly var(--t) ease-in-out infinite; animation-delay: var(--dl); }
@@ -676,10 +685,9 @@ svg { display: block; }
 .map-attrib { z-index: 4; }
 .sky-chip { font-size: 15px; }
 .capture .cap-night, .capture .cap-stars { position: absolute; inset: 0; pointer-events: none; display: none; }
-.capture.night .cap-night { display: block; z-index: 2; mix-blend-mode: multiply; background: radial-gradient(ellipse at 50% 62%, #e8ecff 0, #a3acf0 30%, #3a4688 75%, #1e2552 100%); }
+.capture.night .cap-night { display: block; z-index: 2; mix-blend-mode: multiply; background: radial-gradient(ellipse at 50% 62%, #f2f4ff 0, #c0c7f4 30%, #6f7bc6 75%, #4a5496 100%); }
 .capture.night .cap-stars { display: block; z-index: 2; height: 40%; background-image: radial-gradient(1.6px 1.6px at 12% 20%, #fff 50%, transparent 51%), radial-gradient(1.4px 1.4px at 30% 8%, #fff 50%, transparent 51%), radial-gradient(1.8px 1.8px at 52% 26%, #fff 50%, transparent 51%), radial-gradient(1.3px 1.3px at 70% 12%, #fff 50%, transparent 51%), radial-gradient(1.6px 1.6px at 88% 30%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 42% 34%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 8% 38%, #fff 50%, transparent 51%); }
 .capture.night .cap-stars::after { content: ''; position: absolute; right: 14%; top: 22%; width: 38px; height: 38px; border-radius: 50%; background: #fff7d1; box-shadow: 0 0 22px 6px rgba(255,247,209,.45), inset -9px -4px 0 #f0e2a8; }
-.capture.dusk .cap-night { display: block; z-index: 2; mix-blend-mode: multiply; background: linear-gradient(#ffb48a, #f6d6c4 45%, #e8c8d8); opacity: .9; }
 .seg { display: flex; background: #e9f1e4; border-radius: 14px; padding: 4px; gap: 4px; }
 .seg button { flex: 1; padding: 9px 6px; border-radius: 11px; font-weight: 700; font-size: 13px; color: var(--ink-soft); }
 .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 2px 0 #d3dfcc; }

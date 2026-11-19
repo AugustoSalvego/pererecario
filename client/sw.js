@@ -3,7 +3,7 @@
 //  - tiles do mapa e fontes guardados conforme são usados (cache-first);
 //  - chamadas /api/* NUNCA passam pelo cache: o próprio app trata o offline
 //    com IndexedDB e fila de sincronização.
-const VERSION = 'pererecario-v1.12.0';
+const VERSION = 'pererecario-v1.13.0';
 const SHELL = `${VERSION}-shell`;
 const TILES = 'pererecario-tiles';
 const FONTS = 'pererecario-fonts';
@@ -15,7 +15,7 @@ const ASSETS = [
   'js/shared/game.js',
   'js/ui/common.js', 'js/ui/icons.js', 'js/ui/login.js', 'js/ui/game.js', 'js/ui/map.js', 'js/ui/capture.js',
   'js/ui/album.js', 'js/ui/pond.js', 'js/ui/friends.js', 'js/ui/profile.js', 'js/ui/demo.js',
-  'js/ui/sprites.js', 'js/ui/tutorial.js', 'js/ui/joystick.js', 'js/ui/others.js', 'js/ui/daynight.js', 'js/presence.js',
+  'js/ui/sprites.js', 'js/ui/tutorial.js', 'js/ui/joystick.js', 'js/ui/others.js', 'js/ui/daynight.js', 'js/ui/wardrobe.js', 'js/presence.js',
   'assets/species.json', 'assets/frogs_atlas.png',
   'assets/icons/icon-64.png', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/apple-touch-icon.png',
   'vendor/qrcode.js', 'vendor/jsQR.js',

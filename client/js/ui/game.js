@@ -260,7 +260,6 @@ function applySky() {
   const first = skyNow === null;
   skyNow = phase;
   map.el.classList.toggle('night', phase === 'night');
-  map.el.classList.toggle('dusk', phase === 'dusk');
   document.documentElement.dataset.sky = phase;
   if (!first && phase === 'night') toast('🌙 Anoiteceu no brejo. Os vaga-lumes saíram!', '', null, 3000);
   if (!first && phase === 'day') toast('☀️ Amanheceu no brejo!', 'ok', null, 3000);

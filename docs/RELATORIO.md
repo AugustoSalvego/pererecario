@@ -14,7 +14,7 @@ Existem 15 espécies em 4 raridades (comum 55 %, incomum 28 %, rara 13 %, especi
 
 **Jogadores juntos no mapa.** Quem está com o jogo aberto a até 300 m aparece no mapa dos outros, com o boneco e o nome. Se várias pessoas estão no mesmo lugar (por exemplo, numa sala, onde o GPS de todos dá praticamente o mesmo ponto), os bonecos são afastados automaticamente até uma distância mínima na tela, sempre do mesmo jeito, então o mapa fica estável. Quem não quiser aparecer desliga isso no Perfil.
 
-**Dia e noite.** O jogo calcula a altura do sol no lugar e na hora em que o jogador está. De dia o mapa é claro; no entardecer ganha um tom alaranjado; à noite fica azulado, com uma luz em volta do boneco e vaga-lumes, e o minijogo de captura mostra lua e estrelas.
+**Dia e noite.** O jogo calcula a altura do sol no lugar e na hora em que o jogador está. De dia o mapa fica nas cores normais; à noite (sol abaixo de 4° do horizonte) fica azulado, com uma luz em volta do boneco e vaga-lumes, e o minijogo de captura mostra lua e estrelas.
 
 Jogadores que se encontram pessoalmente podem escanear o **QR code** um do outro: viram "parceiros de brejo" e quem escaneou ganha uma perereca-presente.
 
@@ -204,7 +204,7 @@ O jogo muda conforme o ambiente físico do jogador:
 | **Movimento: chacoalhar** | Acelerômetro (`devicemotion`) | As pererecas mais raras (incomuns, raras e especial) se escondem num matinho. Chacoalhar o celular a até 20 m revela de uma vez todos os matinhos por perto (tocar num matinho revela só aquele): o matinho se mexe por 1 s e a perereca sai. |
 | **Proximidade entre jogadores** | Câmera + QR code | Cada jogador tem um QR no perfil. Escanear o de outra pessoa exige estar perto dela: cria a amizade e libera uma perereca-presente. O QR carrega os dados necessários, então funciona até offline. |
 | **Contexto temporal** | Relógio corrigido pelo servidor | As pererecas de cada brejo mudam a cada 15 min; os presentes são diários. |
-| **Dia e noite** | Posição + hora (cálculo da altura do sol, sem internet) | O mapa e o minijogo mudam de aparência: dia, entardecer/amanhecer e noite (mapa azulado, luz em volta do boneco, vaga-lumes, lua e estrelas). |
+| **Dia e noite** | Posição + hora (cálculo da altura do sol, sem internet) | O mapa e o minijogo mudam de aparência: de dia, cores normais; à noite, mapa azulado, luz em volta do boneco, vaga-lumes, lua e estrelas. |
 | **Forma de se deslocar** | GPS real ou joystick (modo controle) | Andar de verdade mostra todas as pererecas; no modo controle aparecem menos raras. |
 | **Presença de outros jogadores** | Posição dos jogadores com o jogo aberto | Quem está a até 300 m aparece no mapa, com boneco e nome; os bonecos se afastam para não se amontoar. |
 | **Retorno físico** | Vibração e som (Web Audio) | Vibra a cada toque certeiro, ao capturar e ao chacoalhar; sons sintetizados na hora (bolhas, folhas, respingos), sem arquivos de áudio. |
