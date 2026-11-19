@@ -5,6 +5,7 @@ import { frogImg } from '../catalog.js';
 import { charHtml, img, lookOf } from './sprites.js';
 import { mountLookPicker } from './wardrobe.js';
 import { icons } from './icons.js';
+import { BALANCO } from '../shared/game.js';
 import { $, $$, h, esc } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
@@ -26,6 +27,19 @@ function slides(look) {
       art: `<div style="left:150px;top:60px">${img('pond-small.png', 140)}</div>
         <div style="left:20px;top:120px;width:120px;height:44px;border-radius:50%;border:3px solid rgba(70,190,60,.95);box-shadow:0 0 12px rgba(110,230,80,.85);background:rgba(120,230,90,.16)"></div>
         <div style="left:54px;top:68px">${charHtml(look, { dir: 'right', walking: true, scale: 3 })}</div>`,
+    },
+    {
+      title: 'GPS ou Controle?',
+      text: 'No alto da tela, à direita, fica o botão <b>GPS / Controle</b>: toque nele para trocar o jeito de andar. Quem anda de verdade é recompensado!',
+      art: `<div class="tut-modes">
+          <span class="tm-pill">${icons.gps}GPS</span><span class="tm-swap">⇄</span><span class="tm-pill ctl">${icons.gamepad}Controle</span>
+          <span class="tut-tap tm-tap"></span>
+        </div>
+        <div class="tut-mode-cards">
+          <div class="tmc gps"><b>${icons.gps}GPS</b><ul><li>Anda de verdade</li><li><b>Todas</b> as pererecas, até as raras</li><li>Trabalhos pagam <b>+${Math.round((BALANCO.bonusNoGps - 1) * 100)}%</b></li></ul></div>
+          <div class="tmc ctl"><b>${icons.gamepad}Controle</b><ul><li>Joystick ou toque no mapa, sem sair do lugar</li><li><b>Menos</b> pererecas raras</li><li>O carro só anda aqui</li></ul></div>
+        </div>`,
+      artStyle: 'height:250px',
     },
     {
       title: 'Matinho com "?"',

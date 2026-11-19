@@ -1151,3 +1151,20 @@ form.login-card > button[type=submit] { margin-top: auto; }
 .spec-card.in-trade { box-shadow: inset 0 0 0 3px var(--water), var(--shadow); }
 .spec-card.in-trade .price-tag { background: var(--water); color: #fff; }
 .sell-box.in-trade { background: #e4f6fb; box-shadow: 0 3px 0 #bfe3ee; }
+
+/* tutorial: GPS ou Controle */
+.tut-art > .tut-modes { position: relative; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.tm-pill { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 13px; border-radius: 99px; background: #fff; font-weight: 700; font-size: 14px; box-shadow: 0 3px 0 rgba(23,53,42,.15); }
+.tm-pill svg { width: 17px; height: 17px; color: var(--leaf-dark); }
+.tm-pill.ctl svg { color: #4a7fd6; }
+.tm-swap { font-weight: 800; font-size: 20px; color: var(--ink-soft); }
+.tm-tap { position: absolute; left: 56px; top: 8px; border-color: rgba(47,138,50,.7); background: rgba(76,185,68,.2); }
+.tut-art > .tut-mode-cards { position: absolute; left: -6px; right: -6px; top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tmc { background: #fff; border-radius: 18px; padding: 10px 10px 8px; text-align: left; box-shadow: 0 3px 0 rgba(23,53,42,.1); border-top: 5px solid var(--leaf); }
+.tmc.ctl { border-top-color: #4a7fd6; }
+.tmc > b { display: flex; align-items: center; gap: 6px; font-size: 16px; margin-bottom: 4px; }
+.tmc > b svg { width: 18px; height: 18px; color: var(--leaf-dark); }
+.tmc.ctl > b svg { color: #4a7fd6; }
+.tmc ul { margin: 0; padding: 0 0 0 15px; font-size: 12.5px; line-height: 1.32; color: var(--ink-soft); font-weight: 500; }
+.tmc li { margin-bottom: 3px; }
+.tmc li b { color: var(--ink); }
