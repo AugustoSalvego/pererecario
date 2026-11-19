@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
 import { importAll } from '../server/backup.js';
 import { createApp } from '../server/app.js';
-import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, moitasNear, brejosNear, distanceM, jobsNear, jobPay, visibleInMode, frogPrice } from '../client/js/shared/game.js';
+import { spawnsFor, findBrejo, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, moitasNear, brejosNear, distanceM, jobsNear, jobPay, visibleInMode, frogPrice } from '../client/js/shared/game.js';
 
 let server, base, app, db, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
@@ -151,10 +151,15 @@ test('cada jogador tem lagoinhas e pererecas próprias', async () => {
   const sa = spawnsFor(br, windowOf(clock), app.catalog, a.id), sb = spawnsFor(br, windowOf(clock), app.catalog, b.id);
   assert.notDeepEqual(sa.map((x) => [x.speciesId, x.lat]), sb.map((x) => [x.speciesId, x.lat]));
   // a perereca de um jogador não pode ser capturada por outro. Escolhe uma perereca de A que não exista
-  // igual para B (por acaso, B pode ter no mesmo ponto da grade uma perereca da mesma espécie: aí é dele mesmo).
+  // igual para B: o servidor recalcula a lagoinha pelo id com a semente de B, e por acaso B pode ter, no
+  // mesmo ponto da grade, uma lagoinha com uma perereca da mesma espécie no mesmo lugar (aí ela é dele mesmo).
   const w = windowOf(clock);
-  const deB = new Map(pb.flatMap((x) => spawnsFor(x, w, app.catalog, b.id)).map((s) => [s.id, s]));
-  const alheia = pa.flatMap((x) => spawnsFor(x, w, app.catalog, a.id)).find((s) => deB.get(s.id)?.speciesId !== s.speciesId);
+  const deB = (s) => {
+    const [pondId, , n] = s.id.split(':');
+    const pond = findBrejo(pondId, [], b.id);
+    return pond ? spawnsFor(pond, w, app.catalog, b.id)[Number(n)] : null;
+  };
+  const alheia = pa.flatMap((x) => spawnsFor(x, w, app.catalog, a.id)).find((s) => deB(s)?.speciesId !== s.speciesId);
   assert.ok(alheia);
   const r = await sync(b, 'c1', [captureOp(alheia, clock)]);
   assert.notEqual(r.body.results[0].status, 'applied');
