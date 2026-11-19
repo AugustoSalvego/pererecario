@@ -139,45 +139,83 @@ function diaryRow(c, withDay = true) {
   </div>`;
 }
 
-// diário completo: escolhe o dia numa fileira de "páginas"
+// Diário completo em forma de calendário: um mês por vez (setas para os outros meses),
+// os dias com captura ficam marcados com a quantidade, e tocar num dia mostra as capturas dele.
+// Funciona igual com 1 dia ou com meses de jogo.
+const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const ymOf = (day) => { const d = new Date(day * 86400000); return { y: d.getUTCFullYear(), m: d.getUTCMonth() }; };
+const dayFromYmd = (y, m, d) => Math.round(Date.UTC(y, m, d) / 86400000);
+
 function openDiary() {
-  const all = store.view.captures;
   const byDay = new Map();
-  for (const c of all) {
+  for (const c of store.view.captures) {
     const d = dayOf(c.caughtAt);
     if (!byDay.has(d)) byDay.set(d, []);
     byDay.get(d).push(c);
   }
   const days = [...byDay.keys()].sort((a, b) => b - a);
+  // meses que têm alguma captura, do mais antigo para o mais recente
+  const months = [...new Set(days.map((d) => { const { y, m } = ymOf(d); return y * 12 + m; }))].sort((a, b) => a - b);
   let sel = days[0];
-  openSheet(`<h3>Diário de campo</h3><p class="lead">Escolha o dia para ver as capturas.</p>
-    <div class="day-tabs">${days.map((d) => `<button data-day="${d}">${fmtDayShort(d)}<small>${byDay.get(d).length} 🐸</small></button>`).join('')}</div>
-    <div class="day-sum"></div><div class="list diary-all"></div>`, { cls: 'diary-sheet' });
+  let mi = months.length - 1;
+  const today = dayOf(store.now());
+
+  openSheet(`<h3>Diário de campo</h3><p class="lead">Toque num dia marcado para ver as capturas.</p>
+    <div class="cal">
+      <div class="cal-head"><button class="cal-nav" data-nav="-1" aria-label="Mês anterior">${icons.back}</button><b class="cal-title"></b><button class="cal-nav next" data-nav="1" aria-label="Próximo mês">${icons.back}</button></div>
+      <div class="cal-week">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w) => `<span>${w}</span>`).join('')}</div>
+      <div class="cal-grid"></div>
+    </div>
+    <div class="day-title"></div><div class="day-sum"></div><div class="list diary-all"></div>`, { cls: 'diary-sheet' });
   const sheet = $('.diary-sheet');
-  function show() {
-    $$('.day-tabs button', sheet).forEach((b) => b.classList.toggle('on', Number(b.dataset.day) === sel));
+
+  function renderMonth() {
+    const ym = months[mi];
+    const y = Math.floor(ym / 12), m = ym % 12;
+    $('.cal-title', sheet).textContent = `${cap(MONTHS[m])} de ${y}`;
+    $$('.cal-nav', sheet).forEach((b) => { b.disabled = Number(b.dataset.nav) < 0 ? mi === 0 : mi === months.length - 1; });
+    const first = new Date(Date.UTC(y, m, 1)).getUTCDay();
+    const total = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    let html = '<span class="cal-blank"></span>'.repeat(first);
+    for (let d = 1; d <= total; d++) {
+      const day = dayFromYmd(y, m, d);
+      const n = byDay.get(day)?.length || 0;
+      const cls = [n ? 'has' : '', day === sel ? 'on' : '', day === today ? 'today' : ''].join(' ');
+      html += n
+        ? `<button class="cal-day ${cls}" data-day="${day}"><b>${d}</b><small>${n}</small></button>`
+        : `<span class="cal-day ${cls}"><b>${d}</b></span>`;
+    }
+    $('.cal-grid', sheet).innerHTML = html;
+  }
+
+  function showDay() {
     const list = byDay.get(sel) || [];
     const xp = list.reduce((t, c) => t + (store.view.perCapture.get(c.id)?.xp || 0), 0);
     const kinds = new Set(list.map((c) => c.speciesId)).size;
+    const date = new Date(sel * 86400000 + 12 * 3600000).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    $('.day-title', sheet).textContent = sel === today ? `Hoje, ${date}` : sel === today - 1 ? `Ontem, ${date}` : cap(date);
     $('.day-sum', sheet).innerHTML = `<div><b>${list.length}</b><span>${list.length === 1 ? 'perereca' : 'pererecas'}</span></div><div><b>${kinds}</b><span>${kinds === 1 ? 'espécie' : 'espécies'}</span></div><div><b>${xp}</b><span>XP</span></div>`;
     $('.diary-all', sheet).innerHTML = list.map((c) => diaryRow(c, false)).join('');
   }
-  $('.day-tabs', sheet).addEventListener('click', (e) => {
+
+  $('.cal', sheet).addEventListener('click', (e) => {
+    const nav = e.target.closest('.cal-nav');
+    if (nav && !nav.disabled) {
+      mi += Number(nav.dataset.nav);
+      sfx.tap();
+      renderMonth();
+      return;
+    }
     const b = e.target.closest('[data-day]');
     if (!b) return;
     sel = Number(b.dataset.day);
     sfx.tap();
-    show();
+    renderMonth();
+    showDay();
   });
-  show();
-}
-
-function fmtDayShort(day) {
-  const today = dayOf(store.now());
-  if (day === today) return 'Hoje';
-  if (day === today - 1) return 'Ontem';
-  const d = new Date(day * 86400000 + 12 * 3600000);
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  renderMonth();
+  showDay();
 }
 
 export function renderSyncCard(el) {
