@@ -51,7 +51,11 @@ export function termsAlert(card, { what = 'criar a sua conta' } = {}) {
 
 export function toast(msg, kind = '', icon = null, ms = 3200) {
   const root = $('#toasts');
+  // o mesmo aviso de novo (ex.: tocou 3 vezes) não empilha: troca o antigo pelo novo
+  const key = `${kind}|${msg}`;
+  for (const old of [...root.children]) if (old.dataset.key === key) old.remove();
   const el = h(`<div class="toast ${kind}">${icon ? icons[icon] : ''}<span>${msg}</span></div>`);
+  el.dataset.key = key;
   root.appendChild(el);
   while (root.children.length > 3) root.firstElementChild.remove();
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, ms);
@@ -110,7 +114,7 @@ export function closeSheet(immediate = false) {
 export const fmtDate = (t) => new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 export const fmtTime = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 export const fmtDateTime = (t) => `${fmtDate(t)} às ${fmtTime(t)}`;
-export const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(m)} m`);
+export const fmtDist = (m) => (!Number.isFinite(m) ? '—' : m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(m)} m`);
 export const fmtCm = (cm) => `${String(cm).replace('.', ',')} cm`;
 export function fmtDuration(ms) {
   const min = Math.max(0, Math.round(ms / 60000));

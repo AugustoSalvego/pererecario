@@ -29,7 +29,9 @@ import {
 } from '../shared/game.js';
 
 // ponto de referência para o raio de visão: o jogador (ou o centro do mapa, sem GPS)
-const viewPoint = () => geo.pos || map?.center;
+// No modo GPS, antes do celular dizer onde o jogador está, não aparece nada no mapa: as pererecas
+// em volta de um ponto qualquer confundiam (e não dava para pegar, porque falta a distância).
+const viewPoint = () => geo.pos || (geo.mode === 'sim' ? map?.center : null);
 // cada jogador tem as suas lagoinhas e pererecas (a semente do sorteio é o id dele)
 const seed = () => store.view.player?.id || '';
 // lagoinhas em volta do jogador: as automáticas (que existem em qualquer lugar) e as
@@ -129,6 +131,9 @@ export function startGame({ firstTime = false } = {}) {
     if (nav) { unlockAudio(); sfx.tap(); openScreen(nav.dataset.nav); }
   });
   $('.recenter', root).addEventListener('click', recenter);
+  $('.hint-bubble', root).addEventListener('click', (e) => {
+    if (e.currentTarget.dataset.act === 'controle' && geo.mode === 'real') toggleMode();
+  });
   $('.status-pill', root).addEventListener('click', statusSheet);
   $('.compass', root).addEventListener('click', () => {
     const dl = deliveryState();
@@ -407,13 +412,19 @@ function renderHint() {
   let msg = '';
   let shake = false;
   const pos = geo.pos;
-  if (geo.mode === 'real' && geo.error === 'denied') msg = '📍 Localização bloqueada. Permita o acesso à localização no navegador para encontrar as lagoinhas.';
-  else if (geo.mode === 'real' && geo.error === 'unsupported') msg = 'Este aparelho não informa a localização.';
-  else if (!pos) msg = '📡 Procurando sinal de GPS…';
+  // sem GPS: o aviso vira um botão para jogar no modo Controle (que não precisa de GPS)
+  const orCtl = ' <b>Toque aqui</b> para jogar no modo Controle.';
+  let act = '';
+  if (geo.mode === 'real' && geo.error === 'denied') { msg = `📍 Localização bloqueada. Permita a localização no navegador, ou${orCtl.replace(' <b>T', ' <b>t')}`; act = 'controle'; }
+  else if (geo.mode === 'real' && geo.error === 'unsupported') { msg = `Este aparelho não informa a localização.${orCtl}`; act = 'controle'; }
+  else if (!pos && (geo.error === 'timeout' || geo.error === 'unavailable')) { msg = `📡 Não achei o seu GPS. Vá para um lugar aberto, ou${orCtl.replace(' <b>T', ' <b>t')}`; act = 'controle'; }
+  else if (!pos) { msg = `📡 Procurando o sinal de GPS…${orCtl}`; act = 'controle'; }
   else if (pos.accuracy > 60) msg = `📡 Sinal de GPS fraco (±${Math.round(pos.accuracy)} m). Vá para um lugar aberto.`;
   else if (driving) msg = '🚗 Parece que você está num veículo. Por segurança, capturas e trabalhos ficam pausados.';
   else if (hiddenNearby().length) { msg = '🌿 Tem perereca escondida aqui! <b>Toque no matinho</b> ou chacoalhe o celular'; shake = true; }
   setHtml(el, msg);
+  el.dataset.act = act;
+  el.classList.toggle('act', !!act);
   renderCompass();
   el.classList.toggle('shake', shake);
   el.classList.toggle('hidden', !msg || current !== 'map');
@@ -642,6 +653,11 @@ function frogNearTap(ll) {
 
 function onTapObject(key, data) {
   unlockAudio();
+  // sem saber onde o jogador está não dá para medir a distância (antes aparecia "faltam Infinity km")
+  if (!geo.pos && key !== 'player') {
+    sfx.tap();
+    return toast('📡 Ainda não sei onde você está. Espere o GPS, ou toque no aviso para jogar no modo Controle.', 'warn', null, 3500);
+  }
   if (key.startsWith('pond:')) return brejoSheet(data);
   if (key.startsWith('job:')) return tapJob(data);
   if (key === 'dest') return toast(`📦 Ponto de entrega: ${esc(data.job.dest.name)}. Chegue a ${DELIVERY_RANGE_M} m dele.`, '', null, 2500);

@@ -1170,3 +1170,5 @@ form.login-card > button[type=submit] { margin-top: auto; }
 
 /* área de toque maior em volta da perereca e do matinho (o desenho é pequeno e fica pulando) */
 .mfrog .body::after, .mbush .body::after { content: ''; position: absolute; left: -18px; right: -18px; top: -16px; bottom: -12px; border-radius: 22px; }
+.hint-bubble.act { cursor: pointer; pointer-events: auto; }
+.hint-bubble.act b { text-decoration: underline; text-underline-offset: 2px; }
