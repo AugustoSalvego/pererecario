@@ -150,8 +150,13 @@ test('cada jogador tem lagoinhas e pererecas próprias', async () => {
   const br = await ensureBrejo();
   const sa = spawnsFor(br, windowOf(clock), app.catalog, a.id), sb = spawnsFor(br, windowOf(clock), app.catalog, b.id);
   assert.notDeepEqual(sa.map((x) => [x.speciesId, x.lat]), sb.map((x) => [x.speciesId, x.lat]));
-  // a perereca de um jogador não pode ser capturada por outro
-  const r = await sync(b, 'c1', [captureOp(spawnsFor(pa[0], windowOf(clock), app.catalog, a.id)[0], clock)]);
+  // a perereca de um jogador não pode ser capturada por outro. Escolhe uma perereca de A que não exista
+  // igual para B (por acaso, B pode ter no mesmo ponto da grade uma perereca da mesma espécie: aí é dele mesmo).
+  const w = windowOf(clock);
+  const deB = new Map(pb.flatMap((x) => spawnsFor(x, w, app.catalog, b.id)).map((s) => [s.id, s]));
+  const alheia = pa.flatMap((x) => spawnsFor(x, w, app.catalog, a.id)).find((s) => deB.get(s.id)?.speciesId !== s.speciesId);
+  assert.ok(alheia);
+  const r = await sync(b, 'c1', [captureOp(alheia, clock)]);
   assert.notEqual(r.body.results[0].status, 'applied');
 });
 
