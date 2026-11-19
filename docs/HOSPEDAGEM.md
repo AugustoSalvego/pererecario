@@ -103,7 +103,7 @@ O botão "Continuar com Google" só aparece depois deste passo; até lá o jogo 
    - **Não envie logotipo:** com logotipo, o Google exige uma verificação de marca que leva semanas.
    As duas páginas já existem no jogo (`client/privacidade.html` e `client/termos.html`) e mostram como contato o e-mail que manda os códigos (`EMAIL_FROM`), ou `CONTACT_EMAIL` se você definir essa variável no Render.
 5. Em **Público** (ou na própria Tela de permissão), clique em **Publicar app** e confirme. O jogo só pede nome, e-mail e foto do perfil, e para isso o Google não exige verificação. **Não pule este item:** enquanto o app está "em teste", só as contas cadastradas como usuários de teste conseguem entrar com o Google.
-6. No Render, abra o serviço → **Environment**. A linha `GOOGLE_CLIENT_ID` já existe, vazia (criada pelo Blueprint): clique em **Edit**, cole o ID e salve (**Save and deploy**). O servidor reinicia sozinho.
+6. No Render, abra o serviço → **Environment** → **Edit** → **+ Add Environment Variable**: Key `GOOGLE_CLIENT_ID`, Value = o ID copiado → **Save and deploy**. O servidor reinicia sozinho.
 7. Abra o jogo: o botão "Continuar com Google" aparece em cima de "ou com e-mail". Entre com uma conta Google de teste.
 
 Se um dia o endereço do jogo mudar (outro nome no Render ou um domínio próprio), adicione o endereço novo nas **Origens JavaScript autorizadas**; senão o botão do Google mostra um erro.

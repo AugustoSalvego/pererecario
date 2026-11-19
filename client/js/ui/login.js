@@ -95,10 +95,12 @@ export function renderLogin(onDone, config = {}) {
       <span class="tagline">🐸 Ande por aí e capture todas!</span>
     </div>
     <div class="login-stage">
-      ${img('pond-big.png', 380, 'pond-img')}
-      <div class="lily-frog" style="left:20%;bottom:24%">${frogImg('frog_drop', 54)}${img('lilypad.png', 60, 'pad-img')}</div>
-      <div class="lily-frog" style="left:50%;bottom:9%;transform:translateX(-50%)">${frogImg('frog_pitanga', 80)}${img('lilypad.png', 88, 'pad-img')}</div>
-      <div class="lily-frog" style="right:22%;bottom:30%">${frogImg('frog_honey', 46)}${img('lilypad.png', 52, 'pad-img')}</div>
+      <div class="pond-box">
+        ${img('pond-big.png', 380, 'pond-img')}
+        <div class="lily-frog lf-1">${frogImg('frog_drop', 54)}${img('lilypad.png', 60, 'pad-img')}</div>
+        <div class="lily-frog lf-2">${frogImg('frog_pitanga', 80)}${img('lilypad.png', 88, 'pad-img')}</div>
+        <div class="lily-frog lf-3">${frogImg('frog_honey', 46)}${img('lilypad.png', 52, 'pad-img')}</div>
+      </div>
     </div>
     <form class="login-card" novalidate>
       <div class="pending-slot"></div>
@@ -146,7 +148,7 @@ export function renderLogin(onDone, config = {}) {
   root.appendChild(el);
 
   const form = $('form', el);
-  waitingAccounts().then((list) => { $('.pending-slot', el).innerHTML = pendingNote(list); });
+  waitingAccounts().then((list) => { $('.pending-slot', el).innerHTML = pendingNote(list); lockHeight(); });
   const err = $('.form-error', form);
   const submit = $('button[type=submit]', el);
   const banner = $('.offline-banner', el);
@@ -165,10 +167,35 @@ export function renderLogin(onDone, config = {}) {
     card.style.animation = '';
   }
 
+  // Mesma altura nas abas "Entrar" e "Criar conta" (e nos outros cartões): a lagoa não pula a cada clique.
+  // Mede o formulário nas duas abas e usa a maior altura para todos os cartões.
+  // Mede numa cópia invisível, para não mexer no campo em que a pessoa está digitando.
+  function measure(m) {
+    const c = form.cloneNode(true);
+    c.querySelectorAll('iframe').forEach((f) => f.remove());   // o botão do Google não é copiado (recarregaria)
+    const slot = $('.g-slot', form);
+    const cslot = $('.g-slot', c);
+    if (slot && cslot) cslot.style.minHeight = `${slot.offsetHeight}px`;
+    c.querySelectorAll('.reg-only').forEach((x) => x.classList.toggle('hidden', m !== 'register'));
+    c.querySelectorAll('.login-only').forEach((x) => x.classList.toggle('hidden', m === 'register'));
+    c.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:0;width:${form.offsetWidth}px;min-height:0;animation:none`;
+    form.parentElement.appendChild(c);
+    const hgt = c.offsetHeight;
+    c.remove();
+    return hgt;
+  }
+  function lockHeight() {
+    if (form.classList.contains('hidden') || !el.isConnected || !form.offsetWidth) return;
+    el.style.setProperty('--card-h', `${Math.max(measure('login'), measure('register'))}px`);
+  }
+  window.addEventListener('resize', lockHeight);
+  document.fonts?.ready.then(lockHeight).catch(() => {});
+
   const refreshOnline = () => {
     const off = api.isOffline();
     banner.classList.toggle('hidden', !off);
     gArea.classList.toggle('hidden', off || !clientId);
+    lockHeight();
   };
   refreshOnline();
   window.addEventListener('online', refreshOnline);
@@ -185,6 +212,7 @@ export function renderLogin(onDone, config = {}) {
     } catch {}
     window.removeEventListener('online', refreshOnline);
     window.removeEventListener('offline', refreshOnline);
+    window.removeEventListener('resize', lockHeight);
     clearInterval(countdown);
     sfx.win();
     root.classList.add('hidden');
@@ -444,16 +472,20 @@ export function renderLogin(onDone, config = {}) {
   fBtn.addEventListener('click', sendForgot);
   fEmail.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendForgot(); } });
 
+  function applyMode(m) {
+    el.querySelectorAll('.segmented button').forEach((x) => x.classList.toggle('on', x.dataset.mode === m));
+    el.querySelectorAll('.reg-only').forEach((x) => x.classList.toggle('hidden', m !== 'register'));
+    el.querySelectorAll('.login-only').forEach((x) => x.classList.toggle('hidden', m === 'register'));
+    form.password.autocomplete = m === 'register' ? 'new-password' : 'current-password';
+    submit.textContent = m === 'register' ? 'Criar minha conta' : 'Entrar no brejo';
+  }
   el.querySelectorAll('.segmented button').forEach((b) => b.addEventListener('click', () => {
     mode = b.dataset.mode;
     sfx.tap();
-    el.querySelectorAll('.segmented button').forEach((x) => x.classList.toggle('on', x === b));
-    el.querySelectorAll('.reg-only').forEach((x) => x.classList.toggle('hidden', mode !== 'register'));
-    el.querySelectorAll('.login-only').forEach((x) => x.classList.toggle('hidden', mode === 'register'));
-    form.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
-    submit.textContent = mode === 'register' ? 'Criar minha conta' : 'Entrar no brejo';
+    applyMode(mode);
     err.textContent = '';
   }));
+  lockHeight();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

@@ -1024,3 +1024,34 @@ svg { display: block; }
 .pending-note { display: flex; gap: 10px; align-items: flex-start; background: #fff1d6; color: #7a4b00; border: 2px solid #f3cf8a; border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.35; margin-bottom: 12px; overflow-wrap: anywhere; }
 .pending-note svg { width: 22px; height: 22px; flex: none; margin-top: 1px; }
 .login-note a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------- tela de entrada: altura fixa do cartão e lagoa que se ajusta ao espaço ---------- */
+/* o cartão tem a mesma altura nas abas "Entrar" e "Criar conta" (medida no login.js); o botão fica no pé */
+.login-card { display: flex; flex-direction: column; min-height: var(--card-h, auto); }
+form.login-card > button[type=submit] { margin-top: auto; }
+.login-card:not(form) { justify-content: center; }
+/* a lagoa e as pererecas formam uma caixa só, que encolhe para caber entre o título e o cartão */
+.login-stage { flex: 1 1 0; min-height: 96px; }
+.pond-box { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); aspect-ratio: 60 / 34; height: min(90%, calc((100vw - 32px) * 34 / 60), 215px); max-width: 92%; }
+.pond-box .pond-img { position: absolute; inset: 0; left: 0; bottom: 0; transform: none; width: 100% !important; height: 100%; max-width: none; }
+.pond-box .lily-frog .frog { width: 100%; height: auto; }
+.pond-box .lily-frog .pad-img { width: 112% !important; }
+.pond-box .lf-1 { left: 12%; bottom: 22%; width: 14%; }
+.pond-box .lf-2 { left: 50%; bottom: 2%; width: 21%; transform: translateX(-50%); }
+.pond-box .lf-3 { right: 13%; bottom: 33%; width: 12%; }
+/* cartão de entrada um pouco mais compacto: sobra mais espaço para a lagoa */
+.login-card .field { margin-bottom: 10px; }
+.login-card .field input { height: 52px; }
+.login-card .field svg { top: 14px; }
+.login-card .field .eye { top: 6px; }
+.login-card .segmented { margin-bottom: 12px; }
+.login-card .google-area { margin-bottom: 10px; }
+.login-card .google-area .or { margin: 10px 4px 0; }
+.login-card .form-error { margin: 2px 2px 8px; }
+/* celular baixinho: some a frase de baixo do título e o topo encolhe */
+@media (max-height: 720px) {
+  .login-top { padding-top: calc(var(--safe-top) + 2.5vh); }
+  .login-top .tagline { display: none; }
+  .logo { font-size: clamp(38px, 11vw, 50px); }
+  .logo small { margin-top: 8px; }
+}
