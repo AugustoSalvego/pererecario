@@ -15,7 +15,7 @@ import { openJobTalk, runJobGame, startDelivery, deliveryState, cancelDelivery, 
 import { openShop, carSprite, faceBubble } from './shop.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
-import { $, $$, esc, toast, openSheet, closeSheet, fmtDist, ago } from './common.js';
+import { $, $$, esc, toast, openSheet, closeSheet, fmtDist, ago, termsTip } from './common.js';
 import { getCatalog, frogImg, species } from '../catalog.js';
 import { store } from '../store.js';
 import { sync } from '../sync.js';
@@ -746,7 +746,7 @@ function askTerms() {
   const btn = $('[data-act=ok]', sheet);
   btn.addEventListener('click', async () => {
     const e = $('.terms-error', sheet);
-    if (!box.checked) { e.textContent = 'Marque que você leu e concorda para continuar.'; sfx.error(); return; }
+    if (!box.checked) { e.textContent = ''; termsTip(sheet); sfx.error(); return; }
     btn.disabled = true;
     btn.textContent = 'Salvando…';
     try {

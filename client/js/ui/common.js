@@ -11,6 +11,24 @@ export function h(html) {
 }
 
 // ---------- toast ----------
+// Balãozinho em cima da caixinha "Li e concordo", apontando para ela (some ao marcar ou depois de uns segundos)
+export function termsTip(card, text = 'Marque aqui para continuar') {
+  const box = card.querySelector('.terms-check');
+  if (!box) return;
+  box.querySelector('.terms-tip')?.remove();
+  const tip = document.createElement('span');
+  tip.className = 'terms-tip';
+  tip.textContent = text;
+  box.appendChild(tip);
+  box.classList.remove('shake');
+  void box.offsetWidth;
+  box.classList.add('shake');
+  const input = box.querySelector('input');
+  const bye = () => { tip.classList.add('out'); setTimeout(() => tip.remove(), 250); input.removeEventListener('change', bye); };
+  input.addEventListener('change', bye);
+  setTimeout(bye, 4000);
+}
+
 export function toast(msg, kind = '', icon = null, ms = 3200) {
   const root = $('#toasts');
   const el = h(`<div class="toast ${kind}">${icon ? icons[icon] : ''}<span>${msg}</span></div>`);

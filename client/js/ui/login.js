@@ -3,7 +3,7 @@ import { store } from '../store.js';
 import { frogImg } from '../catalog.js';
 import { icons } from './icons.js';
 import { img } from './sprites.js';
-import { $, h, esc, toast } from './common.js';
+import { $, h, esc, toast, termsTip } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
 const hills = `
@@ -69,13 +69,6 @@ function pendingNote(accounts) {
   return accounts.map((a) => `<div class="pending-note">${icons.cloudOff}<span>Este aparelho guarda <b>${a.count} ${a.count === 1 ? 'ação' : 'ações'}</b> da conta <b>${esc(a.displayName || '')}</b>${a.email ? ` (${esc(a.email)})` : ''} que ainda não ${a.count === 1 ? 'subiu' : 'subiram'}. Entre com essa conta para ${a.count === 1 ? 'ela ir' : 'elas irem'} para o servidor.</span></div>`).join('');
 }
 
-const TERMS_MSG = 'Para criar a conta, marque a caixinha dos termos.';
-function shakeTerms(card) {
-  const t = $('.terms-check', card);
-  t.classList.remove('shake');
-  void t.offsetWidth;
-  t.classList.add('shake');
-}
 
 function waitingAccounts() {
   const list = [];
@@ -262,7 +255,7 @@ export function renderLogin(onDone, config = {}) {
     const nick = $('input[name=nick]', nickCard).value.trim();
     const nerr = $('.nick-error', nickCard);
     if (nick.length < 2) { nerr.textContent = 'O apelido precisa de pelo menos 2 letras.'; sfx.error(); return; }
-    if (!$('input[name=terms]', nickCard).checked) { nerr.textContent = TERMS_MSG; shakeTerms(nickCard); sfx.error(); return; }
+    if (!$('input[name=terms]', nickCard).checked) { nerr.textContent = ''; termsTip(nickCard); sfx.error(); return; }
     btn.disabled = true;
     btn.textContent = 'Um instante…';
     try {
@@ -510,7 +503,7 @@ export function renderLogin(onDone, config = {}) {
       if (displayName.length < 2) { err.textContent = 'Escolha um apelido (pelo menos 2 letras).'; sfx.error(); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = 'Esse e-mail não parece certo.'; sfx.error(); return; }
       if (password.length < 8) { err.textContent = 'A senha precisa de pelo menos 8 caracteres.'; sfx.error(); return; }
-      if (!form.terms.checked) { err.textContent = TERMS_MSG; shakeTerms(form); sfx.error(); return; }
+      if (!form.terms.checked) { termsTip(form); sfx.error(); return; }
     }
     submit.disabled = true;
     submit.textContent = 'Um instante…';
