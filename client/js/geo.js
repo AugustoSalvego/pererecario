@@ -45,7 +45,7 @@ class Geo extends EventTarget {
       (p) => {
         if (this.mode !== 'real') return;
         this.error = null;
-        this.update({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, simulated: false });
+        this.update({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, speed: p.coords.speed, simulated: false });
       },
       (e) => this.setError(e.code === 1 ? 'denied' : e.code === 3 ? 'timeout' : 'unavailable'),
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
@@ -84,7 +84,9 @@ class Geo extends EventTarget {
     if (!next.simulated && prev) {
       // GPS parado "tremendo": ignora pulinhos menores que parte da imprecisão informada
       const d = distanceM(prev, next);
-      const dead = Math.max(3, Math.min(12, (next.accuracy || 10) * 0.4));
+      // andando (o GPS informa velocidade): aceita passos pequenos, para o boneco acompanhar
+      const moving = next.speed != null && next.speed > 0.6;
+      const dead = moving ? 1 : Math.max(3, Math.min(12, (next.accuracy || 10) * 0.4));
       if (d < dead) return;
       if (countDistance && next.accuracy <= MAX_ACCURACY_FOR_DISTANCE && d < 80) store.addDistance(d);
       // suaviza leituras imprecisas e desliza o boneco até o novo ponto (sem teletransporte)

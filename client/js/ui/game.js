@@ -385,13 +385,23 @@ function drawPlayer(force = false) {
   map.objects.get('player').sig = sig;
 }
 
+// Animação de andar: o GPS desliza o boneco em passinhos e o joystick move ~35 cm a cada
+// 0,1 s, então "está andando" é qualquer movimento recente, e a direção é calculada a cada
+// 0,8 m percorridos (assim o boneco não fica virando à toa com a tremedeira do GPS).
+let dirAnchor = null;
 function onGeo() {
   const pos = geo.pos;
-  if (lastPos && distanceM(lastPos, pos) > 1.2) {
-    playerDir = dirFromBearing(bearing(lastPos, pos));
+  const step = lastPos ? distanceM(lastPos, pos) : 0;
+  const jump = step >= 80; // teletransporte (demonstração) não anima
+  if (step > 0.05 && !jump) {
     walking = true;
     clearTimeout(walkingTimer);
-    walkingTimer = setTimeout(() => { walking = false; drawPlayer(); }, 800);
+    walkingTimer = setTimeout(() => { walking = false; drawPlayer(); }, geo.mode === 'sim' ? 320 : 1600);
+  }
+  if (!dirAnchor || jump) dirAnchor = { lat: pos.lat, lng: pos.lng };
+  else if (distanceM(dirAnchor, pos) >= 0.8) {
+    playerDir = dirFromBearing(bearing(dirAnchor, pos));
+    dirAnchor = { lat: pos.lat, lng: pos.lng };
   }
   lastPos = { lat: pos.lat, lng: pos.lng };
   if (map.follow) {
