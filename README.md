@@ -9,6 +9,7 @@ Trabalho prático de **Sistemas Distribuídos / Computação Móvel e Ubíqua**.
 - **Documentação completa do trabalho:** [`docs/RELATORIO.md`](docs/RELATORIO.md) (armazenamento local, sincronização, conflitos, falhas, computação ubíqua)
 - **Roteiro da apresentação (testes obrigatórios):** [`docs/ROTEIRO_APRESENTACAO.md`](docs/ROTEIRO_APRESENTACAO.md)
 - **Artes (o que trocar e em que formato):** [`docs/ARTES.md`](docs/ARTES.md)
+- **Hospedagem e segurança dos dados (deploy, backup, restauração):** [`docs/HOSPEDAGEM.md`](docs/HOSPEDAGEM.md)
 
 ## Como jogar
 
@@ -32,27 +33,30 @@ Requer apenas **Node.js 22.13+** (o servidor não tem dependências para rodar c
 
 ```bash
 npm start            # http://localhost:8080  (usa SQLite em data/pererecario.db)
-npm test             # 24 testes de sincronização, idempotência, conflitos, falhas, trabalhos, loja e vendas
+npm test             # 26 testes: sincronização, idempotência, conflitos, falhas, trabalhos, loja, vendas, backup
 ```
 
 Painel do servidor: `http://localhost:8080/admin` (chave padrão local: `brejo-admin`; em produção, defina `ADMIN_KEY`).
 
 > No celular, GPS, câmera e sensores só funcionam com **HTTPS**. Para testar no aparelho use o deploy abaixo (ou um túnel HTTPS para o seu computador).
 
-## Colocar no ar (Render, grátis)
+## Colocar no ar (grátis) e segurança dos dados
 
-1. Crie uma conta em [render.com](https://render.com) (pode entrar com o GitHub).
-2. **New → Blueprint** e escolha este repositório. O arquivo [`render.yaml`](render.yaml) cria o servidor Node e um banco **PostgreSQL gratuito**.
-3. Quando pedir `ADMIN_KEY`, invente uma senha (é a do painel `/admin`). `CARTO_KEY` é opcional: deixe vazio para usar o mapa padrão do OpenStreetMap, ou cole a chave gratuita do CARTO para um mapa mais limpo.
-4. Aguarde o deploy e abra a URL `https://pererecario-xxxx.onrender.com`. Esse é o link para os jogadores (gere um QR code dele para o público).
+Passo a passo completo em [`docs/HOSPEDAGEM.md`](docs/HOSPEDAGEM.md). Em resumo:
 
-Observações do plano gratuito do Render: o servidor "dorme" após 15 min sem acesso e leva ~1 min para acordar (o jogo continua funcionando offline nesse meio-tempo e sincroniza depois); o Postgres gratuito expira 30 dias após criado. Por isso o banco é Postgres e não SQLite: no plano grátis, arquivos locais são apagados quando o servidor dorme.
+1. **Banco no [Neon](https://neon.com)** (PostgreSQL grátis e sem prazo de validade): crie um projeto na região AWS US East 1 (N. Virginia) e copie a *connection string*.
+2. **Servidor no [Render](https://render.com)**: **New → Blueprint** com este repositório. O [`render.yaml`](render.yaml) cria o servidor e pede `DATABASE_URL` (a do Neon), `ADMIN_KEY` (senha do `/admin`) e `CARTO_KEY` (opcional).
+3. **Backup automático**: cadastre os segredos `GAME_URL`, `ADMIN_KEY` e `BACKUP_PASSWORD` no GitHub. O workflow [`backup`](.github/workflows/backup.yml) copia o banco inteiro a cada 6 horas, criptografado, e guarda por 90 dias. Para restaurar: `node scripts/restaurar_backup.js arquivo`.
+
+Por que não o Postgres gratuito do próprio Render: ele expira 30 dias depois de criado e não tem backup. E por que não SQLite em produção: no plano grátis, os arquivos do servidor são apagados quando ele reinicia ou dorme (por isso o servidor nem sobe hospedado sem `DATABASE_URL`).
+
+O servidor gratuito do Render "dorme" após 15 min sem acesso e leva cerca de 1 min para acordar; o jogo continua funcionando offline nesse meio-tempo e sincroniza depois.
 
 ## Onde aparecem as lagoinhas
 
-**Em qualquer lugar, sem cadastro, e diferentes para cada jogador.** O mundo inteiro é coberto por uma grade invisível de ~130 m, e cada ponto da grade tem um sorteio fixo, feito com o id do jogador, que decide se ali existe uma lagoinha (75 % de chance). Cada lagoinha tem 4 pererecas, que mudam a cada **15 minutos**. Celular e servidor fazem o mesmo sorteio, então chegam às mesmas lagoinhas e pererecas, mesmo com o celular offline. Dois jogadores lado a lado veem lagoinhas diferentes; a mesma conta em dois celulares vê as mesmas.
+**Em qualquer lugar, sem cadastro, e diferentes para cada jogador.** O mundo inteiro é coberto por uma grade invisível de ~130 m, e cada ponto da grade tem um sorteio fixo, feito com o id do jogador, que decide se ali existe uma lagoinha (85 % de chance). Cada lagoinha tem 6 pererecas, que mudam a cada **15 minutos**, e outra grade espalha pererecas soltas no mato, longe da água. Celular e servidor fazem o mesmo sorteio, então chegam às mesmas lagoinhas e pererecas, mesmo com o celular offline. Dois jogadores lado a lado veem lagoinhas diferentes; a mesma conta em dois celulares vê as mesmas.
 
-No mapa, as pererecas e os matinhos só aparecem a até 70 m do jogador (mais longe, somem), e as lagoinhas a até 400 m. Quando não há perereca por perto, uma setinha no topo aponta a lagoinha mais próxima.
+No mapa, as pererecas e os matinhos só aparecem a até 90 m do jogador (mais longe, somem), e as lagoinhas a até 400 m. Quando não há perereca por perto, uma setinha no topo aponta a lagoinha mais próxima.
 
 Se quiser uma lagoinha num ponto exato (por exemplo, a sala da apresentação), crie um **brejo à mão**: Perfil → Painel de demonstração → chave de administrador → "Criar brejo onde estou", ou `/admin` → Brejos. O brejo cadastrado esconde a lagoinha automática que estiver em cima dele, e dois brejos cadastrados não podem ficar colados (o servidor recusa).
 

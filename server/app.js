@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { hashPassword, verifyPassword, makeTokens, friendCode } from './auth.js';
 import { makeSync } from './sync.js';
+import { exportAll } from './backup.js';
 import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook, carById } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -274,6 +275,29 @@ export async function createApp({ db, adminKey = process.env.ADMIN_KEY || 'brejo
       requireAdmin(req);
       await db.tx((q) => q.run('UPDATE brejos SET active=0 WHERE id=$1', [String(body.id || '')]));
       return brejos();
+    },
+
+    // Backup completo (todas as tabelas, em JSON). O GitHub Actions baixa isto todo dia.
+    'GET /api/admin/backup': async (req) => {
+      requireAdmin(req);
+      const data = await exportAll(db, { now: now(), version: VERSION });
+      log(`backup exportado: ${Object.entries(data.counts).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+      return data;
+    },
+
+    // Jogador esqueceu a senha (não há e-mail no cadastro): o organizador define uma nova,
+    // e o progresso continua todo lá.
+    'POST /api/admin/reset-password': async (req, body) => {
+      requireAdmin(req);
+      const username = String(body.username || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      if (password.length < 6) throw new HttpError(400, 'A senha nova precisa de pelo menos 6 caracteres');
+      const p = await db.one('SELECT id, display_name FROM players WHERE username=$1', [username]);
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse usuário');
+      const passHash = await hashPassword(password);
+      await db.tx((q) => q.run('UPDATE players SET pass_hash=$1 WHERE id=$2', [passHash, p.id]));
+      log(`senha redefinida pelo administrador: ${username}`);
+      return { ok: true, displayName: p.display_name };
     },
 
     'POST /api/admin/outage': async (req, body) => {

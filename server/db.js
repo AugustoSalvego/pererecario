@@ -168,13 +168,33 @@ async function openSqlite(file) {
   };
 }
 
+function withoutSslParams(url) {
+  try {
+    const u = new URL(url);
+    const keys = ['sslmode', 'channel_binding', 'sslrootcert'].filter((k) => u.searchParams.has(k));
+    if (!keys.length) return url;
+    for (const k of keys) u.searchParams.delete(k);
+    return u.toString();
+  } catch { return url; }
+}
+
 async function openPostgres(url) {
   const pg = (await import('pg')).default;
   pg.types.setTypeParser(20, (v) => Number(v)); // BIGINT -> number
-  const ssl = /localhost|127\.0\.0\.1/.test(url) || process.env.PGSSL === 'off'
-    ? false
-    : (url.includes('.render.com') || process.env.PGSSL === 'on' ? { rejectUnauthorized: false } : false);
-  const pool = new pg.Pool({ connectionString: url, ssl, max: 5 });
+  // SSL: desligado no próprio computador; certificado interno no Render; verificado nos demais
+  // (Neon, Supabase etc. exigem SSL com certificado válido).
+  const local = /localhost|127\.0\.0\.1/.test(url) || process.env.PGSSL === 'off' || /sslmode=disable/.test(url);
+  const ssl = local ? false : (url.includes('.render.com') ? { rejectUnauthorized: false } : true);
+  const pool = new pg.Pool({
+    connectionString: withoutSslParams(url),   // o SSL é decidido acima, não pela URL
+    ssl,
+    max: 5,
+    idleTimeoutMillis: 30000,        // solta conexões paradas antes de o banco gratuito "dormir"
+    connectionTimeoutMillis: 15000,  // o banco que estava dormindo leva alguns segundos para acordar
+  });
+  // Uma conexão parada que cai (o banco reiniciou ou dormiu) não pode derrubar o servidor:
+  // o pool abre outra na próxima consulta.
+  pool.on('error', (e) => console.warn('Postgres: uma conexão parada caiu e será reaberta:', e.message));
   const wrap = (client) => ({
     async query(sql, params = []) { return (await client.query(sql, params)).rows; },
     async one(sql, params = []) { return (await client.query(sql, params)).rows[0] || null; },

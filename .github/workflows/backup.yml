@@ -1,0 +1,47 @@
+# Backup automático do banco do jogo.
+# A cada 6 horas (e quando você clicar em "Run workflow"), baixa o backup completo do servidor
+# (GET /api/admin/backup), compacta, criptografa com a sua senha e guarda como "artifact" do
+# GitHub por 90 dias. Fica fora do servidor e fora do banco: se o banco sumir, os dados não somem.
+#
+# Segredos necessários (GitHub > Settings > Secrets and variables > Actions):
+#   GAME_URL         endereço do jogo, ex.: https://pererecario.onrender.com
+#   ADMIN_KEY        a mesma chave de administrador configurada no servidor
+#   BACKUP_PASSWORD  uma senha só para os backups (guarde num lugar seguro!)
+# Para restaurar: docs/HOSPEDAGEM.md, seção "Se der problema".
+name: backup
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      GAME_URL: ${{ secrets.GAME_URL }}
+      ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+      BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+    steps:
+      - name: Conferir os segredos
+        run: |
+          for v in GAME_URL ADMIN_KEY BACKUP_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "Falta o segredo $v (veja docs/HOSPEDAGEM.md)"; exit 1; fi
+          done
+      - name: Baixar o backup do servidor
+        # o servidor gratuito pode estar dormindo: tenta por até ~3 minutos
+        run: |
+          curl -fsS --retry 8 --retry-delay 20 --retry-all-errors --max-time 120 \
+            -H "X-Admin-Key: $ADMIN_KEY" "${GAME_URL%/}/api/admin/backup" -o backup.json
+          node -e "const d=require('./backup.json'); if (d.app!=='pererecario') { console.error('resposta inesperada'); process.exit(1) } console.log('Backup ok:', JSON.stringify(d.counts))"
+      - name: Compactar e criptografar
+        run: |
+          STAMP=$(date -u +%Y-%m-%d_%H%M)
+          gzip -9 backup.json
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in backup.json.gz -out "pererecario-$STAMP.json.gz.enc" -pass env:BACKUP_PASSWORD
+          rm backup.json.gz
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ env.STAMP }}
+          path: pererecario-*.json.gz.enc
+          retention-days: 90

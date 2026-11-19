@@ -86,7 +86,7 @@ Uma decisão importante é que **as regras do jogo são determinísticas e compa
 | Servidor | Node.js 22, módulo `http`, `node:sqlite` (local) ou `pg` (PostgreSQL) |
 | Protocolo | HTTPS com REST/JSON. Autenticação por token assinado com HMAC-SHA256 (cabeçalho `Authorization: Bearer`) |
 | Senhas | scrypt com sal aleatório |
-| Hospedagem | Render (web service + PostgreSQL) definido em `render.yaml` |
+| Hospedagem | Servidor no Render (`render.yaml`) e PostgreSQL no Neon (gratuito, sem prazo de validade); backup do banco inteiro a cada 6 h pelo GitHub Actions, criptografado (`docs/HOSPEDAGEM.md`) |
 
 Rotas principais:
 
@@ -244,7 +244,7 @@ O jogo muda conforme o ambiente físico do jogador:
 
 ## 10. Testes automatizados
 
-`npm test` roda 24 testes (`test/sync.test.js`) com o servidor real e banco em memória:
+`npm test` roda 26 testes (`test/sync.test.js`) com o servidor real e banco em memória:
 
 1. cadastro, login e acesso sem token;
 2. servidor e cliente calculam as mesmas pererecas;
@@ -269,6 +269,10 @@ O jogo muda conforme o ambiente físico do jogador:
 21. loja: compra sem saldo é recusada, carro repetido não cobra duas vezes, dois aparelhos não gastam o mesmo dinheiro e não dá para usar um carro que não foi comprado;
 22. pererecas soltas no mato: valem como as da lagoinha, e moitinha inventada é recusada;
 23. venda: paga uma vez só, com o preço do servidor; favorita e captura que perdeu o conflito não vendem.
+24. backup completo e restauração num banco novo, sem duplicar ao restaurar de novo;
+25. redefinição de senha pelo administrador sem perder o progresso.
+
+No GitHub, os mesmos testes rodam também contra um PostgreSQL de verdade, com um teste a mais: derrubar todas as conexões do banco (como quando ele reinicia ou "dorme") não derruba o servidor.
 
 Os fluxos completos (login, mapa, captura, modo offline com o app fechado e reaberto, reconexão, conflito com dois aparelhos, queda do servidor, os três minijogos de trabalho, a entrega, a compra do carro e outro jogador vendo o carro) também foram exercitados num navegador Chrome automatizado.
 

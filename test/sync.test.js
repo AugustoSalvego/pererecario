@@ -1,24 +1,26 @@
 // Testes do servidor: idempotência, conflitos, convergência e falhas.
-// Rodar com: npm test
+// Rodar com: npm test  (SQLite em memória)
+// Contra um PostgreSQL de verdade: TEST_DATABASE_URL="postgres://..." npm test  (o GitHub faz isso sozinho)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { openDb } from '../server/db.js';
+import { importAll } from '../server/backup.js';
 import { createApp } from '../server/app.js';
 import { spawnsFor, windowOf, windowStart, giftFor, dayOf, maskFromSpecies, pondsNear, moitasNear, brejosNear, distanceM, jobsNear, jobPay, visibleInMode, frogPrice } from '../client/js/shared/game.js';
 
-let server, base, app, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
+let server, base, app, db, clock = Date.UTC(2026, 10, 18, 13, 0, 0);
 const now = () => clock;
 const ADMIN = 'teste-admin';
 
 before(async () => {
-  const db = await openDb({ url: '', file: ':memory:' });
+  db = await openDb({ url: process.env.TEST_DATABASE_URL || '', file: ':memory:' });
   app = await createApp({ db, adminKey: ADMIN, tokenSecret: 'segredo-de-teste', now, quiet: true });
   server = app.server();
   await new Promise((r) => server.listen(0, r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => server.close());
+after(async () => { server.close(); await db.close(); });
 
 async function call(method, path, body, headers = {}) {
   const res = await fetch(base + path, {
@@ -438,4 +440,44 @@ test('ranking e progresso recuperado em outro aparelho', async () => {
   const rk = await call('GET', '/api/ranking', null, auth(p));
   assert.equal(rk.status, 200);
   assert.ok(rk.body.me.xp > 0);
+});
+
+test('backup completo e restauração num banco novo (sem duplicar ao restaurar de novo)', async () => {
+  clock += 61_000;   // o limite de 30 cadastros/logins por minuto vale também nos testes
+  const p = await newPlayer('backupeiro');
+  const b = await ensureBrejo();
+  const spawns = spawnsFor(b, windowOf(clock), app.catalog, p.id);
+  await sync(p, 'c1', spawns.slice(0, 2).map((s) => captureOp(s, clock)));
+  const denied = await call('GET', '/api/admin/backup', undefined, { 'X-Admin-Key': 'errada' });
+  assert.equal(denied.status, 403);
+  const r = await call('GET', '/api/admin/backup', undefined, { 'X-Admin-Key': ADMIN });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.app, 'pererecario');
+  assert.ok(r.body.counts.players >= 1 && r.body.counts.captures >= 2);
+  // restaura num banco vazio (SQLite em memória, mesmo que o original seja Postgres)
+  const fresh = await openDb({ url: '', file: ':memory:' });
+  const added = await importAll(fresh, r.body);
+  assert.deepEqual(added, r.body.counts);
+  const again = await importAll(fresh, r.body);
+  assert.ok(Object.values(again).every((n) => n === 0), 'restaurar de novo não pode duplicar');
+  const caps = await fresh.query('SELECT * FROM captures WHERE player_id=$1', [p.id]);
+  assert.equal(caps.length, 2);
+  await fresh.close();
+});
+
+test('administrador redefine a senha de quem esqueceu, sem perder o progresso', async () => {
+  clock += 61_000;   // o limite de 30 cadastros/logins por minuto vale também nos testes
+  const p = await newPlayer('esquecido');
+  const b = await ensureBrejo();
+  await sync(p, 'c1', [captureOp(spawnsFor(b, windowOf(clock), app.catalog, p.id)[0], clock)]);
+  const bad = await call('POST', '/api/admin/reset-password', { username: 'esquecido', password: 'nova1234' }, { 'X-Admin-Key': 'errada' });
+  assert.equal(bad.status, 403);
+  const r = await call('POST', '/api/admin/reset-password', { username: 'ESQUECIDO', password: 'nova1234' }, { 'X-Admin-Key': ADMIN });
+  assert.equal(r.status, 200);
+  const old = await call('POST', '/api/auth/login', { username: 'esquecido', password: 'senha123' });
+  assert.equal(old.status, 401);
+  const ok = await call('POST', '/api/auth/login', { username: 'esquecido', password: 'nova1234' });
+  assert.equal(ok.status, 200);
+  const st = (await sync({ token: ok.body.token }, 'c2', [])).body.state;
+  assert.equal(st.captures.length, 1);
 });

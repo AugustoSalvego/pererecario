@@ -55,6 +55,21 @@
         <span id="outage" class="muted"></span>
       </div>
     </section>
+    <section style="margin-bottom:16px">
+      <h2>Dados dos jogadores</h2>
+      <p class="muted">O backup automático roda no GitHub a cada 6 horas (ver docs/HOSPEDAGEM.md). Aqui você baixa um na hora, por exemplo antes de mexer em algo no servidor.</p>
+      <div class="row" style="margin-bottom:12px">
+        <button id="bkdown">Baixar backup agora</button>
+        <span id="bkmsg" class="muted"></span>
+      </div>
+      <p class="muted" style="margin-top:6px">Jogador esqueceu a senha? Defina uma nova (o progresso dele continua todo lá) e passe para ele.</p>
+      <div class="row">
+        <input id="rpuser" placeholder="usuário do jogador" autocomplete="off" style="min-width:160px">
+        <input id="rppass" placeholder="senha nova (mín. 6)" autocomplete="off" style="min-width:160px">
+        <button class="alt" id="rpgo">Redefinir senha</button>
+        <span id="rpmsg" class="muted"></span>
+      </div>
+    </section>
     <div class="grid">
       <section><h2>Jogadores (ranking)</h2><table id="players"></table></section>
       <section><h2>Capturas recebidas</h2><p class="muted">"Atraso" = tempo entre a captura no celular e a chegada ao servidor (capturas feitas offline).</p><table id="captures"></table></section>
@@ -87,6 +102,28 @@ async function call(method, path, body) {
   if (!r.ok) throw new Error(d.error || r.status);
   return d;
 }
+$('#bkdown').addEventListener('click', async () => {
+  $('#bkmsg').textContent = 'Gerando…';
+  try {
+    const d = await call('GET', '/api/admin/backup');
+    const blob = new Blob([JSON.stringify(d)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `pererecario-backup-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $('#bkmsg').textContent = `Backup baixado: ${d.counts.players} jogadores, ${d.counts.captures} capturas, ${d.counts.jobs} trabalhos, ${d.counts.sales} vendas.`;
+  } catch (e) { $('#bkmsg').textContent = `Erro: ${e.message}`; }
+});
+$('#rpgo').addEventListener('click', async () => {
+  const username = $('#rpuser').value.trim(), password = $('#rppass').value;
+  if (!username || password.length < 6) { $('#rpmsg').textContent = 'Informe o usuário e uma senha com pelo menos 6 caracteres.'; return; }
+  try {
+    const d = await call('POST', '/api/admin/reset-password', { username, password });
+    $('#rpmsg').textContent = `Pronto: ${d.displayName} já pode entrar com a senha nova.`;
+    $('#rppass').value = '';
+  } catch (e) { $('#rpmsg').textContent = `Erro: ${e.message}`; }
+});
 function table(el, cols, rows) {
   el.innerHTML = `<tr>${cols.map((c) => `<th>${c[0]}</th>`).join('')}</tr>` + (rows.length ? rows.map((r) => `<tr>${cols.map((c) => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length}" class="muted">Nada ainda</td></tr>`);
 }

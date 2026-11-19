@@ -1,10 +1,13 @@
 # Deploy no Render (Blueprint): https://render.com/docs/blueprint-spec
-# Cria o servidor web (Node) + um banco PostgreSQL gratuito e liga os dois.
+# Cria o servidor web (Node). O banco é um PostgreSQL permanente fora do Render (Neon, grátis e
+# sem prazo de validade): o Postgres gratuito do próprio Render expira em 30 dias e não tem backup.
+# Passo a passo completo: docs/HOSPEDAGEM.md
 services:
   - type: web
     name: pererecario
     runtime: node
     plan: free
+    region: virginia            # mesma região do banco no Neon (AWS US East, N. Virginia)
     buildCommand: npm install --omit=dev
     startCommand: npm start
     healthCheckPath: /healthz
@@ -12,16 +15,10 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: DATABASE_URL
-        fromDatabase:
-          name: pererecario-db
-          property: connectionString
+        sync: false # o Render pede o valor na criação: a "connection string" do Neon (postgresql://...)
       - key: TOKEN_SECRET
         generateValue: true
       - key: ADMIN_KEY
-        sync: false # o Render pede o valor na criação: é a senha do painel /admin
+        sync: false # o Render pede o valor na criação: é a senha do painel /admin e do backup
       - key: CARTO_KEY
         sync: false # opcional: chave gratuita do mapa CARTO (carto.com/basemaps/apikey); vazio = OpenStreetMap
-
-databases:
-  - name: pererecario-db
-    plan: free
