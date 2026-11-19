@@ -238,7 +238,10 @@ test('loja: sem saldo é recusada; item repetido não cobra; dois aparelhos gast
   const p = await newPlayer('lojinha');
   const poor = await sync(p, 'c1', [buyOp('hatch')]);
   assert.equal(poor.body.results[0].status, 'rejected');
-  const jobs = findJobs(p, 6);
+  // trabalhos até juntar B$ 250 (o sedã); os moradores são sorteados, então o total varia um pouco
+  const jobs = [];
+  let sum = 0;
+  for (const j of findJobs(p, 12)) { if (sum >= 250) break; jobs.push(j); sum += jobPay(j.type, 'gps'); }
   await sync(p, 'c1', jobs.map((j) => jobOp(j)));
   let st = (await sync(p, 'c1', [])).body.state;
   const earned = st.jobs.reduce((t, j) => t + j.pay, 0);
