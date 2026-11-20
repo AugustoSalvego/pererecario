@@ -46,7 +46,7 @@ Passo a passo completo em [`docs/HOSPEDAGEM.md`](docs/HOSPEDAGEM.md). Em resumo:
 
 1. **Banco no [Neon](https://neon.com)** (PostgreSQL grátis e sem prazo de validade): crie um projeto na região AWS US East 1 (N. Virginia) e copie a *connection string*.
 2. **Servidor no [Render](https://render.com)**: **New → Blueprint** com este repositório. O [`render.yaml`](render.yaml) cria o servidor, pede a `DATABASE_URL` (a do Neon) e sorteia a `ADMIN_KEY` (senha do `/admin`, que você vê em **Environment**).
-3. **Backup automático**: cadastre os segredos `GAME_URL`, `ADMIN_KEY` e `BACKUP_PASSWORD` no GitHub. O workflow [`backup`](.github/workflows/backup.yml) copia o banco inteiro a cada 6 horas, criptografado, e guarda por 90 dias. Para restaurar: `node scripts/restaurar_backup.js arquivo`.
+3. **Backup automático**: cadastre os segredos `GAME_URL`, `ADMIN_KEY` e `BACKUP_PASSWORD` no GitHub. O workflow [`backup`](.github/workflows/backup.yml) copia o banco inteiro a cada 2 horas, criptografado, e guarda por 30 dias. Para restaurar: `node scripts/restaurar_backup.js arquivo`.
 4. **Opcionais e grátis:** `GOOGLE_CLIENT_ID` (botão "Continuar com Google") e `BREVO_API_KEY` + `EMAIL_FROM` (código de 6 números por e-mail no cadastro e no "Esqueci a senha"). Sem eles, o jogo funciona só com e-mail e senha, sem código.
 
 Por que não o Postgres gratuito do próprio Render: ele expira 30 dias depois de criado e não tem backup. E por que não SQLite em produção: no plano grátis, os arquivos do servidor são apagados quando ele reinicia ou dorme (por isso o servidor nem sobe hospedado sem `DATABASE_URL`).

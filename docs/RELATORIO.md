@@ -88,7 +88,7 @@ Uma decisão importante é que **as regras do jogo são determinísticas e compa
 | Servidor | Node.js 22, módulo `http`, `node:sqlite` (local) ou `pg` (PostgreSQL) |
 | Protocolo | HTTPS com REST/JSON. Autenticação por token assinado com HMAC-SHA256 (cabeçalho `Authorization: Bearer`) |
 | Senhas | scrypt com sal aleatório |
-| Hospedagem | Servidor no Render (`render.yaml`) e PostgreSQL no Neon (gratuito, sem prazo de validade); backup do banco inteiro a cada 6 h pelo GitHub Actions, criptografado (`docs/HOSPEDAGEM.md`) |
+| Hospedagem | Servidor no Render (`render.yaml`) e PostgreSQL no Neon (gratuito, sem prazo de validade); backup do banco inteiro a cada 2 h pelo GitHub Actions, criptografado (`docs/HOSPEDAGEM.md`) |
 
 Rotas principais:
 

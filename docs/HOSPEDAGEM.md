@@ -7,7 +7,7 @@ São três peças, cada uma num serviço diferente (mais o login com o Google no
 |---|---|---|---|
 | Servidor (Node.js) | **Render** (web service) | entrega o jogo (PWA) e recebe a sincronização | grátis |
 | Banco de dados (PostgreSQL) | **Neon** | guarda contas, capturas, trabalhos, vendas, compras | grátis, sem prazo de validade |
-| Backup | **GitHub Actions** (deste repositório) | copia o banco inteiro a cada 6 horas, criptografado | grátis |
+| Backup | **GitHub Actions** (deste repositório) | copia o banco inteiro a cada 2 horas, criptografado | grátis |
 | Login com Google (opcional) | **Google Cloud** | botão "Continuar com Google" | grátis |
 | Código por e-mail (opcional) | **Brevo** | confirma o e-mail no cadastro e manda o código do "Esqueci a senha" | grátis (300 e-mails por dia) |
 
@@ -23,7 +23,7 @@ O Firebase faria a sincronização sozinho, por dentro, e esconderia justamente 
 
 1. **No celular, na fila (IndexedDB):** tudo o que ele fez e ainda não chegou ao servidor. O jogo pede ao navegador armazenamento permanente, para não ser apagado quando falta espaço. A fila só sai do celular quando o servidor confirma o recebimento; se a internet cair no meio, ela é reenviada sem duplicar nada. Sair da conta ou entrar com outra **não apaga** a fila: ela fica guardada no aparelho e volta quando a conta entrar de novo ali.
 2. **No servidor (Neon):** a cópia oficial. Entrando em qualquer celular, o jogador recebe tudo de volta.
-3. **Nos backups (GitHub):** uma cópia do banco inteiro a cada 6 horas, guardada por 90 dias, fora do servidor e fora do banco.
+3. **Nos backups (GitHub):** uma cópia do banco inteiro a cada 2 horas, guardada por 30 dias, fora do servidor e fora do banco.
 4. **No celular, no histórico:** o celular também guarda tudo o que o servidor já confirmou. A cada sincronização o servidor diz quantas ações daquele celular ele tem; se for menos do que o celular sabe que mandou (o banco foi restaurado de um backup, ou voltado no tempo), o celular reenvia o histórico e o servidor recupera só o que faltava, sem duplicar. Assim, mesmo num desastre, o que foi feito depois do último backup volta assim que os jogadores abrirem o jogo.
 
 Para o jogador, o estado aparece no canto de cima: **ponto verde "Online"**, **ponto vermelho "Offline"** com quantas ações estão guardadas no celular, **"Sincronizando…"** quando a internet volta e **"Tudo salvo"** quando o servidor confirma. Tocando ali, o jogo explica em palavras.
@@ -34,7 +34,7 @@ O que pode fazer um jogador perder algo, e o que já protege:
 
 | Risco | Proteção |
 |---|---|
-| O banco gratuito expirar ou ser apagado | Neon gratuito não expira; backups a cada 6 h no GitHub; restauração com um comando |
+| O banco gratuito expirar ou ser apagado | Neon gratuito não expira; backups a cada 2 h no GitHub; restauração com um comando |
 | O servidor reiniciar ou "dormir" | Os dados estão no banco, não no servidor. Sem `DATABASE_URL`, o servidor se recusa a subir, para não gravar num arquivo temporário |
 | O banco reiniciar ou dormir com o servidor ligado | O servidor reabre a conexão sozinho (testado no GitHub contra um Postgres de verdade) |
 | Alguém apagar dados por engano | Neon volta o banco para qualquer momento das últimas 6 horas; além disso, há os backups |
@@ -79,7 +79,7 @@ O que pode fazer um jogador perder algo, e o que já protege:
    - `GAME_URL`: a URL do jogo, por exemplo `https://pererecario-xxxx.onrender.com`;
    - `ADMIN_KEY`: a mesma do Render (a que você copiou no passo 2.5);
    - `BACKUP_PASSWORD`: uma senha **só para os backups**. Guarde num lugar seguro (gerenciador de senhas, por exemplo): sem ela, o backup não abre.
-2. Vá em **Actions → backup → Run workflow**. Em 1 ou 2 minutos aparece um ✅ e, dentro da execução, um arquivo `backup-...` em *Artifacts*. A partir daí ele roda sozinho a cada 6 horas.
+2. Vá em **Actions → backup → Run workflow**. Em 1 ou 2 minutos aparece um ✅ e, dentro da execução, um arquivo `backup-...` em *Artifacts*. A partir daí ele roda sozinho a cada 2 horas.
 3. **Atenção, o repositório é público:** qualquer pessoa logada no GitHub consegue baixar os arquivos de backup. Por isso eles saem criptografados (têm nomes de usuário e as senhas, guardadas embaralhadas com scrypt), e o workflow se recusa a rodar sem `BACKUP_PASSWORD`. Use uma senha **longa** (por exemplo, quatro ou cinco palavras aleatórias) e não a reaproveite em nenhum outro lugar. Se puder deixar o repositório privado depois da avaliação, melhor ainda.
 
 ### 4. Login com o Google (Google Cloud, grátis, 10 min)

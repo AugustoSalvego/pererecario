@@ -1,5 +1,5 @@
 # Backup automático do banco do jogo.
-# A cada 6 horas (e quando você clicar em "Run workflow"), baixa o backup completo do servidor
+# A cada 2 horas (e quando você clicar em "Run workflow"), baixa o backup completo do servidor
 # (GET /api/admin/backup), compacta, criptografa com a sua senha e guarda como "artifact" do
 # GitHub por 90 dias. Fica fora do servidor e fora do banco: se o banco sumir, os dados não somem.
 #
@@ -14,7 +14,9 @@
 name: backup
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    # a cada 2 horas: o agendador gratuito do GitHub às vezes pula execuções (em 20/11 pulou
+    # duas seguidas); com 2 h, uma execução pulada deixa no máximo 4 h sem cópia
+    - cron: '17 */2 * * *'
   workflow_dispatch:
 
 permissions:
@@ -61,7 +63,7 @@ jobs:
         with:
           name: backup-${{ env.STAMP }}
           path: pererecario-*.json.gz.enc
-          retention-days: 90
+          retention-days: 30   # hoje cada cópia tem ~0,3 MB: 12 por dia × 30 dias ≈ 100 MB, dentro dos 500 MB grátis mesmo se o repositório ficar privado
       - name: Manter o backup automático ligado (o GitHub desliga agendamentos após 60 dias sem commits)
         if: always()
         env:
