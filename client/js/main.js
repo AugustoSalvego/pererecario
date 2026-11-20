@@ -8,6 +8,10 @@ import { setTileProvider } from './ui/map.js';
 import { api } from './api.js';
 import * as db from './db.js';
 
+// iPhone: o Safari ignora o "não ampliar" da página; estes eventos de gesto são só dele.
+for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+
+
 async function boot() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW não registrado', e));

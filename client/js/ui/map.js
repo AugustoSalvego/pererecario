@@ -267,7 +267,13 @@ export class GameMap {
       pinch = { d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), zoom: this.zoom };
       moved = 99;   // depois de uma pinça, não vale como toque
     };
+    // Esquece todos os dedos (gesto encerrado de um jeito que o celular não avisou).
+    const reset = () => { pts.clear(); pinch = null; start = null; last = null; };
     el.addEventListener('pointerdown', (e) => {
+      // O primeiro dedo de um gesto novo (isPrimary) quer dizer que não há outro dedo na tela: se a lista
+      // ainda tem algum, é um "fantasma" (o celular não avisou que ele saiu: notificação, troca de app,
+      // tela apagando). Sem limpar, o arrasto de um dedo só virava pinça com o fantasma e dava zoom.
+      if (e.isPrimary) reset();
       if (pts.size >= 2) return;   // um terceiro dedo é ignorado
       try { el.setPointerCapture(e.pointerId); } catch {}
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -314,7 +320,12 @@ export class GameMap {
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
-    el.addEventListener('lostpointercapture', end);
+    // só quando o próprio mapa perde o dedo (o evento sobe de elementos de dentro também: esses não contam)
+    el.addEventListener('lostpointercapture', (e) => { if (e.target === el) end(e); });
+    // app em segundo plano ou janela sem foco no meio de um toque: o fim do toque pode nunca chegar
+    document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
+    window.addEventListener('pagehide', reset);
+    window.addEventListener('blur', reset);
     el.addEventListener('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom - e.deltaY * 0.002); }, { passive: false });
   }
 
