@@ -16,6 +16,7 @@ import { openShop, carSprite, faceBubble } from './shop.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
 import { $, $$, esc, toast, openSheet, closeSheet, fmtDist, ago, termsAlert, setHtml } from './common.js';
+import { installBack } from './back.js';
 import { getCatalog, frogImg, species } from '../catalog.js';
 import { store } from '../store.js';
 import { sync } from '../sync.js';
@@ -210,6 +211,10 @@ export function startGame({ firstTime = false } = {}) {
   } else {
     geo.start();
     if (!sensors.needsPermission()) sensors.request();
+    // quem já jogava antes das telas novas do GPS/Controle vê só elas, uma vez
+    if (!store.settings.modeTutSeen) {
+      setTimeout(() => openTutorial({ onlyModes: true, onDone: () => { renderAll(); setTimeout(askTerms, 600); } }), 900);
+    }
   }
   presence.start();
   store.ensureExpedition();
@@ -220,9 +225,32 @@ export function startGame({ firstTime = false } = {}) {
     document.addEventListener('click', ask, true);
   }
   prefetchTiles();
+  // botão Voltar do celular: fecha o que estiver aberto em vez de sair do jogo
+  installBack(backAction);
   // quem já tinha conta antes dos termos (ou quando os termos mudam) vê o resumo e marca "li e concordo"
   setTimeout(askTerms, 1500);
   sync.addEventListener('synced', () => setTimeout(askTerms, 600));
+}
+
+// O que o botão Voltar do celular faz, do que está mais por cima para o que está mais embaixo.
+// Devolve 'exit' quando não há nada para fechar (está no mapa).
+function backAction() {
+  const click = (sel) => { const b = document.querySelector(sel); if (b) { b.click(); return true; } return false; };
+  if (click('.alert-root .alert-x')) return 'done';                    // aviso (termos)
+  if (click('.scanner [data-act=close]')) return 'done';               // câmera do QR
+  if (click('.job-result [data-act=ok], .job-result .btn')) return 'done';
+  if (click('.jobgame [data-act=close]')) return 'done';               // minijogo de trabalho
+  if (click('.capture .result [data-act=continue]')) return 'done';    // depois de pegar: continuar caçando
+  if (click('.capture [data-act=close]')) return 'done';               // captura (a perereca continua lá)
+  const tut = document.querySelector('.tutorial');
+  if (tut) { tut.dispatchEvent(new Event('tut-back')); return 'done'; } // tutorial: volta uma tela
+  if (document.querySelector('#sheet-root .sheet')) {
+    if (termsOpen) return 'done';                                      // os termos precisam de resposta
+    closeSheet();
+    return 'done';
+  }
+  if (current !== 'map') { sfx.tap(); openScreen('map'); return 'done'; }
+  return 'exit';
 }
 
 // ---------- telas ----------

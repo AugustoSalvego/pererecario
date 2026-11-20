@@ -10,6 +10,46 @@ import { $, $$, h, esc } from './common.js';
 import { sfx, unlockAudio } from '../audio.js';
 
 
+// As três telas sobre o jeito de andar (botão GPS/Controle, joystick e a diferença entre os modos).
+function modeSlides(look) {
+  return [
+    {
+      title: 'O botão GPS / Controle',
+      text: 'No canto de cima, à direita, fica o botão que diz <b>GPS</b> ou <b>Controle</b>. <b>Toque nele</b> para trocar o jeito de andar, quando quiser.',
+      art: `<div class="tut-screen">
+          <div class="ts-road a"></div><div class="ts-road b"></div>
+          <div class="ts-player"><i></i><span></span></div>
+          <div class="ts-col">
+            <span class="ts-pill"><i class="ts-dot"></i>Online</span>
+            <span class="ts-pill ts-mode">${icons.gps}GPS<span class="tut-tap ts-tap"></span></span>
+            <span class="ts-pill">B$ 120</span>
+          </div>
+          <div class="ts-callout">Toque aqui para trocar!</div>
+        </div>`,
+    },
+    {
+      title: 'Jogando com o Controle',
+      text: 'No <b>Controle</b> você joga sem sair do lugar: <b>arraste o joystick</b>, embaixo à esquerda, ou <b>toque no mapa</b> onde quer ir.',
+      art: `<div class="tut-screen">
+          <div class="ts-road a"></div><div class="ts-road b"></div>
+          <svg class="ts-path" viewBox="0 0 300 220" aria-hidden="true"><path d="M150 122 L240 74" fill="none" stroke="#2f8a32" stroke-width="4" stroke-dasharray="2 9" stroke-linecap="round"></path></svg>
+          <div class="ts-char">${charHtml(look, { dir: 'right', walking: true, scale: 1.9 })}</div>
+          <span class="tut-tap ts-tap2"></span><span class="ts-label t2">ou toque no mapa</span>
+          <div class="ts-joy"><i></i></div><span class="ts-label t1">arraste</span>
+          <span class="ts-pill ctl small">${icons.gamepad}Controle</span>
+        </div>`,
+    },
+    {
+      title: 'GPS ou Controle?',
+      text: 'Os dois valem! Mas quem anda de verdade, com o <b>GPS</b>, é recompensado.',
+      art: `<div class="tut-mode-cards" style="top:6px">
+          <div class="tmc gps"><b>${icons.gps}GPS</b><ul><li>Anda de verdade</li><li><b>Mais</b> pererecas, e mais raras</li><li>Trabalhos pagam <b>+${Math.round((BALANCO.bonusNoGps - 1) * 100)}%</b></li></ul></div>
+          <div class="tmc ctl"><b>${icons.gamepad}Controle</b><ul><li>Joystick ou toque no mapa, sem sair do lugar</li><li><b>Menos</b> pererecas raras</li><li>O carro só anda aqui</li></ul></div>
+        </div>`,
+    },
+  ];
+}
+
 function slides(look) {
   return [
     {
@@ -23,24 +63,12 @@ function slides(look) {
     },
     {
       title: 'Ande até uma lagoinha',
-      text: 'Use o GPS e caminhe por aí. A setinha no topo aponta a lagoinha mais próxima. O <b>círculo verde</b> em volta de você mostra o seu alcance: <b>10 metros</b>.',
+      text: 'A setinha no topo aponta a lagoinha mais próxima. O <b>círculo verde</b> em volta de você mostra o seu alcance: <b>10 metros</b>.',
       art: `<div style="left:150px;top:60px">${img('pond-small.png', 140)}</div>
         <div style="left:20px;top:120px;width:120px;height:44px;border-radius:50%;border:3px solid rgba(70,190,60,.95);box-shadow:0 0 12px rgba(110,230,80,.85);background:rgba(120,230,90,.16)"></div>
         <div style="left:54px;top:68px">${charHtml(look, { dir: 'right', walking: true, scale: 3 })}</div>`,
     },
-    {
-      title: 'GPS ou Controle?',
-      text: 'No alto da tela, à direita, fica o botão <b>GPS / Controle</b>: toque nele para trocar o jeito de andar. Quem anda de verdade é recompensado!',
-      art: `<div class="tut-modes">
-          <span class="tm-pill">${icons.gps}GPS</span><span class="tm-swap">⇄</span><span class="tm-pill ctl">${icons.gamepad}Controle</span>
-          <span class="tut-tap tm-tap"></span>
-        </div>
-        <div class="tut-mode-cards">
-          <div class="tmc gps"><b>${icons.gps}GPS</b><ul><li>Anda de verdade</li><li><b>Mais</b> pererecas, e mais raras</li><li>Trabalhos pagam <b>+${Math.round((BALANCO.bonusNoGps - 1) * 100)}%</b></li></ul></div>
-          <div class="tmc ctl"><b>${icons.gamepad}Controle</b><ul><li>Joystick ou toque no mapa, sem sair do lugar</li><li><b>Menos</b> pererecas raras</li><li>O carro só anda aqui</li></ul></div>
-        </div>`,
-      artStyle: 'height:250px',
-    },
+    ...modeSlides(look),
     {
       title: 'Matinho com "?"',
       text: 'As comuns ficam à vista, pulando no mapa. As mais raras se escondem num <b>matinho</b> que mostra um <b>"?"</b>: chegou perto? <b>Toque no matinho</b> ou <b>chacoalhe o celular</b> para ela sair!',
@@ -66,16 +94,17 @@ function slides(look) {
 }
 
 // first = primeira vez (termina na escolha do visual). Em "Como jogar" são só as dicas;
-// o visual se troca no Perfil (guarda-roupa).
-export function openTutorial({ first = false, firstTime = false, onDone } = {}) {
+// o visual se troca no Perfil (guarda-roupa). onlyModes = só as telas do GPS/Controle (para quem já jogava).
+const WAIT_MS = 2000;   // cada tela segura os botões por 2 s: dá tempo de ver antes de passar
+export function openTutorial({ first = false, firstTime = false, onlyModes = false, onDone } = {}) {
   document.querySelector('.tutorial')?.remove();
   const startLook = lookOf(store.view.player);
-  let idx = 0, picker = null;
-  const list = slides(startLook);
+  let idx = 0, picker = null, lockTimer = null, locked = false;
+  const list = onlyModes ? modeSlides(startLook) : slides(startLook);
+
   const total = list.length + (first ? 1 : 0);
   const last = total - 1;
   const el = h(`<div class="tutorial">
-    <button class="skip">Pular</button>
     <div class="tut-stage"></div>
     <div class="tut-dots">${Array.from({ length: total }, () => '<i></i>').join('')}</div>
     <button class="btn block next">Próximo</button>
@@ -84,10 +113,26 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
   const stage = $('.tut-stage', el);
   const next = $('.next', el);
 
+  // trava os botões por 2 s a cada tela (a barrinha no botão mostra o tempo)
+  function lock() {
+    clearTimeout(lockTimer);
+    locked = true;
+    el.classList.add('waiting');
+    next.disabled = true;
+    next.classList.remove('wait');
+    void next.offsetWidth;   // reinicia a barrinha
+    next.classList.add('wait');
+    lockTimer = setTimeout(() => {
+      locked = false;
+      el.classList.remove('waiting');
+      next.disabled = false;
+      next.classList.remove('wait');
+    }, WAIT_MS);
+  }
+
   function render() {
     $$('.tut-dots i', el).forEach((d, i) => d.classList.toggle('on', i === idx));
     const isPicker = first && idx === list.length;
-    $('.skip', el).classList.toggle('hidden', idx === last);
     el.querySelector('.tut-text')?.remove();
     picker?.destroy();
     picker = null;
@@ -102,17 +147,21 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
       stage.insertAdjacentHTML('afterend', `<div class="tut-text"><h2>${s.title}</h2><p>${s.text}</p></div>`);
       next.textContent = idx === last ? 'Entendi!' : 'Próximo';
     }
+    lock();
   }
 
-  $('.skip', el).addEventListener('click', () => { idx = last; sfx.tap(); render(); });
+  // botão Voltar do celular: volta uma tela (o tutorial não fecha pelo Voltar)
+  el.addEventListener('tut-back', () => { if (idx > 0) { idx--; render(); } });
   next.addEventListener('click', async () => {
+    if (locked) return;
     unlockAudio();
     sfx.tap();
     if (idx < last) { idx++; render(); return; }
+    clearTimeout(lockTimer);
     const look = picker?.look;
     picker?.destroy();
     if (look && look !== lookOf(store.view.player)) await store.setLook(look);
-    await store.saveSettings({ tutorialDone: true, onboarded: true });
+    await store.saveSettings(onlyModes ? { modeTutSeen: true } : { tutorialDone: true, onboarded: true, modeTutSeen: true });
     if (first) await sensors.request();
     el.style.transition = 'opacity .25s';
     el.style.opacity = '0';
@@ -126,7 +175,7 @@ export function openTutorial({ first = false, firstTime = false, onDone } = {}) 
     if (x0 == null) return;
     const dx = e.changedTouches[0].clientX - x0;
     x0 = null;
-    if (dx < -60 && idx < last) { idx++; render(); }
+    if (dx < -60 && idx < last && !locked) { idx++; render(); }
     if (dx > 60 && idx > 0) { idx--; render(); }
   });
   render();

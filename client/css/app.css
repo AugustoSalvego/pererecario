@@ -1180,3 +1180,38 @@ form.login-card > button[type=submit] { margin-top: auto; }
 /* economia de bateria: pererecas e matinhos longe ficam parados (cada animação infinita obriga o
    celular a desenhar a tela o tempo todo); perto do jogador eles continuam pulando */
 .mfrog.still .frog, .mfrog.still .shadow, .mbush.still .bush, .mbush.still .bubble { animation: none; }
+
+/* tutorial: cada tela segura os botões por 2 s (a barrinha mostra o tempo) */
+.tutorial .next { position: relative; overflow: hidden; }
+.tutorial .next:disabled { opacity: 1; filter: saturate(.6) brightness(1.04); cursor: default; }
+.tutorial .next.wait::after { content: ''; position: absolute; left: 0; bottom: 0; width: 100%; height: 5px; background: rgba(255,255,255,.8); transform-origin: left center; animation: tutWait 2s linear forwards; }
+@keyframes tutWait { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.tutorial .tut-stage { margin-top: 14px; }
+
+/* tutorial: o canto da tela do jogo, para mostrar onde fica o botão e o joystick */
+.tut-art > .tut-screen { left: 0; top: 0; width: 300px; height: 220px; border-radius: 24px; background: #e4efd5; overflow: hidden; box-shadow: inset 0 0 0 4px #17352a; }
+.ts-road { position: absolute; background: #fff; }
+.ts-road.a { left: -30px; top: 158px; width: 380px; height: 18px; transform: rotate(-11deg); }
+.ts-road.b { left: 96px; top: -30px; width: 16px; height: 290px; transform: rotate(17deg); }
+.ts-player { position: absolute; left: 12px; top: 12px; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px 0 4px; border-radius: 99px; background: #fff; box-shadow: 0 2px 0 rgba(23,53,42,.12); }
+.ts-player i { width: 26px; height: 26px; border-radius: 50%; background: #cdeac0; }
+.ts-player span { width: 52px; height: 8px; border-radius: 4px; background: #d6dfd0; }
+.ts-col { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.ts-pill { position: relative; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 99px; background: #fff; font-weight: 700; font-size: 12.5px; color: var(--ink); box-shadow: 0 2px 0 rgba(23,53,42,.14); }
+.ts-pill svg { width: 15px; height: 15px; color: var(--leaf-dark); }
+.ts-pill.ctl svg { color: #4a7fd6; }
+.ts-pill.small { position: absolute; right: 12px; top: 12px; }
+.ts-dot { width: 8px; height: 8px; border-radius: 50%; background: #34b44a; }
+.ts-mode { box-shadow: 0 0 0 3px var(--sun), 0 2px 0 rgba(23,53,42,.14); }
+.ts-tap { position: absolute; left: 50%; top: 50%; margin: -17px 0 0 -17px; border-color: rgba(47,138,50,.75); background: rgba(76,185,68,.22); }
+.ts-callout { position: absolute; right: 90px; top: 48px; background: var(--sun); color: #4a3200; font-weight: 700; font-size: 13.5px; padding: 8px 12px; border-radius: 14px; white-space: nowrap; box-shadow: 0 3px 0 rgba(74,50,0,.18); }
+.ts-callout::after { content: ''; position: absolute; right: -9px; top: 50%; margin-top: -7px; border-style: solid; border-width: 7px 0 7px 9px; border-color: transparent transparent transparent var(--sun); }
+.ts-path { position: absolute; left: 0; top: 0; width: 300px; height: 220px; }
+.ts-char { position: absolute; left: 128px; top: 62px; }
+.ts-tap2 { position: absolute; left: 223px; top: 57px; border-color: rgba(47,138,50,.75); background: rgba(76,185,68,.22); }
+.ts-label { position: absolute; font-size: 12px; font-weight: 700; color: var(--ink); background: rgba(255,255,255,.92); padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+.ts-label.t2 { left: 160px; top: 100px; }
+.ts-label.t1 { left: 102px; bottom: 44px; }
+.ts-joy { position: absolute; left: 18px; bottom: 16px; width: 76px; height: 76px; border-radius: 50%; background: rgba(255,255,255,.55); border: 3px solid rgba(255,255,255,.95); box-shadow: 0 3px 0 rgba(23,53,42,.15); }
+.ts-joy i { position: absolute; left: 18px; top: 18px; width: 34px; height: 34px; border-radius: 50%; background: var(--leaf); box-shadow: 0 3px 0 var(--leaf-dark); animation: joyNudge 1.6s ease-in-out infinite; }
+@keyframes joyNudge { 0%, 100% { transform: translate(-8px, 4px); } 50% { transform: translate(10px, -7px); } }
