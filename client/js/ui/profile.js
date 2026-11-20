@@ -178,14 +178,14 @@ export function renderProfile(el) {
   setHtml($('.stats', el), [
     ['book', '#4cb944', `${v.discovered.size}/${cat.species.length}`, 'espécies'],
     ['pond', '#3bb5cf', caught.length, 'capturas'],
-    ['route', '#ff7a5c', fmtDist(v.totalMeters), 'caminhados'],
+    ['route', '#ff7a5c', fmtDist(v.totalMeters), 'percorridos'],
     ['flag', '#9b67e0', huntDays, huntDays === 1 ? 'dia de caçada' : 'dias de caçada'],
   ].map(([ic, c, b, s]) => `<div class="card stat"><div class="ico" style="background:${c}">${icons[ic]}</div><div><b>${b}</b><span>${s}</span></div></div>`).join(''));
 
   const cur = store.currentExpedition();
   setHtml($('.exp-slot', el), `<div class="card exp-now">
       <div style="display:flex;justify-content:space-between;align-items:center"><b>${fmtDay(dayOf(store.now()))}</b><span class="s" style="font-size:13px;color:var(--ink-soft)">salva sozinha, mesmo offline</span></div>
-      <div class="row"><div><b>${cur?.captures.length || 0}</b><span>pererecas</span></div><div><b>${cur?.xp || 0}</b><span>XP</span></div><div><b>${fmtDist(cur?.meters || 0)}</b><span>caminhados</span></div></div>
+      <div class="row"><div><b>${cur?.captures.length || 0}</b><span>pererecas</span></div><div><b>${cur?.xp || 0}</b><span>XP</span></div><div><b>${fmtDist(cur?.meters || 0)}</b><span>percorridos</span></div></div>
       <div class="frogs-row">${(cur?.captures || []).slice(0, 12).map((c) => frogImg(c.speciesId, 30)).join('') || '<span class="s" style="font-size:13px;color:var(--ink-soft)">Nenhuma perereca hoje ainda. Bora caçar!</span>'}</div>
     </div>`);
 

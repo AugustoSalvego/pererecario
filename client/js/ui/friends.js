@@ -58,9 +58,11 @@ export function mountFriends(el, context) {
       <div class="past-box hidden">
         <div class="section-title">Últimas trocas</div>
         <div class="list trade-list"></div>
+        <button class="btn ghost block see-all hidden" data-act="all-trades">Ver todas as trocas</button>
       </div>
     </div>`;
   $('[data-act=scan]', el).addEventListener('click', () => { sfx.tap(); openScanner(); });
+  $('[data-act=all-trades]', el).addEventListener('click', () => { sfx.tap(); openAllTrades(); });
   $('.friend-list', el).addEventListener('click', (e) => {
     const row = e.target.closest('[data-friend]');
     if (row) { sfx.tap(); openFriendProfile(row.dataset.friend); }
@@ -88,12 +90,16 @@ export async function renderFriends(el) {
 
   const day = dayOf(store.now());
   // trocas andando ficam no alto; as últimas que terminaram ficam embaixo dos parceiros
-  const past = v.trades.filter((t) => !v.activeTrades.includes(t)).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 3);
+  const allPast = pastTrades();
+  const past = allPast.slice(0, PAST_SHOWN);
   $('.trades-box', el).classList.toggle('hidden', !v.activeTrades.length);
   $('.ntrades', el).textContent = v.tradeActions ? `${v.tradeActions} esperando você` : '';
   setHtml($('.trades-box .trade-list', el), v.activeTrades.map(tradeRow).join(''));
   $('.past-box', el).classList.toggle('hidden', !past.length);
   setHtml($('.past-box .trade-list', el), past.map(tradeRow).join(''));
+  const seeAll = $('.past-box .see-all', el);
+  seeAll.classList.toggle('hidden', allPast.length <= PAST_SHOWN);
+  seeAll.textContent = `Ver todas as trocas (${allPast.length})`;
 
   $('.nfriends', el).textContent = v.friends.length ? `${v.friends.length}` : '';
   $('.friend-tip', el).classList.toggle('hidden', !v.friends.length);
@@ -110,6 +116,73 @@ export async function renderFriends(el) {
 }
 
 // ---------------- trocas ----------------
+const PAST_SHOWN = 3; // quantas trocas terminadas aparecem na tela de Amigos
+const PAGE = 30; // na lista completa, mostra de 30 em 30
+const DONE = new Set(['done']);
+const pastTrades = () => store.view.trades.filter((t) => !store.view.activeTrades.includes(t)).sort((a, b) => b.updatedAt - a.updatedAt);
+
+// "Hoje", "Ontem" ou "20 de novembro" (com o ano quando não é o ano atual), no fuso do celular.
+function dayLabel(t) {
+  const d = new Date(t), now = new Date(store.now());
+  const key = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  if (key(d) === key(now)) return 'Hoje';
+  if (key(d) === key(yest)) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+}
+
+// Lista completa das trocas que já terminaram: filtro por resultado e por parceiro,
+// separadas por dia e mostradas aos poucos (podem ser centenas).
+function openAllTrades() {
+  let status = 'all', friend = 'all', shown = PAGE;
+  const sheet = openSheet(`<h3>Todas as trocas</h3><p class="lead"></p>
+    <div class="filters tr-status"><button data-s="all" class="on">Todas</button><button data-s="done">Feitas</button><button data-s="other">Não concluídas</button></div>
+    <div class="filters tr-friend"></div>
+    <div class="list trade-list trades-all"></div>
+    <button class="btn ghost block see-all hidden" data-act="more">Mostrar mais</button>`, { cls: 'trades-sheet' });
+
+  function render() {
+    const all = pastTrades();
+    const names = new Map();
+    for (const t of all) if (!names.has(t.friendId)) names.set(t.friendId, t.friendName || 'Amigo');
+    if (friend !== 'all' && !names.has(friend)) friend = 'all';
+    const fBox = $('.tr-friend', sheet);
+    fBox.classList.toggle('hidden', names.size < 2);
+    setHtml(fBox, `<button data-f="all" class="${friend === 'all' ? 'on' : ''}">Todos os parceiros</button>`
+      + [...names].map(([id, n]) => `<button data-f="${esc(id)}" class="${friend === id ? 'on' : ''}">${esc(n)}</button>`).join(''));
+    $$('.tr-status button', sheet).forEach((b) => b.classList.toggle('on', b.dataset.s === status));
+
+    const list = all.filter((t) => (friend === 'all' || t.friendId === friend)
+      && (status === 'all' || (status === 'done') === DONE.has(t.status)));
+    const done = all.filter((t) => DONE.has(t.status)).length;
+    $('.lead', sheet).textContent = `${all.length} ${all.length === 1 ? 'troca' : 'trocas'} no total · ${done} ${done === 1 ? 'feita' : 'feitas'}`;
+    let html = '', last = null;
+    for (const t of list.slice(0, shown)) {
+      const lbl = dayLabel(t.updatedAt);
+      if (lbl !== last) { html += `<div class="tday">${esc(lbl)}</div>`; last = lbl; }
+      html += tradeRow(t);
+    }
+    setHtml($('.trades-all', sheet), html || '<p class="lead" style="text-align:center;margin:18px 0">Nenhuma troca com esse filtro.</p>');
+    const more = $('[data-act=more]', sheet);
+    more.classList.toggle('hidden', list.length <= shown);
+    more.textContent = `Mostrar mais (${list.length - Math.min(shown, list.length)})`;
+  }
+
+  $('.tr-status', sheet).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    sfx.tap(); status = b.dataset.s; shown = PAGE; render();
+  });
+  $('.tr-friend', sheet).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-f]'); if (!b) return;
+    sfx.tap(); friend = b.dataset.f; shown = PAGE; render();
+  });
+  $('[data-act=more]', sheet).addEventListener('click', () => { sfx.tap(); shown += PAGE; render(); });
+  $('.trades-all', sheet).addEventListener('click', (e) => {
+    const row = e.target.closest('[data-trade]'); if (!row) return;
+    sfx.tap(); closeSheet(true); openTrade(row.dataset.trade);
+  });
+  render();
+}
 const STATUS = {
   invited: 'Convite enviado', open: 'Escolhendo', finishing: 'Trocando…', done: 'Troca feita',
   declined: 'Recusada', cancelled: 'Cancelada', failed: 'Desfeita', expired: 'Venceu',

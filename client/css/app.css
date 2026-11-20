@@ -420,6 +420,11 @@ svg { display: block; }
 .day-sum b { display: block; font-size: 20px; }
 .day-sum span { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
 .see-all { margin-top: 4px; }
+.past-box .see-all { margin-top: 2px; }
+.trades-sheet .filters { margin: 0 -2px; }
+.trades-sheet .tr-friend { padding-top: 0; }
+.trades-all .tday { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin: 10px 4px 2px; }
+.trades-all .tday:first-child { margin-top: 0; }
 .wardrobe-sheet .lp-hero { height: 140px; }
 .tut-picker .lp-hero { height: 128px; }
 .xpline { margin-top: 8px; position: relative; z-index: 1; font-size: 13px; font-weight: 600; }

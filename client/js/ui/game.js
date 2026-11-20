@@ -473,7 +473,7 @@ function placeLight() {
 function renderExpedition() {
   const el = $('.hud-expedition');
   const cur = store.currentExpedition();
-  el.innerHTML = `<div><b>🐸 ${cur?.captures.length || 0}</b>hoje</div><div class="sep"></div><div><b>${fmtDist(cur?.meters || 0)}</b>andados</div>`;
+  el.innerHTML = `<div><b>🐸 ${cur?.captures.length || 0}</b>hoje</div><div class="sep"></div><div><b>${fmtDist(cur?.meters || 0)}</b>percorridos</div>`;
 }
 
 // o Jipe abre matinhos de mais longe (só no modo controle, que é onde o carro anda)
