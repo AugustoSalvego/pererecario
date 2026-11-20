@@ -337,7 +337,8 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
       const buys = await q.query('SELECT price FROM purchases WHERE player_id=$1', [playerId]);
       const sold = await q.query('SELECT price FROM sales WHERE player_id=$1', [playerId]);
       const friends = Number((await q.one('SELECT COUNT(*) AS n FROM friendships WHERE player_id=$1', [playerId])).n);
-      const balance = balanceOf(jobs, buys, sold, friends);
+      const grants = await q.query('SELECT amount FROM grants WHERE player_id=$1', [playerId]);
+      const balance = balanceOf(jobs, buys, sold, friends, grants);
       if (balance < car.price) return { status: 'rejected', error: `Saldo insuficiente no servidor (B$ ${balance} de B$ ${car.price})` };
       await q.run(
         'INSERT INTO purchases (id, player_id, item, price, bought_at, device_id, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
@@ -489,6 +490,7 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
     const jobs = await db.query('SELECT * FROM jobs WHERE player_id=$1 ORDER BY done_at, id', [playerId]);
     const buys = await db.query('SELECT * FROM purchases WHERE player_id=$1 ORDER BY bought_at, id', [playerId]);
     const sales = await db.query('SELECT * FROM sales WHERE player_id=$1 ORDER BY sold_at, id', [playerId]);
+    const grants = await db.query('SELECT * FROM grants WHERE player_id=$1 ORDER BY created_at, id', [playerId]);
     const friends = await db.query(
       `SELECT f.friend_id, f.created_at, p.display_name, p.avatar, p.look FROM friendships f
        JOIN players p ON p.id = f.friend_id WHERE f.player_id=$1 ORDER BY f.created_at`, [playerId],
@@ -511,10 +513,13 @@ export function makeSync({ db, catalog, now = () => Date.now(), log = () => {} }
         email: p.email || null, google: !!p.google_sub, hasPassword: String(p.pass_hash || '').startsWith('scrypt$'),
         termsAccepted: p.terms_version === TERMS_VERSION,
         staff: !!Number(p.staff),
+        speedMult: Number(p.speed_mult) || 1,
+        teleport: p.teleport_at ? { lat: Number(p.teleport_lat), lng: Number(p.teleport_lng), at: Number(p.teleport_at) } : null,
       },
       jobs: jobs.map((j) => ({ id: j.id, jobId: j.job_id, type: j.type, pay: j.pay, mode: j.mode, doneAt: Number(j.done_at), deviceId: j.device_id })),
       purchases: buys.map((b) => ({ id: b.id, item: b.item, price: b.price, boughtAt: Number(b.bought_at), deviceId: b.device_id })),
       sales: sales.map((v) => ({ id: v.id, captureId: v.capture_id, speciesId: v.species_id, price: v.price, soldAt: Number(v.sold_at), deviceId: v.device_id })),
+      grants: grants.map((g) => ({ id: g.id, amount: Number(g.amount), note: g.note || '', at: Number(g.created_at) })),
       captures: caps.map((c) => ({
         id: c.id, spawnId: c.spawn_id, speciesId: c.species_id, sizeCm: c.size_cm, kind: c.kind,
         brejoId: c.brejo_id, friendId: c.friend_id, expeditionId: c.expedition_id, caughtAt: c.caught_at,

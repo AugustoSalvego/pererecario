@@ -11,7 +11,7 @@ import { mountJoystick } from './joystick.js';
 import { mountOthers } from './others.js';
 import { skyPhase } from './daynight.js';
 import { presence } from '../presence.js';
-import { openJobTalk, runJobGame, startDelivery, deliveryState, cancelDelivery, finishDelivery, npcSprite } from './jobs.js';
+import { openJobTalk, runJobGame, startDelivery, deliveryState, cancelDelivery, finishDelivery, npcSprite, coinBurst } from './jobs.js';
 import { openShop, carSprite, faceBubble } from './shop.js';
 import { icons } from './icons.js';
 import { charHtml, headHtml, img, lookOf, sparkleHtml, bearing, dirFromBearing } from './sprites.js';
@@ -158,6 +158,8 @@ export function startGame({ firstTime = false } = {}) {
     if (!store.view.player) return;   // saindo da conta: a tela vai recarregar
     refreshObjects();
     renderAll();
+    grantNotices();
+    applyTeleport();
     const lv = store.view.level.level;
     if (lv > lastLevel) { setTimeout(() => { sfx.win(); toast(`⭐ Você subiu para o nível ${lv}!`, 'ok', null, 3500); }, 1200); }
     lastLevel = lv;
@@ -232,6 +234,46 @@ export function startGame({ firstTime = false } = {}) {
   sync.addEventListener('synced', () => setTimeout(askTerms, 600));
 }
 
+// Teletransporte pedido no /admin: vai para o modo controle e põe o boneco no ponto, uma vez.
+// Só vale se o pedido tiver menos de 10 min (entrar dias depois noutro celular não teletransporta de novo).
+let teleporting = false;
+async function applyTeleport() {
+  const t = store.view.player?.teleport;
+  if (!t || teleporting || t.at <= (store.settings.teleportDone || 0)) return;
+  teleporting = true;
+  try {
+    await store.saveSettings({ teleportDone: t.at });
+    if (store.now() - t.at > 10 * 60 * 1000) return;
+    if (geo.mode !== 'sim') await geo.setMode('sim');
+    geo.teleport(t.lat, t.lng);
+    await store.saveSettings({ simPos: { lat: t.lat, lng: t.lng } });
+    recenter();
+    sfx.win?.();
+    toast('✨ Você foi teletransportado! (modo Controle)', 'ok', null, 4500);
+  } finally { teleporting = false; }
+}
+
+// Brejais que o administrador deu (/admin → Dar Brejais): avisa uma vez cada um, com chuva de moedas.
+let grantsBusy = false;
+async function grantNotices() {
+  const list = store.view.grants || [];
+  if (!list.length || grantsBusy) return;
+  const seen = new Set(store.settings.grantsSeen || []);
+  const fresh = list.filter((g) => !seen.has(g.id));
+  if (!fresh.length) return;
+  grantsBusy = true;
+  try {
+    await store.saveSettings({ grantsSeen: list.map((g) => g.id) });
+    const total = fresh.reduce((s, g) => s + g.amount, 0);
+    const note = fresh.length === 1 && fresh[0].note ? ` (${esc(fresh[0].note)})` : '';
+    setTimeout(() => {
+      sfx.coin?.();
+      coinBurst($('.money-pill') || document.body, 12);
+      toast(`🎁 Caiu <b>B$ ${total}</b> na sua conta!${note}`, 'ok', null, 5000);
+    }, 600);
+  } finally { grantsBusy = false; }
+}
+
 // O que o botão Voltar do celular faz, do que está mais por cima para o que está mais embaixo.
 // Devolve 'exit' quando não há nada para fechar (está no mapa).
 function backAction() {
@@ -289,7 +331,9 @@ function renderHud() {
   }
   lastBalance = v.balance;
   const car = geo.mode === 'sim' ? carById(v.vehicle) : null;
-  geo.joySpeed = car ? car.speed : WALK_SPEED;
+  // velocidade no controle: a pé ou a do carro, vezes o multiplicador que o administrador deu à conta (1× a 10×)
+  const mult = Math.min(10, Math.max(1, Number(v.player?.speedMult) || 1));
+  geo.joySpeed = (car ? car.speed : WALK_SPEED) * mult;
   const look = lookOf(v.player);
   const av = $('.player-chip .avatar');
   if (av.dataset.look !== look) { av.innerHTML = headHtml(look, 1.7); av.dataset.look = look; }   // 1.7: a cabeça inteira (com a aba do chapéu) cabe na bolinha

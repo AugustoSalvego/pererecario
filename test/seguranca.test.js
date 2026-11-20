@@ -104,6 +104,51 @@ test('conta da organização: some do ranking dos outros, mas continua sendo uma
   assert.equal(again.body.players, seenByAna.body.players + 1);
 });
 
+test('admin: velocidade no modo controle e Brejais dados a uma conta', async () => {
+  ipN++;
+  clock += 61_000;
+  const lu = await call('POST', '/api/auth/register', { displayName: 'Lu', email: 'lu@seguranca.test', password: 'senha-da-lu' });
+  assert.equal(lu.status, 200);
+  const key = 'chave-forte-de-teste';
+  const token = lu.body.token;
+  const snap = async () => (await call('POST', '/api/sync', { deviceId: 'lu1', ops: [] }, { token })).body.state;
+  assert.equal((await snap()).player.speedMult, 1);
+
+  // velocidade: só com a chave, só valores permitidos
+  assert.equal((await call('POST', '/api/admin/speed', { user: 'lu@seguranca.test', mult: 10 })).status, 403);
+  assert.equal((await call('POST', '/api/admin/speed', { user: 'lu@seguranca.test', mult: 7 }, { key })).status, 400);
+  assert.equal((await call('POST', '/api/admin/speed', { user: 'ninguem@seguranca.test', mult: 10 }, { key })).status, 404);
+  assert.equal((await call('POST', '/api/admin/speed', { user: 'LU@seguranca.test', mult: 10 }, { key })).body.mult, 10);
+  assert.equal((await snap()).player.speedMult, 10);
+
+  // Brejais: sem saldo não compra; depois de receber, compra
+  const buy = (n) => call('POST', '/api/sync', { deviceId: 'lu1', ops: [{ opId: `compra-${n}`, type: 'shop.buy', ts: clock, payload: { buyId: `b-${n}`, item: 'hatch', boughtAt: clock } }] }, { token });
+  assert.equal((await buy(1)).body.results[0].status, 'rejected');
+  assert.equal((await call('POST', '/api/admin/grant', { user: 'lu@seguranca.test', amount: 200 })).status, 403);
+  assert.equal((await call('POST', '/api/admin/grant', { user: 'lu@seguranca.test', amount: 0 }, { key })).status, 400);
+  assert.equal((await call('POST', '/api/admin/grant', { user: 'lu@seguranca.test', amount: 1.5 }, { key })).status, 400);
+  const g = await call('POST', '/api/admin/grant', { user: 'lu@seguranca.test', amount: 200, note: 'teste' }, { key });
+  assert.equal(g.status, 200);
+  const s1 = await snap();
+  assert.equal(s1.grants.length, 1);
+  assert.equal(s1.grants[0].amount, 200);
+  assert.equal(s1.grants[0].note, 'teste');
+  assert.equal((await buy(2)).body.results[0].status, 'applied');
+  // dar Brejais não mexe no ranking de "Brejais ganhos"
+  const rank = await call('GET', '/api/ranking', null, { token });
+  assert.equal(rank.body.boards.gold.me.gold, 0);
+
+  // teletransporte: guarda o ponto e a hora do pedido para o jogo da conta aplicar
+  assert.equal(s1.player.teleport, null);
+  assert.equal((await call('POST', '/api/admin/teleport', { user: 'lu@seguranca.test', lat: -23.1, lng: -50.3 })).status, 403);
+  assert.equal((await call('POST', '/api/admin/teleport', { user: 'lu@seguranca.test', lat: 123, lng: -50.3 }, { key })).status, 400);
+  const tp = await call('POST', '/api/admin/teleport', { user: 'lu@seguranca.test', lat: -23.1068, lng: -50.3602 }, { key });
+  assert.equal(tp.status, 200);
+  const s2 = await snap();
+  assert.deepEqual({ lat: s2.player.teleport.lat, lng: s2.player.teleport.lng }, { lat: -23.1068, lng: -50.3602 });
+  assert.equal(s2.player.teleport.at, clock);
+});
+
 test('servidor hospedado sem ADMIN_KEY forte: o jogo sobe, o painel não abre nem com a chave padrão', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'perereca-'));
   const port = 20000 + Math.floor(Math.random() * 20000);

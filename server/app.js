@@ -145,6 +145,7 @@ export async function createApp({
       createdAt: p.created_at, email: p.email || null, google: !!p.google_sub, hasPassword: hasPassword(p),
       termsAccepted: p.terms_version === TERMS_VERSION,
       staff: !!Number(p.staff),   // conta da organização: vê o painel de demonstração
+      speedMult: Number(p.speed_mult) || 1,   // velocidade no modo controle (escolhida no /admin)
     };
   }
 
@@ -549,7 +550,7 @@ export async function createApp({
     // ----- administração / demonstração -----
     'GET /api/admin/overview': async (req) => {
       requireAdmin(req);
-      const players = await db.query('SELECT id, username, display_name, email, google_sub, staff, created_at FROM players ORDER BY created_at DESC');
+      const players = await db.query('SELECT id, username, display_name, email, google_sub, staff, speed_mult, created_at FROM players ORDER BY created_at DESC');
       const ranking = await sync.ranking();
       const xpBy = new Map(ranking.map((r) => [r.id, r]));
       const t = now();
@@ -576,7 +577,7 @@ export async function createApp({
           activeToday: Number((await db.one('SELECT COUNT(DISTINCT player_id) AS n FROM operations WHERE received_at > $1', [t - 86400000])).n),
           activeExternal: Number((await db.one('SELECT COUNT(DISTINCT o.player_id) AS n FROM operations o JOIN players p ON p.id = o.player_id WHERE o.received_at > $1 AND p.staff = 0', [t - 86400000])).n),
         },
-        players: players.map(({ google_sub, staff, ...p }) => ({ ...p, google: !!google_sub, staff: !!Number(staff), xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
+        players: players.map(({ google_sub, staff, speed_mult, ...p }) => ({ ...p, google: !!google_sub, staff: !!Number(staff), speedMult: Number(speed_mult) || 1, xp: xpBy.get(p.id)?.xp ?? 0, level: xpBy.get(p.id)?.level ?? 1, species: xpBy.get(p.id)?.species ?? 0, captures: xpBy.get(p.id)?.captures ?? 0 })),
         captures: await db.query(
           `SELECT c.id, c.spawn_id, c.species_id, c.kind, c.mode, c.caught_at, c.received_at, c.device_id, p.username
            FROM captures c JOIN players p ON p.id = c.player_id ORDER BY c.received_at DESC LIMIT 40`),
@@ -661,6 +662,52 @@ export async function createApp({
       return { ok: true, displayName: p.display_name, staff: !!staff };
     },
 
+    // Velocidade no modo controle multiplicada para uma conta (1×, 2×, 5× ou 10×). Só o joystick e o
+    // toque no mapa mudam; no GPS a velocidade é a do próprio jogador. O alcance de 10 m continua igual.
+    'POST /api/admin/speed': async (req, body) => {
+      requireAdmin(req);
+      const user = String(body.user || '').trim().toLowerCase();
+      const p = user ? await db.one('SELECT id, display_name FROM players WHERE username=$1 OR email=$1', [user]) : null;
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse e-mail. Crie a conta no jogo primeiro.');
+      const mult = Number(body.mult);
+      if (![1, 2, 5, 10].includes(mult)) throw new HttpError(400, 'Velocidade inválida: use 1, 2, 5 ou 10.');
+      await db.tx((q) => q.run('UPDATE players SET speed_mult=$1 WHERE id=$2', [mult, p.id]));
+      log(`velocidade de ${p.display_name} no modo controle: ${mult}×`);
+      return { ok: true, displayName: p.display_name, mult };
+    },
+
+    // Teletransporte: o jogo da conta, na próxima sincronização, passa para o modo controle e põe o
+    // boneco nesse ponto. Vale uma vez, e só se o pedido for recente (o jogo confere a hora).
+    'POST /api/admin/teleport': async (req, body) => {
+      requireAdmin(req);
+      const user = String(body.user || '').trim().toLowerCase();
+      const p = user ? await db.one('SELECT id, display_name FROM players WHERE username=$1 OR email=$1', [user]) : null;
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse e-mail. Crie a conta no jogo primeiro.');
+      const lat = Number(body.lat), lng = Number(body.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 85 || Math.abs(lng) > 180) {
+        throw new HttpError(400, 'Coordenadas inválidas. Cole do Google Maps, por exemplo: -23.1068, -50.3602');
+      }
+      await db.tx((q) => q.run('UPDATE players SET teleport_lat=$1, teleport_lng=$2, teleport_at=$3 WHERE id=$4', [lat, lng, now(), p.id]));
+      log(`teletransporte de ${p.display_name} para ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+      return { ok: true, displayName: p.display_name, lat, lng };
+    },
+
+    // Dar Brejais a uma conta. Cada doação é uma linha nova na tabela grants (o saldo é a soma das
+    // linhas, como os trabalhos e as vendas): repetir o pedido dá de novo, por isso o painel confirma.
+    'POST /api/admin/grant': async (req, body) => {
+      requireAdmin(req);
+      const user = String(body.user || '').trim().toLowerCase();
+      const p = user ? await db.one('SELECT id, display_name FROM players WHERE username=$1 OR email=$1', [user]) : null;
+      if (!p) throw new HttpError(404, 'Nenhum jogador com esse e-mail. Crie a conta no jogo primeiro.');
+      const amount = Number(body.amount);
+      if (!Number.isInteger(amount) || amount < 1 || amount > 100000) throw new HttpError(400, 'Valor inválido: de 1 a 100000 Brejais.');
+      const note = String(body.note || '').trim().slice(0, 80);
+      await db.tx((q) => q.run('INSERT INTO grants (id, player_id, amount, note, created_at) VALUES ($1,$2,$3,$4,$5)',
+        [crypto.randomUUID(), p.id, amount, note || null, now()]));
+      log(`B$ ${amount} para ${p.display_name}${note ? ` (${note})` : ''}`);
+      return { ok: true, displayName: p.display_name, amount };
+    },
+
     // LGPD: apagar uma conta e tudo ligado a ela, a pedido do jogador (Política de Privacidade).
     // Para não apagar por engano, o e-mail tem de ser digitado duas vezes.
     'POST /api/admin/delete-player': async (req, body) => {
@@ -676,6 +723,7 @@ export async function createApp({
         }
         await q.run('DELETE FROM friendships WHERE player_id=$1 OR friend_id=$1', [p.id]);
         await q.run('DELETE FROM trades WHERE from_id=$1 OR to_id=$1', [p.id]);
+        await q.run('DELETE FROM grants WHERE player_id=$1', [p.id]);
         if (p.email) await q.run('DELETE FROM email_codes WHERE email=$1', [p.email]);
         await q.run('DELETE FROM players WHERE id=$1', [p.id]);
       });

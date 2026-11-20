@@ -152,6 +152,15 @@ export const SCHEMA = [
     updated_at BIGINT NOT NULL,
     received_at BIGINT NOT NULL
   )`,
+  // Brejais dados pelo administrador (/admin → Dar Brejais). Entram no saldo, não no ranking de "Brejais ganhos".
+  `CREATE TABLE IF NOT EXISTS grants (
+    id TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    note TEXT,
+    created_at BIGINT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_grants_player ON grants (player_id)`,
   `CREATE INDEX IF NOT EXISTS idx_trades_from ON trades (from_id)`,
   `CREATE INDEX IF NOT EXISTS idx_trades_to ON trades (to_id)`,
   `CREATE INDEX IF NOT EXISTS idx_captures_player ON captures (player_id)`,
@@ -273,6 +282,12 @@ const MIGRATIONS = [
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_players_google ON players (google_sub)',
   // contas da organização (demonstração): não aparecem no ranking dos outros nem contam como jogadores externos
   'ALTER TABLE players ADD COLUMN staff INTEGER NOT NULL DEFAULT 0',
+  // velocidade no modo controle multiplicada (1 = normal; o administrador escolhe 2, 5 ou 10 no /admin)
+  'ALTER TABLE players ADD COLUMN speed_mult INTEGER NOT NULL DEFAULT 1',
+  // teletransporte pedido pelo administrador: o jogo da conta vai para esse ponto (modo controle) uma vez
+  'ALTER TABLE players ADD COLUMN teleport_lat DOUBLE PRECISION',
+  'ALTER TABLE players ADD COLUMN teleport_lng DOUBLE PRECISION',
+  'ALTER TABLE players ADD COLUMN teleport_at BIGINT',
   // aceite dos Termos de Uso e da Política de Privacidade (qual versão e quando)
   'ALTER TABLE players ADD COLUMN terms_version TEXT',
   'ALTER TABLE players ADD COLUMN terms_at BIGINT',

@@ -104,7 +104,7 @@ Rotas principais:
 | `POST /api/presence` | Informa a posição atual e recebe os jogadores por perto (a até 300 m) |
 | `GET /api/players/code?code=` | Busca jogador pelo código de amigo |
 | `GET /api/health`, `/healthz` | Verificação de disponibilidade |
-| `/api/admin/*` | Painel do servidor, cadastro de brejos e simulação de queda (exige `X-Admin-Key`) |
+| `/api/admin/*` | Painel do servidor, cadastro de brejos, simulação de queda e ferramentas do organizador: velocidade no modo controle por conta (1×, 2×, 5× ou 10×, com "Voltar ao normal"), teletransporte para coordenadas e Brejais dados a uma conta (tabela `grants`, somada ao saldo e fora do ranking) (exige `X-Admin-Key`) |
 
 ## 4. Estratégia de armazenamento local
 

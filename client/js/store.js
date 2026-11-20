@@ -239,6 +239,7 @@ class Store extends EventTarget {
     const purchases = new Map((s.purchases || []).map((b) => [b.item, { ...b, pending: false }]));
     const sales = new Map((s.sales || []).map((v) => [v.captureId, { ...v, pending: false }]));
     const trades = new Map((s.trades || []).map((t) => [t.id, { ...t, pending: false }]));
+    const grants = s.grants || [];   // Brejais dados pelo administrador
     const player = s.player ? { ...s.player } : this.session?.player ? { ...this.session.player } : null;
     const me = this.deviceId;
     const ensureExp = (id, at) => {
@@ -321,7 +322,7 @@ class Store extends EventTarget {
         case 'shop.buy': {
           // compra otimista: só entra se o saldo local cobrir (o servidor confere de novo)
           const car = carById(p.item);
-          const bal = balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()], friends.size);
+          const bal = balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()], friends.size, grants);
           if (car && !purchases.has(car.id) && bal >= car.price) purchases.set(car.id, { id: p.buyId, item: car.id, price: car.price, boughtAt: p.boughtAt, deviceId: me, pending: true });
           break;
         }
@@ -383,7 +384,8 @@ class Store extends EventTarget {
       jobsDone: new Set(jobs.keys()),
       purchases: [...purchases.values()],
       cars: new Set(purchases.keys()),
-      balance: balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()], friends.size),
+      balance: balanceOf([...jobs.values()], [...purchases.values()], [...sales.values()], friends.size, grants),
+      grants,
       sales: [...sales.values()].sort((a, b) => b.soldAt - a.soldAt),
       sold: new Set(sales.keys()),
       // o Meu Brejo: o que não foi vendido nem foi para um amigo numa troca

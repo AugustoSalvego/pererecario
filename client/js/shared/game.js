@@ -364,10 +364,12 @@ export const friendBonus = (friends) => Math.min(Math.max(0, Number(friends) || 
 // Saldo em Brejais: tudo o que os trabalhos pagaram menos tudo o que foi comprado.
 // saldo = trabalhos + vendas de pererecas + bônus de amigos − compras
 // (calculado, nunca guardado: reenviar não muda nada)
-export const balanceOf = (jobs, purchases, sales = [], friends = 0) =>
+// grants = Brejais dados pelo administrador no /admin (cada um é uma linha; nunca se soma duas vezes)
+export const balanceOf = (jobs, purchases, sales = [], friends = 0, grants = []) =>
   jobs.reduce((s, j) => s + (Number(j.pay) || 0), 0)
   + sales.reduce((s, v) => s + (Number(v.price) || 0), 0)
   + friendBonus(friends)
+  + grants.reduce((s, g) => s + (Number(g.amount) || 0), 0)
   - purchases.reduce((s, b) => s + (Number(b.price) || 0), 0);
 
 export const TRADE_TTL_MS = BALANCO.trocaValeHoras * 3600 * 1000;

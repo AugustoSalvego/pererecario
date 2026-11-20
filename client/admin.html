@@ -13,7 +13,7 @@
   header h1 { margin: 0; font-size: 24px; flex: 1; }
   header img { width: 44px; height: 44px; border-radius: 12px; }
   input, button, select { font: inherit; }
-  input { height: 40px; border-radius: 10px; border: 2px solid var(--line); padding: 0 10px; }
+  input, select { height: 40px; border-radius: 10px; border: 2px solid var(--line); padding: 0 10px; background: #fff; }
   button { height: 40px; border-radius: 10px; border: 0; padding: 0 14px; background: var(--leaf); color: #fff; font-weight: 600; cursor: pointer; }
   button.alt { background: #ff7a5c; } button.ghost { background: #fff; color: var(--ink); border: 2px solid var(--line); }
   main { padding: 20px 24px 60px; max-width: 1300px; margin: auto; }
@@ -75,6 +75,29 @@
         <button class="alt" id="ston">Marcar como organização</button>
         <button class="alt" id="stoff">Desmarcar</button>
         <span id="stmsg" class="muted"></span>
+      </div>
+      <p class="muted" style="margin-top:6px">Velocidade no modo Controle: deixa uma conta andar mais rápido com o joystick e o toque no mapa (a pé e de carro). No GPS não muda nada. Para tirar, use "Voltar ao normal". Vale na próxima sincronização do jogo dele (em até meio minuto).</p>
+      <div class="row" style="margin-bottom:12px">
+        <input id="spuser" placeholder="e-mail da conta" autocomplete="off" style="min-width:200px">
+        <select id="spmult"><option value="1">1× (normal)</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
+        <button class="alt" id="spgo">Aplicar velocidade</button>
+        <button class="ghost" id="spoff">Voltar ao normal</button>
+        <span id="spmsg" class="muted"></span>
+      </div>
+      <p class="muted" style="margin-top:6px">Teletransportar: cole as coordenadas do Google Maps (clique com o botão direito no mapa, ou segure o dedo no celular, e copie os números). O jogo da conta passa para o modo Controle e vai para lá na próxima sincronização (em até meio minuto, com o jogo aberto). O pedido vale por 10 minutos.</p>
+      <div class="row" style="margin-bottom:12px">
+        <input id="tpuser" placeholder="e-mail da conta" autocomplete="off" style="min-width:200px">
+        <input id="tpcoord" placeholder="-23.1068, -50.3602" autocomplete="off" style="min-width:190px">
+        <button class="alt" id="tpgo">Teletransportar</button>
+        <span id="tpmsg" class="muted"></span>
+      </div>
+      <p class="muted" style="margin-top:6px">Dar Brejais: o valor cai no saldo da conta (dá para comprar carro) e aparece um aviso no jogo dele. Não entra no ranking de "Brejais ganhos". Cada clique dá de novo.</p>
+      <div class="row" style="margin-bottom:12px">
+        <input id="gruser" placeholder="e-mail da conta" autocomplete="off" style="min-width:200px">
+        <input id="gramount" type="number" min="1" max="100000" step="1" placeholder="B$" style="width:90px">
+        <input id="grnote" placeholder="motivo (opcional)" maxlength="80" style="min-width:160px">
+        <button class="alt" id="grgo">Dar Brejais</button>
+        <span id="grmsg" class="muted"></span>
       </div>
       <p class="muted" style="margin-top:6px">Jogador pediu para apagar a conta (direito dele pela LGPD, como diz a Política de Privacidade)? Escreva o e-mail duas vezes. Apaga a conta e todo o progresso; não dá para desfazer (só restaurando um backup).</p>
       <div class="row" style="margin-bottom:12px">
@@ -164,6 +187,38 @@ $('#dlgo').addEventListener('click', async () => {
     load();
   } catch (e) { $('#dlmsg').textContent = `Erro: ${e.message}`; }
 });
+async function setSpeed(mult) {
+  const user = $('#spuser').value.trim();
+  if (!user) { $('#spmsg').textContent = 'Informe o e-mail da conta.'; return; }
+  try {
+    const d = await call('POST', '/api/admin/speed', { user, mult });
+    $('#spmsg').textContent = d.mult === 1 ? `Pronto: ${d.displayName} voltou à velocidade normal.` : `Pronto: ${d.displayName} anda ${d.mult}× mais rápido no modo Controle.`;
+    load();
+  } catch (e) { $('#spmsg').textContent = `Erro: ${e.message}`; }
+}
+$('#spgo').addEventListener('click', () => setSpeed(Number($('#spmult').value)));
+$('#spoff').addEventListener('click', () => { $('#spmult').value = '1'; setSpeed(1); });
+$('#tpgo').addEventListener('click', async () => {
+  const user = $('#tpuser').value.trim();
+  const nums = ($('#tpcoord').value.match(/-?\d+(?:[.,]\d+)?/g) || []).map((n) => Number(n.replace(',', '.')));
+  if (!user) { $('#tpmsg').textContent = 'Informe o e-mail da conta.'; return; }
+  if (nums.length < 2) { $('#tpmsg').textContent = 'Cole a latitude e a longitude, por exemplo: -23.1068, -50.3602'; return; }
+  try {
+    const d = await call('POST', '/api/admin/teleport', { user, lat: nums[0], lng: nums[1] });
+    $('#tpmsg').textContent = `Pronto: ${d.displayName} vai para ${d.lat.toFixed(5)}, ${d.lng.toFixed(5)} na próxima sincronização.`;
+  } catch (e) { $('#tpmsg').textContent = `Erro: ${e.message}`; }
+});
+$('#grgo').addEventListener('click', async () => {
+  const user = $('#gruser').value.trim(), amount = Number($('#gramount').value), note = $('#grnote').value.trim();
+  if (!user) { $('#grmsg').textContent = 'Informe o e-mail da conta.'; return; }
+  if (!Number.isInteger(amount) || amount < 1 || amount > 100000) { $('#grmsg').textContent = 'Valor de 1 a 100000.'; return; }
+  if (!confirm(`Dar B$ ${amount} para ${user}?`)) return;
+  try {
+    const d = await call('POST', '/api/admin/grant', { user, amount, note });
+    $('#grmsg').textContent = `Pronto: caiu B$ ${d.amount} na conta de ${d.displayName}.`;
+    $('#gramount').value = '';
+  } catch (e) { $('#grmsg').textContent = `Erro: ${e.message}`; }
+});
 $('#ston').addEventListener('click', () => setStaff(true));
 $('#stoff').addEventListener('click', () => setStaff(false));
 $('#rpgo').addEventListener('click', async () => {
@@ -201,7 +256,7 @@ async function load() {
     $('#cards').innerHTML = [['Jogando agora', d.online ?? 0], ['Jogadores externos', c.external ?? c.players], ['Externos ativos nas últimas 24 h', c.activeExternal ?? c.activeToday], ['Contas da organização', c.staff ?? 0], ['Capturas', c.captures], ['Operações recebidas', c.operations], ['Reenvios ignorados', c.resends], ['Conflitos resolvidos', c.conflicts], ['Operações rejeitadas', c.rejected]]
       .map(([k, v]) => `<div class="card"><b>${v}</b><span>${k}</span></div>`).join('');
     $('#outage').textContent = d.outageUntil > d.serverTime ? `Servidor "fora do ar" por mais ${Math.round((d.outageUntil - d.serverTime) / 1000)} s` : 'Servidor no ar';
-    table($('#players'), [['#', (r) => r.i], ['Apelido', (r) => esc(r.display_name) + (r.staff ? ' <span class="tag duplicate">organização</span>' : '')], ['E-mail', (r) => esc(r.email || `@${r.username}`) + (r.google ? ' <span class="tag applied">Google</span>' : '')], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
+    table($('#players'), [['#', (r) => r.i], ['Apelido', (r) => esc(r.display_name) + (r.staff ? ' <span class="tag duplicate">organização</span>' : '') + (r.speedMult > 1 ? ` <span class="tag conflict">${r.speedMult}× velocidade</span>` : '')], ['E-mail', (r) => esc(r.email || `@${r.username}`) + (r.google ? ' <span class="tag applied">Google</span>' : '')], ['Nível', (r) => r.level], ['XP', (r) => r.xp], ['Espécies', (r) => r.species], ['Capturas', (r) => r.captures], ['Criado', (r) => t(r.created_at)]],
       [...d.players].sort((a, b) => b.xp - a.xp).map((r, i) => ({ ...r, i: i + 1 })));
     table($('#captures'), [['Jogador', (r) => esc(r.username)], ['Espécie', (r) => esc(r.species_id.replace('frog_', ''))], ['Tipo', (r) => r.kind], ['Modo', (r) => (r.mode === 'controle' ? '🎮 controle' : r.mode === 'presente' ? '🎁 presente' : '📍 GPS')], ['Aparelho', (r) => esc(r.device_id)], ['Capturada', (r) => t(r.caught_at)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.caught_at)}</span>`]], d.captures);
     table($('#ops'), [['Recebida', (r) => t(r.received_at)], ['Jogador', (r) => esc(r.username)], ['Tipo', (r) => r.type], ['Resultado', (r) => `<span class="tag ${r.status}">${r.status}</span>`], ['Aparelho', (r) => esc(r.device_id)], ['op_id', (r) => r.op_id.slice(0, 8)], ['Atraso', (r) => `<span class="late">${dur(r.received_at - r.client_ts)}</span>`]], d.operations);
