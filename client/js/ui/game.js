@@ -373,7 +373,9 @@ function renderGpsChip() {
   const ctl = geo.mode === 'sim';
   const btn = $('.mode-btn');
   btn.className = `mode-btn ${ctl ? 'controle' : ''}`;
-  btn.innerHTML = ctl ? `${icons.gamepad}Controle` : `${icons.gps}GPS`;
+  // o "toque para mudar" embaixo mostra que é um botão (muita gente não percebia que dava para trocar)
+  btn.innerHTML = `${ctl ? icons.gamepad : icons.gps}<span class="mb-txt"><b>${ctl ? 'Controle' : 'GPS'}</b><small>toque para mudar</small></span>`;
+  btn.setAttribute('aria-label', `Modo de andar: ${ctl ? 'Controle' : 'GPS'}. Toque para mudar.`);
   $('#game').classList.toggle('controle', ctl);
   $('.joystick').classList.toggle('hidden', !ctl);
   $('.shake-btn').classList.remove('hidden');   // o botão fica sempre: serve de reserva se chacoalhar não funcionar

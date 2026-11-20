@@ -717,8 +717,8 @@ svg { display: block; }
 @keyframes objIn { from { opacity: 0; } }
 
 /* ---------- modo de andar (GPS / controle) ---------- */
-.mode-btn { display: flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 99px; background: rgba(255,255,255,.95); font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 rgba(23,53,42,.15); color: var(--ink); white-space: nowrap; }
-.mode-btn svg { width: 17px; height: 17px; }
+.mode-btn { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 5px 13px 5px 11px; border-radius: 18px; background: rgba(255,255,255,.95); font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 rgba(23,53,42,.15); color: var(--ink); white-space: nowrap; }
+.mode-btn svg { width: 17px; height: 17px; flex: none; }
 .mode-btn.controle svg { color: #4a7fd6; }
 .mode-btn:not(.controle) svg { color: var(--leaf-dark); }
 .joystick { position: absolute; left: 16px; bottom: calc(var(--safe-bottom) + 104px); z-index: 6; }
@@ -1204,7 +1204,7 @@ form.login-card > button[type=submit] { margin-top: auto; }
 .ts-dot { width: 8px; height: 8px; border-radius: 50%; background: #34b44a; }
 .ts-mode { box-shadow: 0 0 0 3px var(--sun), 0 2px 0 rgba(23,53,42,.14); }
 .ts-tap { position: absolute; left: 50%; top: 50%; margin: -17px 0 0 -17px; border-color: rgba(47,138,50,.75); background: rgba(76,185,68,.22); }
-.ts-callout { position: absolute; right: 90px; top: 48px; background: var(--sun); color: #4a3200; font-weight: 700; font-size: 13.5px; padding: 8px 12px; border-radius: 14px; white-space: nowrap; box-shadow: 0 3px 0 rgba(74,50,0,.18); }
+.ts-callout { position: absolute; right: 146px; top: 52px; background: var(--sun); color: #4a3200; font-weight: 700; font-size: 13.5px; padding: 8px 12px; border-radius: 14px; white-space: nowrap; box-shadow: 0 3px 0 rgba(74,50,0,.18); }
 .ts-callout::after { content: ''; position: absolute; right: -9px; top: 50%; margin-top: -7px; border-style: solid; border-width: 7px 0 7px 9px; border-color: transparent transparent transparent var(--sun); }
 .ts-path { position: absolute; left: 0; top: 0; width: 300px; height: 220px; }
 .ts-char { position: absolute; left: 128px; top: 62px; }
@@ -1215,3 +1215,10 @@ form.login-card > button[type=submit] { margin-top: auto; }
 .ts-joy { position: absolute; left: 18px; bottom: 16px; width: 76px; height: 76px; border-radius: 50%; background: rgba(255,255,255,.55); border: 3px solid rgba(255,255,255,.95); box-shadow: 0 3px 0 rgba(23,53,42,.15); }
 .ts-joy i { position: absolute; left: 18px; top: 18px; width: 34px; height: 34px; border-radius: 50%; background: var(--leaf); box-shadow: 0 3px 0 var(--leaf-dark); animation: joyNudge 1.6s ease-in-out infinite; }
 @keyframes joyNudge { 0%, 100% { transform: translate(-8px, 4px); } 50% { transform: translate(10px, -7px); } }
+
+/* botão GPS / Controle com "toque para mudar" embaixo (no jogo e no desenho do tutorial) */
+.mode-btn .mb-txt, .ts-pill .mb-txt { display: flex; flex-direction: column; align-items: center; line-height: 1.08; text-align: center; }
+.mode-btn .mb-txt b { font-size: 13.5px; font-weight: 700; }
+.mode-btn .mb-txt small, .ts-pill .mb-txt small { font-size: 10px; font-weight: 600; color: var(--ink-soft); letter-spacing: .01em; }
+.ts-pill.ts-mode, .ts-pill.small { height: auto; padding: 4px 11px 4px 9px; border-radius: 15px; }
+.ts-pill .mb-txt b { font-size: 12.5px; }

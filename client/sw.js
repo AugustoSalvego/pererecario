@@ -3,7 +3,7 @@
 //  - tiles do mapa e fontes guardados conforme são usados (cache-first);
 //  - chamadas /api/* NUNCA passam pelo cache: o próprio app trata o offline
 //    com IndexedDB e fila de sincronização.
-const VERSION = 'pererecario-v1.33.0';
+const VERSION = 'pererecario-v1.33.1';
 const SHELL = `${VERSION}-shell`;
 const TILES = 'pererecario-tiles';
 const FONTS = 'pererecario-fonts';

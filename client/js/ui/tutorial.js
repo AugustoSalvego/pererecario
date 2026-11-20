@@ -21,10 +21,10 @@ function modeSlides(look) {
           <div class="ts-player"><i></i><span></span></div>
           <div class="ts-col">
             <span class="ts-pill"><i class="ts-dot"></i>Online</span>
-            <span class="ts-pill ts-mode">${icons.gps}GPS<span class="tut-tap ts-tap"></span></span>
+            <span class="ts-pill ts-mode">${icons.gps}<span class="mb-txt"><b>GPS</b><small>toque para mudar</small></span><span class="tut-tap ts-tap"></span></span>
             <span class="ts-pill">B$ 120</span>
           </div>
-          <div class="ts-callout">Toque aqui para trocar!</div>
+          <div class="ts-callout">Toque aqui!</div>
         </div>`,
     },
     {
@@ -36,7 +36,7 @@ function modeSlides(look) {
           <div class="ts-char">${charHtml(look, { dir: 'right', walking: true, scale: 1.9 })}</div>
           <span class="tut-tap ts-tap2"></span><span class="ts-label t2">ou toque no mapa</span>
           <div class="ts-joy"><i></i></div><span class="ts-label t1">arraste</span>
-          <span class="ts-pill ctl small">${icons.gamepad}Controle</span>
+          <span class="ts-pill ctl small">${icons.gamepad}<span class="mb-txt"><b>Controle</b><small>toque para mudar</small></span></span>
         </div>`,
     },
     {
