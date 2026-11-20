@@ -2,6 +2,7 @@
 //  - SQLite (node:sqlite, embutido no Node 22) para rodar localmente e nos testes;
 //  - PostgreSQL (pacote "pg") quando a variável DATABASE_URL existe (ex.: Render).
 // O SQL usa placeholders $1, $2...; no SQLite eles viram ?1, ?2...
+import { backfillNameKeys } from './names.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -293,6 +294,9 @@ const MIGRATIONS = [
   'ALTER TABLE players ADD COLUMN terms_at BIGINT',
   // perereca que saiu numa troca: continua contando XP para quem pegou, mas sai da bolsa
   'ALTER TABLE captures ADD COLUMN traded_at BIGINT',
+  // apelido único: name_key é o apelido limpo (ver server/names.js); o índice único impede repetir
+  'ALTER TABLE players ADD COLUMN name_key TEXT',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_players_name_key ON players (name_key)',
 ];
 
 export async function openDb({ url = process.env.DATABASE_URL, file = process.env.SQLITE_PATH || 'data/pererecario.db' } = {}) {
@@ -303,5 +307,6 @@ export async function openDb({ url = process.env.DATABASE_URL, file = process.en
       if (!/duplicate column|already exists/i.test(e.message)) throw e;
     }
   }
+  await backfillNameKeys(db);
   return db;
 }

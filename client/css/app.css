@@ -997,6 +997,10 @@ svg { display: block; }
 .field .eye { position: absolute; right: 8px; top: 8px; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: #8aa695; background: none; }
 .field .eye svg { position: static; width: 22px; height: 22px; }
 .pw-hint { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; margin: -4px 4px 4px; }
+.name-hint { font-size: 12.5px; font-weight: 700; margin: -4px 4px 8px; }
+.name-hint:empty { display: none; }
+.name-hint[data-state=ok] { color: #2f8f4e; }
+.name-hint[data-state=bad] { color: #c8432b; }
 .nick-card h3 { margin: 2px 0 6px; font-size: 22px; }
 .nick-lead { color: var(--ink-soft); font-size: 14.5px; margin: 0 0 14px; line-height: 1.35; }
 .g-badge { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 14px; color: #fff; background: conic-gradient(#ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); box-shadow: 0 2px 0 rgba(0,0,0,.12); }

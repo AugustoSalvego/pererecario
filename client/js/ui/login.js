@@ -118,6 +118,7 @@ export function renderLogin(onDone, config = {}) {
       <div class="google-area hidden"><div class="g-slot"></div><div class="or"><span>ou com e-mail</span></div></div>
       <div class="segmented"><button type="button" data-mode="login" class="on">Entrar</button><button type="button" data-mode="register">Criar conta</button></div>
       <label class="field reg-only hidden">${icons.sparkle}<input name="displayName" autocomplete="nickname" placeholder="Seu apelido no jogo" maxlength="24"></label>
+      <div class="name-hint reg-only hidden" aria-live="polite"></div>
       <label class="field">${icons.mail}<input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="Seu e-mail (Gmail)" maxlength="254"></label>
       <label class="field pw">${icons.key}<input name="password" type="password" autocomplete="current-password" placeholder="Senha"><button type="button" class="eye" aria-label="Mostrar senha">${icons.eye}</button></label>
       <div class="pw-hint reg-only hidden">Mínimo de 8 caracteres.</div>
@@ -131,6 +132,7 @@ export function renderLogin(onDone, config = {}) {
       <h3>Quase lá! 🐸</h3>
       <p class="nick-lead">Como você quer ser chamado no jogo? É o nome que aparece no mapa e no ranking.</p>
       <label class="field">${icons.sparkle}<input name="nick" autocomplete="nickname" placeholder="Seu apelido" maxlength="24"></label>
+      <div class="name-hint" aria-live="polite"></div>
       <label class="terms-check"><input type="checkbox" name="terms"><span>Li e concordo com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</span></label>
       <div class="form-error nick-error"></div>
       <button class="btn block" type="button" data-act="nick-ok">Começar a caçar</button>
@@ -249,6 +251,7 @@ export function renderLogin(onDone, config = {}) {
         showCard(nickCard);
         const inp = $('input[name=nick]', nickCard);
         inp.value = r.suggestion || '';
+        inp.dispatchEvent(new Event('input'));
         setTimeout(() => inp.focus(), 50);
         sfx.pop();
         return;
@@ -281,6 +284,8 @@ export function renderLogin(onDone, config = {}) {
     pendingCredential = null;
     showCard(form);
   });
+  watchName($('input[name=nick]', nickCard), $('.name-hint', nickCard));
+  watchName(form.displayName, $('.name-hint', form));
   googleClientId(config).then(async (id) => {
     clientId = id;
     if (!id) return;
@@ -545,5 +550,27 @@ export function renderLogin(onDone, config = {}) {
       submit.disabled = false;
       submit.textContent = mode === 'register' ? 'Criar minha conta' : 'Entrar no brejo';
     }
+  });
+}
+
+// Enquanto a pessoa digita o apelido, pergunta ao servidor se ele está livre (espera ela parar
+// de digitar por um instante). É só um aviso: a regra de verdade é conferida ao criar a conta.
+// Maiúscula/minúscula e acento contam: "Duzão" e "duzao" são apelidos diferentes.
+function watchName(input, hint) {
+  let timer = null, seq = 0;
+  const show = (state, text) => { hint.dataset.state = state; hint.textContent = text; };
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const my = ++seq;
+    const v = input.value.trim();
+    if (v.length < 2) { show('', ''); return; }
+    timer = setTimeout(async () => {
+      try {
+        const r = await api.get(`/api/auth/name?n=${encodeURIComponent(v)}`, { timeout: 6000 });
+        if (my !== seq) return;   // a pessoa já digitou outra coisa
+        if (r.available) show('ok', '✓ Apelido disponível');
+        else show('bad', `✗ ${r.reason || 'Esse apelido já está em uso. Escolha outro.'}`);
+      } catch { if (my === seq) show('', ''); }   // sem internet: sem aviso (o cadastro avisa)
+    }, 400);
   });
 }

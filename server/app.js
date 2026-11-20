@@ -9,6 +9,7 @@ import { exportAll } from './backup.js';
 import { makeGoogleVerifier, GoogleError } from './google.js';
 import { mailerFromEnv, codeEmail } from './mailer.js';
 import { TERMS_VERSION } from './terms.js';
+import { cleanName, NAME_TAKEN, isNameConflict } from './names.js';
 import { hash32, maskFromSpecies, xpBreakdown, levelFor, distanceM, MIN_BREJO_GAP_M, validLook, carById } from '../client/js/shared/game.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,7 +35,6 @@ export function loadCatalog() {
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const NO_PASSWORD = '!sem-senha';                    // conta só com Google: nenhuma senha confere
 const hasPassword = (p) => String(p?.pass_hash || '').startsWith('scrypt$');
-const cleanName = (s) => String(s || '').trim().replace(/\s+/g, ' ');
 const TERMS_NEEDED = 'Para criar a conta, marque que você leu e concorda com os Termos de Uso e a Política de Privacidade.';
 
 // Código de 6 números por e-mail: vale 15 minutos, 5 tentativas, reenvio depois de 1 minuto
@@ -160,18 +160,29 @@ export async function createApp({
     return `j${crypto.randomUUID().slice(0, 12)}`;
   }
 
+  // Apelido já usado por outra conta? (comparação exata depois de limpar: ver server/names.js)
+  const nameTaken = async (q, name) => !!(await q.one('SELECT id FROM players WHERE name_key=$1', [cleanName(name)]));
+
   async function createPlayer({ username = null, displayName, passHash, email = null, googleSub = null, emailVerified = 0, terms = false }) {
     const id = crypto.randomUUID();
-    await db.tx(async (q) => {
-      let code;
-      do { code = friendCode(); } while (await q.one('SELECT id FROM players WHERE friend_code=$1', [code]));
-      const uname = username || (await uniqueUsername(q, email ? email.split('@')[0] : displayName));
-      await q.run(
-        `INSERT INTO players (id, username, display_name, pass_hash, avatar, avatar_ts, friend_code, created_at, email, google_sub, email_verified, terms_version, terms_at)
-         VALUES ($1,$2,$3,$4,'frog_leaf',0,$5,$6,$7,$8,$9,$10,$11)`,
-        [id, uname, displayName, passHash, code, now(), email, googleSub, emailVerified, terms ? TERMS_VERSION : null, terms ? now() : null],
-      );
-    });
+    const name = cleanName(displayName);
+    try {
+      await db.tx(async (q) => {
+        if (await nameTaken(q, name)) throw new HttpError(409, NAME_TAKEN);
+        let code;
+        do { code = friendCode(); } while (await q.one('SELECT id FROM players WHERE friend_code=$1', [code]));
+        const uname = username || (await uniqueUsername(q, email ? email.split('@')[0] : name));
+        await q.run(
+          `INSERT INTO players (id, username, display_name, name_key, pass_hash, avatar, avatar_ts, friend_code, created_at, email, google_sub, email_verified, terms_version, terms_at)
+           VALUES ($1,$2,$3,$4,$5,'frog_leaf',0,$6,$7,$8,$9,$10,$11,$12)`,
+          [id, uname, name, name, passHash, code, now(), email, googleSub, emailVerified, terms ? TERMS_VERSION : null, terms ? now() : null],
+        );
+      });
+    } catch (e) {
+      // dois cadastros com o mesmo apelido ao mesmo tempo: o índice único do banco segura o segundo
+      if (isNameConflict(e)) throw new HttpError(409, NAME_TAKEN);
+      throw e;
+    }
     return id;
   }
 
@@ -293,6 +304,7 @@ export async function createApp({
         if (name.length < 2 || name.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
         if (password.length < 8) throw new HttpError(400, 'A senha precisa de pelo menos 8 caracteres');
         if (await db.one('SELECT id FROM players WHERE username=$1', [username])) throw new HttpError(409, 'Esse usuário já existe');
+        if (await nameTaken(db, name)) throw new HttpError(409, NAME_TAKEN);
         const id = await createPlayer({ username, displayName: name, passHash: await hashPassword(password) });
         log(`novo jogador: ${username}`);
         return session(id);
@@ -301,6 +313,7 @@ export async function createApp({
       if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, 'Esse e-mail não parece certo');
       if (password.length < 8) throw new HttpError(400, 'A senha precisa de pelo menos 8 caracteres');
       if (body.acceptTerms !== true) throw new HttpError(400, TERMS_NEEDED);
+      if (await nameTaken(db, displayName)) throw new HttpError(409, NAME_TAKEN);
       const same = await db.one('SELECT * FROM players WHERE email=$1', [email]);
       if (same) {
         throw new HttpError(409, same.google_sub && !hasPassword(same)
@@ -425,6 +438,7 @@ export async function createApp({
       if (!displayName) return { needsNickname: true, suggestion: (g.givenName || g.name || '').slice(0, 24) };
       if (displayName.length < 2 || displayName.length > 24) throw new HttpError(400, 'O apelido deve ter de 2 a 24 caracteres');
       if (body.acceptTerms !== true) throw new HttpError(400, TERMS_NEEDED);
+      if (await nameTaken(db, displayName)) throw new HttpError(409, NAME_TAKEN);
       const id = await createPlayer({ displayName, passHash: NO_PASSWORD, email: g.email, googleSub: g.sub, emailVerified: g.email ? 1 : 0, terms: true });
       log(`novo jogador (Google): ${displayName}`);
       return session(id, { created: true });
@@ -462,6 +476,16 @@ export async function createApp({
     },
 
     'GET /api/brejos': async () => brejos(),
+
+    // O apelido está livre? (o cadastro avisa enquanto a pessoa digita; a regra mesmo é conferida
+    // de novo na hora de criar a conta)
+    'GET /api/auth/name': async (req, body, url) => {
+      limit(clientIp(req), 'name', 90);
+      const name = cleanName(url.searchParams.get('n'));
+      if (name.length < 2 || name.length > 24) return { name, available: false, reason: 'O apelido deve ter de 2 a 24 caracteres' };
+      const taken = await nameTaken(db, name);
+      return { name, available: !taken, reason: taken ? NAME_TAKEN : null };
+    },
 
     'POST /api/sync': async (req, body) => {
       const playerId = auth(req);

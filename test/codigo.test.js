@@ -303,3 +303,29 @@ test('carteiro do Brevo: endereço, chave e formato certos; erro do Brevo vira f
   assert.ok(body.htmlContent.includes('Ana &lt;b&gt;'));
   await assert.rejects(send({ to: 'ana@codigo.test', ...msg }), /400/);
 });
+
+test('apelido em uso: avisa antes de mandar o código; se alguém pegar o nome no meio, o código não cria a conta', async () => {
+  tick();
+  const first = await call('POST', '/api/auth/register', { displayName: 'Rã do Código', email: 'ra1@codigo.test', password: 'senha123' });
+  assert.equal(first.body.needsCode, true);
+  // um segundo cadastro com o mesmo apelido, antes do primeiro confirmar: o nome ainda está livre
+  tick();
+  const second = await call('POST', '/api/auth/register', { displayName: 'Rã do Código', email: 'ra2@codigo.test', password: 'senha123' });
+  assert.equal(second.body.needsCode, true);
+  // o primeiro confirma e fica com o nome
+  tick();
+  const ok = await call('POST', '/api/auth/register/confirm', { ticket: first.body.ticket, code: codeFor('ra1@codigo.test') });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  // o segundo confirma depois: recusado com o aviso, e nenhuma conta nasce
+  tick();
+  const late = await call('POST', '/api/auth/register/confirm', { ticket: second.body.ticket, code: codeFor('ra2@codigo.test') });
+  assert.equal(late.status, 409);
+  assert.equal(late.body.error, 'Esse apelido já está em uso. Escolha outro.');
+  assert.equal(await db.one("SELECT id FROM players WHERE email='ra2@codigo.test'"), null);
+  // e quem tenta o nome agora é avisado antes de receber qualquer e-mail
+  tick();
+  const before = mailsTo('ra3@codigo.test');
+  const third = await call('POST', '/api/auth/register', { displayName: 'Rã do Código', email: 'ra3@codigo.test', password: 'senha123' });
+  assert.equal(third.status, 409);
+  assert.equal(mailsTo('ra3@codigo.test'), before, 'não pode mandar e-mail para um apelido ocupado');
+});

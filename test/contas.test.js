@@ -78,6 +78,20 @@ test('criar conta com apelido, e-mail e senha; entrar com e-mail e senha', async
   assert.equal(wrong.status, 401);
 });
 
+test('Google: apelido já em uso é recusado e a conta só nasce com um apelido livre', async () => {
+  clock += 61_000;
+  const owner = await call('POST', '/api/auth/register', { displayName: 'Sapo Único', email: 'sapo.unico@teste.com', password: 'senha123' });
+  assert.equal(owner.status, 200, JSON.stringify(owner.body));
+  const cred = () => idToken({ sub: '2900', email: 'sapo.copia@gmail.com', given_name: 'Sapo' });
+  const dup = await call('POST', '/api/auth/google', { credential: cred(), displayName: 'Sapo Único' });
+  assert.equal(dup.status, 409);
+  assert.equal(dup.body.error, 'Esse apelido já está em uso. Escolha outro.');
+  assert.equal((await call('POST', '/api/auth/google', { credential: cred() })).body.needsNickname, true, 'a conta não pode ter nascido');
+  const ok = await call('POST', '/api/auth/google', { credential: cred(), displayName: 'Sapo único' });   // "ú" minúsculo: outro nome
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.player.displayName, 'Sapo único');
+});
+
 test('Google: conta nova pede o apelido, cria a conta e depois entra na mesma', async () => {
   clock += 61_000;
   const first = await call('POST', '/api/auth/google', { credential: idToken({ sub: '2001', email: 'joao@gmail.com', given_name: 'João' }) });

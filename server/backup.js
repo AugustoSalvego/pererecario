@@ -3,6 +3,7 @@
 // .github/workflows/backup.yml) e pelo script scripts/restaurar_backup.js.
 // A restauração só acrescenta: linha que já existe (mesma chave) é mantida como está, então
 // restaurar duas vezes, ou num banco que já tem parte dos dados, não duplica nada.
+import { backfillNameKeys } from './names.js';
 
 export const TABLES = [
   'players', 'brejos', 'captures', 'expeditions', 'expedition_distance', 'friendships',
@@ -29,7 +30,9 @@ export async function importAll(db, data) {
       const rows = Array.isArray(data.tables[t]) ? data.tables[t] : [];
       let n = 0;
       for (const row of rows) {
-        const cols = Object.keys(row).filter((c) => /^[a-z_]+$/.test(c));
+        // name_key (apelido único) não vem do arquivo: é recalculado depois, para um nome repetido
+        // nunca fazer o banco pular a conta inteira (ON CONFLICT DO NOTHING)
+        const cols = Object.keys(row).filter((c) => /^[a-z_]+$/.test(c) && !(t === 'players' && c === 'name_key'));
         if (!cols.length) continue;
         const sql = `INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) ON CONFLICT DO NOTHING`;
         const res = await q.run(sql, cols.map((c) => row[c]));
@@ -38,5 +41,6 @@ export async function importAll(db, data) {
       added[t] = n;
     }
   });
+  await backfillNameKeys(db);
   return added;
 }
