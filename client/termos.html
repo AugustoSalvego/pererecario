@@ -46,12 +46,12 @@
 <p>Como os seus dados são usados está explicado na <a href="privacidade.html">Política de Privacidade</a>.</p>
 
 <h2>Contato</h2>
-<p>Dúvidas ou pedidos: <span class="contato">a página do projeto no GitHub (<a href="https://github.com/AugustoSalvego/pererecario/issues">github.com/AugustoSalvego/pererecario/issues</a>)</span>.</p>
+<p>Dúvidas ou pedidos: <span class="contato">o e-mail <a href="mailto:suporte.pererecario@gmail.com">suporte.pererecario@gmail.com</a></span>.</p>
 </div>
 <footer><a href="/">Voltar ao jogo</a> · <a href="privacidade.html">Política de Privacidade</a></footer>
 </main>
 <script>
-  // e-mail de contato do jogo (o mesmo que manda os códigos); sem ele, o contato é pelo GitHub
+  // e-mail de contato: o padrão é o do suporte; CONTACT_EMAIL ou EMAIL_FROM no servidor trocam por outro
   fetch('/api/config').then((r) => r.json()).then((c) => {
     if (!c.contactEmail) return;
     document.querySelectorAll('.contato').forEach((el) => { el.innerHTML = `o e-mail <a href="mailto:${c.contactEmail}">${c.contactEmail}</a>`; });
